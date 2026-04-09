@@ -1,0 +1,36 @@
+/*
+ * StatusLED.c
+ *
+ * Created: 14-11-2022 22:47:50
+ *  Author: Roel Smeets
+ */ 
+
+///////////////////////////////////////////////////////////////////////////////
+// system includes
+
+#include <asf.h>
+#include <stdbool.h>
+
+///////////////////////////////////////////////////////////////////////////////
+// application includes
+
+#include "DeviceIOLib.h"
+#include "StatusLED.h"
+
+///////////////////////////////////////////////////////////////////////////////
+// void stled_Init(void)
+
+void stled_Init(void)
+{
+	dio_SetPinDirection(PIN_STATUS_LED, IOPORT_DIR_OUTPUT);
+	dio_SetPin(PIN_STATUS_LED, false);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+// void stled_Toggle(void)
+
+void stled_Toggle(void)
+{
+	dio_TogglePin(PIN_STATUS_LED);	
+}

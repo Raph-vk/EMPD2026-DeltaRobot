@@ -1,0 +1,26 @@
+/*
+ * TaskSleep.c
+ *
+ * Created: 16-11-2022 19:15:58
+ *  Author: Roel Smeets
+ */ 
+
+///////////////////////////////////////////////////////////////////////////////
+// system includes
+
+#include <asf.h>
+#include <stdbool.h>
+
+///////////////////////////////////////////////////////////////////////////////
+// application includes
+
+#include "TaskSleep.h"
+
+///////////////////////////////////////////////////////////////////////////////
+// void taskSleep (uint32_t sleepMs)
+
+void taskSleep (uint32_t sleepMs)
+{
+	vTaskDelay((TickType_t)  ( sleepMs / portTICK_PERIOD_MS) );
+
+}
