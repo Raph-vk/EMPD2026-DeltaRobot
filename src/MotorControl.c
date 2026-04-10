@@ -32,7 +32,6 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // void motor_DisplayStatus(void)
-
 void motor_DisplayStatus(void)
 {
 	uint8_t portInValue = 0;
@@ -69,7 +68,6 @@ void motor_DisplayStatus(void)
 
 ///////////////////////////////////////////////////////////////////////////////
 // bool motor_HasOverload(void)
-
 bool motor_HasOverload(void)
 {
 	bool overload = true;

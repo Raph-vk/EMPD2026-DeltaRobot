@@ -32,17 +32,15 @@ Deze file is de centrale opstart van de applicatie.
 
 static TaskHandle_t handle_InputHandlerTask	= NULL;
 static TaskHandle_t handle_ContolTask		= NULL;
-static TaskHandle_t handle_MotionControlTask= NULL;
 
 ///////////////////////////////////////////////////////////////////////////////
 // global handles & objects
 
 EventGroupHandle_t	handle_ThreadEventGroup = NULL;
-SemaphoreHandle_t	handle_StartSemaphore = NULL;
-SemaphoreHandle_t	handle_StopSemaphore = NULL;
-SemaphoreHandle_t	handle_ResetSemaphore = NULL;
+EventGroupHandle_t	handle_ButtonEventGroup = NULL;
+
 SemaphoreHandle_t	TimerInterruptSemaphore = NULL;
-SemaphoreHandle_t	handle_NoodSemaphore = NULL;
+SemaphoreHandle_t	handle_EmergencySemaphore = NULL;
 
 //QueueHandle_t		handle_ParameterQueue	= NULL;
 
@@ -63,46 +61,35 @@ void StartApplicationTasks(void)
 		//Foutafhandeling is leeggelaten
 	//}
 	
-	// Aanmaken van Semaphore voor Knoppen, communicatie tussen InputHandlerTask -> ControlTask.
-
-	// restart button semaphore
-	handle_NoodSemaphore = xSemaphoreCreateBinary();
-		if (handle_noodSemaphore == NULL)
-		{
-			// Foutafhandeling is leeggelaten
-		}
-	handle_StartSemaphore = xSemaphoreCreateBinary();
-		if (handle_StartSemaphore == NULL)
-		{
-			// Foutafhandeling is leeggelaten
-		}
-	// restart button semaphore
-	handle_StopSemaphore = xSemaphoreCreateBinary();
-		if (handle_StopSemaphore == NULL)
-		{
-			// Foutafhandeling is leeggelaten
-		}
-	// restart button semaphore
-	handle_ResetSemaphore = xSemaphoreCreateBinary();
-		if (handle_ResetSemaphore == NULL)
-		{
-			// Foutafhandeling is leeggelaten
-		}
-	
-
-	// Event group aanmaken, Deze wordt gebruikt om te wachten tot alle taken klaar zijn met opstarten.
-	// Wanneer parameter setting taak & button handler taak zijn opgestart wordt controltaak pas opgestart.
-	//// event group to wait for parameter setting task & button handler task before
-	//// running the control task on startup
+	// Event group aanmaken voor knoppen, communicatie tussen ButtonHandlerTask -> ControlTask.
 	handle_ThreadEventGroup = xEventGroupCreate();
 	if (handle_ThreadEventGroup == NULL)
 	{
 		// Foutafhandeling is leeggelaten
 	}
 	
+	// Event group aanmaken, Deze wordt gebruikt om te wachten tot alle taken klaar zijn met opstarten.
+	// Wanneer parameter setting taak & button handler taak zijn opgestart wordt controltaak pas opgestart.
+	//// event group to wait for parameter setting task & button handler task before
+	//// running the control task on startup
+	handle_ButtonEventGroup = xEventGroupCreate();
+	if (handle_ButtonEventGroup == NULL)
+	{
+		// Foutafhandeling is leeggelaten
+	}
+	
+	// EmergencySmephore aanmaken
+	handle_EmergencySemaphore = xSemaphoreCreateBinary();
+	if (handle_EmergencySemaphore == NULL)
+	{
+		// Foutafhandeling is leeggelaten
+	}	
+	
+
+	
 	/**************************************************** Taken aanmaken ****************************************************/
 	// De taken worden aangemaakt en in de ready list geplaatst.
-	result = xTaskCreate(InputHandlerTask, "tsk_Input", (configMINIMAL_STACK_SIZE), NULL, 0, &handle_InputHandlerTask);
+	result = xTaskCreate(ButtonHandlerTask, "tsk_Input", (configMINIMAL_STACK_SIZE), NULL, 0, &handle_ButtonHandlerTask);
 	if (result == pdPASS )
 	{
 	}
@@ -111,10 +98,6 @@ void StartApplicationTasks(void)
 	{
 	}
 
-	result = xTaskCreate(MotionControlTask, "tsk_Motion", (configMINIMAL_STACK_SIZE), NULL, 4, &handle_MotionControlTask);
-	if (result == pdPASS )
-	{
-	}
 	/**************************************************** Taken aanmaken ****************************************************/
 }
 

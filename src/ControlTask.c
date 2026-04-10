@@ -1,302 +1,170 @@
 /*
  * ControlTask.c
  *
- * Created: 09-04-2026
- * Author: Raph van Koeveringe
- */
+ * Created: 10-9-2023 09:48:15
+ *  Author: rasmsmee
+ */ 
 
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 
 #include <asf.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include <string.h>
 
 ///////////////////////////////////////////////////////////////////////////////
-// FreeRTOS includes
+// application includes
 
-#include "FreeRTOS.h"
-#include "task.h"
-#include "queue.h"
-#include "semphr.h"
-#include "event_groups.h"
-
+#include "CommandConsole.h"
 #include "vPrintString.h"
 #include "TaskSleep.h"
 
 ///////////////////////////////////////////////////////////////////////////////
-// other includes
+// HAL includes for RTSW board
 
-#include "ApplicationTasks.h"
+#include "DeviceIOLib.h"
+#include "InterruptLib.h"
 #include "bits.h"
-#include "LEDLib.h"
 
 ///////////////////////////////////////////////////////////////////////////////
-// types
+// position controller & application includes
 
-typedef enum
+#include "PositionControllerLoad.h"
+#include "MotorControl.h"
+#include "QuadratureCounters.h"
+#include "ButtonHandlerTask.h"
+#include "ControlTask.h"
+#include "ApplicationTasks.h"
+
+
+///////////////////////////////////////////////////////////////////////////////
+// file globals
+
+static SemaphoreHandle_t TimerInterruptSemaphore = NULL;
+
+
+///////////////////////////////////////////////////////////////////////////////
+// void ClockInterruptHandler(uint32_t id, uint32_t mask)
+//
+// invoked on every clock tick (1 ms) of the external hardware clock
+
+void ClockInterruptHandler(uint32_t id, uint32_t mask)
 {
-    STATE_INIT = 0,
-    STATE_WAIT,
-    STATE_HOMING,
-    STATE_READY,
-    STATE_RUN,
-    STATE_PAUSE,
-    STATE_FAULT
-} ControlState_t;
-
-typedef enum
-{
-    MOTION_CMD_DISABLED = 0,
-    MOTION_CMD_HOMING,
-    MOTION_CMD_HOLD,
-    MOTION_CMD_RUN
-} MotionCommand_t;
-
-///////////////////////////////////////////////////////////////////////////////
-// extern handles
-
-extern EventGroupHandle_t handle_ThreadEventGroup;
-
-extern SemaphoreHandle_t handle_StartSemaphore;
-extern SemaphoreHandle_t handle_StopSemaphore;
-extern SemaphoreHandle_t handle_RestartSemaphore;
-extern SemaphoreHandle_t handle_NoodSemaphore;
-
-extern SemaphoreHandle_t handle_HomeDoneSemaphore;
-extern SemaphoreHandle_t handle_CycleDoneSemaphore;
-
-extern QueueHandle_t handle_MotionCommandQueue;
-
-///////////////////////////////////////////////////////////////////////////////
-// locals
-
-static ControlState_t currentState = STATE_INIT;
-
-///////////////////////////////////////////////////////////////////////////////
-// helpers
-
-static void updateStateLeds(ControlState_t state)
-{
-    switch (state)
-    {
-        case STATE_INIT:
-            led_DisplayValue(0x03);   // pas later aan naar jouw wens
-            break;
-
-        case STATE_WAIT:
-            led_DisplayValue(0x01);   // voorbeeld
-            break;
-
-        case STATE_HOMING:
-            led_DisplayValue(0x02);   // voorbeeld
-            break;
-
-        case STATE_READY:
-            led_DisplayValue(0x04);   // voorbeeld
-            break;
-
-        case STATE_RUN:
-            led_DisplayValue(0x08);   // voorbeeld
-            break;
-
-        case STATE_PAUSE:
-            led_DisplayValue(0x05);   // voorbeeld
-            break;
-
-        case STATE_FAULT:
-            led_DisplayValue(0x0F);   // voorbeeld
-            break;
-
-        default:
-            led_DisplayValue(0x00);
-            break;
-    }
+	// Als interrupt Semaphore is aangemaakt, geef vrij.
+	if (TimerInterruptSemaphore != NULL)
+	{
+		xSemaphoreGiveFromISR(TimerInterruptSemaphore, NULL);
+	}
 }
 
-static void sendMotionCommand(MotionCommand_t cmd)
-{
-    if (handle_MotionCommandQueue != NULL)
-    {
-        xQueueOverwrite(handle_MotionCommandQueue, &cmd);
-    }
-}
-
-static bool emergencyInputStillActive(void)
-{
-    // Later echte nood-input uitlezen
-    return false;
-}
-
-static void enterState(ControlState_t newState)
-{
-    currentState = newState;
-    updateStateLeds(currentState);
-
-    switch (currentState)
-    {
-        case STATE_INIT:
-            vPrintString("> STATE = INIT\r\n");
-            sendMotionCommand(MOTION_CMD_DISABLED);
-            break;
-
-        case STATE_WAIT:
-            vPrintString("> STATE = WAIT\r\n");
-            sendMotionCommand(MOTION_CMD_DISABLED);
-            break;
-
-        case STATE_HOMING:
-            vPrintString("> STATE = HOMING\r\n");
-            sendMotionCommand(MOTION_CMD_HOMING);
-            break;
-
-        case STATE_READY:
-            vPrintString("> STATE = READY\r\n");
-            sendMotionCommand(MOTION_CMD_HOLD);
-            break;
-
-        case STATE_RUN:
-            vPrintString("> STATE = RUN\r\n");
-            sendMotionCommand(MOTION_CMD_RUN);
-            break;
-
-        case STATE_PAUSE:
-            vPrintString("> STATE = PAUSE\r\n");
-            sendMotionCommand(MOTION_CMD_HOLD);
-            break;
-
-        case STATE_FAULT:
-            vPrintString("> STATE = FAULT\r\n");
-            sendMotionCommand(MOTION_CMD_DISABLED);
-            break;
-
-        default:
-            sendMotionCommand(MOTION_CMD_DISABLED);
-            break;
-    }
-}
 
 ///////////////////////////////////////////////////////////////////////////////
-// ControlTask
+// void ControlTask(void *pvParameters)
 
 void ControlTask(void *pvParameters)
 {
-    (void)pvParameters;
+	uint32_t flags = 0;
+	uint32_t maxSemCount = 1;
+	uint32_t initialSemCount = 0;
 
-    bool startPressed;
-    bool stopPressed;
-    bool resetPressed;
-    bool noodActive;
-    bool homeDone;
-    bool cycleDone;
+	EventBits_t uxBits = 0;
+	BaseType_t clearAllbits	  = pdFALSE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
+	BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
+	TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
+	
+	double wblFactor = 0.0;
+	
+	vPrintString("> starting ControlTask (load)\n");
 
-    vPrintString("> starting ControlTask\r\n");
+	// schakeld direct de motoren uit.
+	motor_DisableESCONController();
 
-    enterState(STATE_INIT);
+	// setup external 1 ms timer tick handler:
+	// maak Semaphore aan
+	TimerInterruptSemaphore = xSemaphoreCreateCounting(maxSemCount, initialSemCount);
+	
+	// Bij opkomend signaal in PIN, run ClockInterruptHandler. 
+	flags = PIO_IT_RISE_EDGE;
+	interrupt_AttachHandler(ClockInterruptHandler, PIN_30, flags);
+	
+	vPrintString("> ControlTask waiting for helper tasks...\n");
 
-    // Wacht tot InputHandlerTask en MotionControlTask actief zijn
-    xEventGroupWaitBits(
-        handle_ThreadEventGroup,
-        BIT_0 | BIT_1,
-        pdFALSE,
-        pdTRUE,
-        portMAX_DELAY
-    );
+	// wait for ButtonHandlerTask and ParameterSettingTask to get up and running:
+	// Wacht tot BIT_1 AND BIT_0 TRUE zijn in handle_ThreadEventGroup, 
+	uxBits = xEventGroupWaitBits(handle_ThreadEventGroup, BIT_1 | BIT_0,
+								 clearAllbits, waitForAllbits, ticksToWait);	
 
-    enterState(STATE_WAIT);
+	vPrintString("> helper tasks running, ControlTask started, event group = 0x%04x\n", uxBits);
+	
+	// Stel de Quadraturecounters in.
+	QCEncodersSetup();
+	
+	// Schakelt de Escon in en stuurt naar home positie.
+	motor_EnableESCONController(); 
+	motor_GotoHomePosition(MOVE_LEFT); 
 
-    while (true)
-    {
-        startPressed = (xSemaphoreTake(handle_StartSemaphore, 0) == pdTRUE);
-        stopPressed  = (xSemaphoreTake(handle_StopSemaphore, 0) == pdTRUE);
-        resetPressed = (xSemaphoreTake(handle_RestartSemaphore, 0) == pdTRUE);
-        noodActive   = (xSemaphoreTake(handle_NoodSemaphore, 0) == pdTRUE);
+	// zet Quadraturecounter op nul en print dit.
+	QCEncodersClearCount();
+	QCEncodersShowCount("> Initial home");
 
-        homeDone     = (xSemaphoreTake(handle_HomeDoneSemaphore, 0) == pdTRUE);
-        cycleDone    = (xSemaphoreTake(handle_CycleDoneSemaphore, 0) == pdTRUE);
+	vPrintString("> ready\n");
+	vPrintString("> press button SW1 to start (watch your fingers...)\n");
+	
+	// Wacht tot reset/start knop ingedrukt wordt.
+	ticksToWait = portMAX_DELAY;
+	xSemaphoreTake(handle_RestartSemaphore, ticksToWait);	// wait for SW1 first button press
+	
+	while (true)
+	{
+		// Zoek nogmaals de home positie op, zet de QC op nul en print dit.
+		motor_GotoHomePosition(MOVE_LEFT);
+		QCEncodersClearCount();
+		QCEncodersShowCount("> HOME");
+		
+		// Check ingestelde bandbreedte waarde en print.
+		// always leave parameter value in queue! So use xQueuePeek
+		ticksToWait = 0;
+		xQueuePeek(handle_ParameterQueue, &wblFactor, ticksToWait);
+		vPrintString("> running with wblFactor: %.3f\n", wblFactor);
+		
+		// Mechanische parameters voor regeling bepalen
+		posctrlLoad_InitParameters(wblFactor);
+		
+		
+		ControlLoop();	// this loop exits by pressing button SW1
+	}
+	
+	/* Should never go here */
+	vTaskDelete(NULL);
+}
 
-        // nood heeft altijd hoogste prioriteit
-        if (noodActive)
-        {
-            enterState(STATE_FAULT);
-        }
 
-        switch (currentState)
-        {
-            case STATE_INIT:
-            {
-                break;
-            }
+///////////////////////////////////////////////////////////////////////////////
+//  void ControlLoop(void)
 
-            case STATE_WAIT:
-            {
-                if (startPressed || resetPressed)
-                {
-                    enterState(STATE_HOMING);
-                }
-                break;
-            }
+void ControlLoop(void)
+{
+	vPrintString("> enter Control Loop (load)\n");
 
-            case STATE_HOMING:
-            {
-                if (homeDone)
-                {
-                    enterState(STATE_READY);
-                }
-                break;
-            }
+	BaseType_t restart = pdFALSE;
+	BaseType_t ticksToWait = 0;
+	bool continueControlLoop = true;
+	
+	
+	while (continueControlLoop)
+	{
+		// wait for periodic 1 ms timer tick to unblock this thread and
+		// run the motion controller:
+		xSemaphoreTake(TimerInterruptSemaphore, portMAX_DELAY);
+		posctrlLoad_RunController();
+		
+		// check restart semaphore here, invoked by button press
+		restart = xSemaphoreTake(handle_RestartSemaphore, ticksToWait);
+		if (restart == pdTRUE)
+		{
+			continueControlLoop = false;
+		}
+		taskSleep(0);
+	}
 
-            case STATE_READY:
-            {
-                if (startPressed)
-                {
-                    enterState(STATE_RUN);
-                }
-                break;
-            }
-
-            case STATE_RUN:
-            {
-                if (stopPressed)
-                {
-                    enterState(STATE_PAUSE);
-                }
-                else if (cycleDone)
-                {
-                    enterState(STATE_READY);
-                }
-                break;
-            }
-
-            case STATE_PAUSE:
-            {
-                if (startPressed)
-                {
-                    enterState(STATE_RUN);
-                }
-                else if (resetPressed)
-                {
-                    enterState(STATE_READY);
-                }
-                break;
-            }
-
-            case STATE_FAULT:
-            {
-                if (resetPressed && (emergencyInputStillActive() == false))
-                {
-                    enterState(STATE_WAIT);
-                }
-                break;
-            }
-
-            default:
-            {
-                enterState(STATE_FAULT);
-                break;
-            }
-        }
-
-        taskSleep(10);
-    }
+	vPrintString("> exit Control Loop (load)\n");
 }

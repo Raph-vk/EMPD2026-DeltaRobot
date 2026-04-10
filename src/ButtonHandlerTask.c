@@ -1,8 +1,8 @@
 /*
  * ButtonHandlerTask.c
  *
- * Created: 23-11-2023 13:11:18
- *  Author: rasmsmee
+ * Created: 10/04/2023
+ *  Author: Raph van Koeveringe
  */ 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -27,39 +27,95 @@
 #include "bits.h"
 #include "ApplicationTasks.h"
 
+#define BIT_START_BUTTON    BIT_10
+#define BIT_STOP_BUTTON     BIT_11
+#define BIT_RESET_BUTTON    BIT_12
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+// void EmergencyHandler(uint32_t id, uint32_t mask)
+//
+// invoked on every clock tick (1 ms) of the external hardware clock
+void EmergencyInterruptHandler(uint32_t id, uint32_t mask)
+{
+	motor_DisableESCONController();
+	
+	// Als EmergencySemaphore is aangemaakt, geef vrij.
+	if (handle_EmergenySemaphore != NULL)
+	{
+		xSemaphoreGiveFromISR(handle_EmergenySemaphore, NULL);
+	}
+	
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 /* void ButtonHandlerTask(void *pvParameters)
 
-Deze taak bewaakt knop SW1 en gebruikt die als restart/start-knop voor de regeling. 
+Bewaakt de knoppen Start, Stop en Reset en zet eventbits voor de ControlTask.
 
 */
 void ButtonHandlerTask(void *pvParameters)
 {
-	uint8_t buttonNumber = 0;	// 0 == SW1
-	
+	uint8_t startButton = 0;   // SW1
+	uint8_t stopButton  = 1;   // SW2
+	uint8_t resetButton = 2;   // SW3
+
 	vPrintString("> starting ButtonHandlerTask\n");
 
-	// Laat weten aan de control task dat deze helper-task actief is, via een eventBit.
-	// signal to control thread that ButtonHandlerTask is up and running:
-	xEventGroupSetBits( handle_ThreadEventGroup, BIT_0 );
-	
-	while(true)
+	// Apart aangeven dat deze task actief is
+	xEventGroupSetBits(handle_ThreadEventGroup, BIT_0);
+
+	while (true)
 	{
-		// Wanneer knop wordt ingedrukt
-		if (switch_IsPressed(buttonNumber))
+		// START
+		if (switch_IsPressed(startButton))
 		{
-			// wait until button released:
-			while (switch_IsPressed(buttonNumber))
+			taskSleep(20); // debounce
+			if (switch_IsPressed(startButton))
 			{
+				while (switch_IsPressed(startButton))
+				{
+					taskSleep(1);
+				}
+
+				vPrintString("> START button SW%d pressed!\n", startButton + 1);
+				xEventGroupSetBits(handle_ButtonEventGroup, BIT_START_BUTTON);
 			}
-			
-			// Laat weten dat knop is indrukt
-			vPrintString("> restart button SW%d pressed!\n", buttonNumber + 1);
-			
-			// ControlTask -> ControlLoop neemt Semaphore.
-			xSemaphoreGive(handle_RestartSemaphore);
 		}
+
+		// STOP
+		if (switch_IsPressed(stopButton))
+		{
+			taskSleep(20); // debounce
+			if (switch_IsPressed(stopButton))
+			{
+				while (switch_IsPressed(stopButton))
+				{
+					taskSleep(1);
+				}
+
+				vPrintString("> STOP button SW%d pressed!\n", stopButton + 1);
+				xEventGroupSetBits(handle_ButtonEventGroup, BIT_STOP_BUTTON);
+			}
+		}
+
+		// RESET
+		if (switch_IsPressed(resetButton))
+		{
+			taskSleep(20); // debounce
+			if (switch_IsPressed(resetButton))
+			{
+				while (switch_IsPressed(resetButton))
+				{
+					taskSleep(1);
+				}
+
+				vPrintString("> RESET button SW%d pressed!\n", resetButton + 1);
+				xEventGroupSetBits(handle_ButtonEventGroup, BIT_RESET_BUTTON);
+			}
+		}
+
 		taskSleep(10);
 	}
 }
