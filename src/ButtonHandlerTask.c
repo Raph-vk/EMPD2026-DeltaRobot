@@ -27,11 +27,6 @@
 #include "bits.h"
 #include "ApplicationTasks.h"
 
-#define BIT_START_BUTTON    BIT_10
-#define BIT_STOP_BUTTON     BIT_11
-#define BIT_RESET_BUTTON    BIT_12
-
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // void EmergencyHandler(uint32_t id, uint32_t mask)
@@ -42,9 +37,9 @@ void EmergencyInterruptHandler(uint32_t id, uint32_t mask)
 	motor_DisableESCONController();
 	
 	// Als EmergencySemaphore is aangemaakt, geef vrij.
-	if (handle_EmergenySemaphore != NULL)
+	if (handle_EmergencySemaphore != NULL)
 	{
-		xSemaphoreGiveFromISR(handle_EmergenySemaphore, NULL);
+		xSemaphoreGiveFromISR(handle_EmergencySemaphore, NULL);
 	}
 	
 }
