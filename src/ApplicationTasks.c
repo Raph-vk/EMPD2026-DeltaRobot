@@ -23,15 +23,17 @@ Deze file is de centrale opstart van de applicatie.
 
 #include "ApplicationTasks.h"
 #include "ButtonHandlerTask.h"
-#include "ParameterSettingTask.h"
+#include "VisualisationTask.h"
 #include "ControlTask.h"
 
 
 ///////////////////////////////////////////////////////////////////////////////
 // application tasks handler declarations
 
-static TaskHandle_t handle_InputHandlerTask	= NULL;
+static TaskHandle_t handle_ButtonHandlerTask= NULL;
 static TaskHandle_t handle_ContolTask		= NULL;
+static TaskHandle_t handle_VisualisationTask= NULL;
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // global handles & objects
@@ -39,10 +41,7 @@ static TaskHandle_t handle_ContolTask		= NULL;
 EventGroupHandle_t	handle_ThreadEventGroup = NULL;
 EventGroupHandle_t	handle_ButtonEventGroup = NULL;
 
-SemaphoreHandle_t	TimerInterruptSemaphore = NULL;
-SemaphoreHandle_t	handle_EmergencySemaphore = NULL;
-
-//QueueHandle_t		handle_ParameterQueue	= NULL;
+QueueHandle_t		handle_StateQueue	= NULL;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -50,16 +49,15 @@ SemaphoreHandle_t	handle_EmergencySemaphore = NULL;
 void StartApplicationTasks(void)
 {
 	BaseType_t result = pdFAIL;
-	UBaseType_t parameterQueueSize = 1;
+	UBaseType_t StateQueueSize = 1;
 
-	// Aanmaken van "parameter queue"
-	// Bandbreedte is aanpasbaar met potmeter, die ingestelde waarde wordt hier doorgegeven.
-	// queue for bandwidth parameter passing
-	//handle_InputQueue = xQueueCreate(parameterQueueSize, sizeof(double));
-	//if (handle_ParameterQueue == NULL)
-	//{
+	// Aanmaken van "SystemState queue"
+	// Geeft de actuele status waarin de machine zich bevindt door.
+	handle_StateQueue = xQueueCreate(StateQueueSize, SystemState_t);
+	if (handle_StateQueue == NULL)
+	{
 		//Foutafhandeling is leeggelaten
-	//}
+	}
 	
 	// Event group aanmaken voor knoppen, communicatie tussen ButtonHandlerTask -> ControlTask.
 	handle_ThreadEventGroup = xEventGroupCreate();

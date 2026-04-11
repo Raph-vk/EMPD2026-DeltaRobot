@@ -1,66 +1,8 @@
 /*
  * ControlTask.c
  *
- * Created: 10-9-2023 09:48:15
- *  Author: rasmsmee
- */ 
-
-///////////////////////////////////////////////////////////////////////////////
-// system includes
-
-#include <asf.h>
-#include <string.h>
-
-///////////////////////////////////////////////////////////////////////////////
-// application includes
-
-#include "CommandConsole.h"
-#include "vPrintString.h"
-#include "TaskSleep.h"
-
-///////////////////////////////////////////////////////////////////////////////
-// HAL includes for RTSW board
-
-#include "DeviceIOLib.h"
-#include "InterruptLib.h"
-#include "bits.h"
-
-///////////////////////////////////////////////////////////////////////////////
-// position controller & application includes
-
-#include "PositionControllerLoad.h"
-#include "MotorControl.h"
-#include "QuadratureCounters.h"
-#include "ButtonHandlerTask.h"
-#include "ControlTask.h"
-#include "ApplicationTasks.h"
-
-
-///////////////////////////////////////////////////////////////////////////////
-// file globals
-
-static SemaphoreHandle_t TimerInterruptSemaphore = NULL;
-
-
-///////////////////////////////////////////////////////////////////////////////
-// void ClockInterruptHandler(uint32_t id, uint32_t mask)
-//
-// invoked on every clock tick (1 ms) of the external hardware clock
-
-void ClockInterruptHandler(uint32_t id, uint32_t mask)
-{
-	// Als interrupt Semaphore is aangemaakt, geef vrij.
-	if (TimerInterruptSemaphore != NULL)
-	{
-		xSemaphoreGiveFromISR(TimerInterruptSemaphore, NULL);
-	}
-}
-
-/*
- * ControlTask.c
- *
- * Created: 10-9-2023 09:48:15
- * Author: rasmsmee / uitgebreid door Raph
+ * Created: 11/04/2026
+ * Author: Raph van Koeveringe
  */
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -100,35 +42,6 @@ void ClockInterruptHandler(uint32_t id, uint32_t mask)
 static SemaphoreHandle_t TimerInterruptSemaphore = NULL;
 
 ///////////////////////////////////////////////////////////////////////////////
-// local type definitions
-typedef enum
-{
-	CONTROL_STATE_INIT = 0,
-	CONTROL_STATE_WAIT,
-	CONTROL_STATE_HOMING,
-	CONTROL_STATE_READY,
-	CONTROL_STATE_RUNNING,
-	CONTROL_STATE_FAULT
-} ControlState_t;
-
-///////////////////////////////////////////////////////////////////////////////
-// local function prototypes
-
-static void SetLedsWait(void);
-static void SetLedsHoming(void);
-static void SetLedsReady(void);
-static void SetLedsRunning(void);
-static void SetLedsFault(void);
-
-static void InitMechanicalParameters(void);
-
-static bool HomingStep(void);
-static void HoldOnPosStep(void);
-static bool RunSequenceStep(void);
-
-static bool IsEmergencyActive(void);
-
-///////////////////////////////////////////////////////////////////////////////
 // void ClockInterruptHandler(uint32_t id, uint32_t mask)
 //
 // invoked on every clock tick (1 ms) of the external hardware clock
@@ -153,7 +66,7 @@ void ClockInterruptHandler(uint32_t id, uint32_t mask)
 void EmergencyInterruptHandler(uint32_t id, uint32_t mask)
 {
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
+	vPrintString("> EMERGENCY INTERRUPT!!\n");
 	// Direct veilig maken
 	motor_DisableESCONController();
 
@@ -176,7 +89,7 @@ Vanuit FAULT met reset + geen foutsignaal terug naar WAIT.
 */
 void ControlTask(void *pvParameters)
 {
-	ControlState_t state = CONTROL_STATE_INIT;
+	SystemState_t state =  STATE_INIT;
 	
 	EventBits_t buttonBits = 0;
 	BaseType_t clearAllbits  = pdTRUE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
@@ -224,30 +137,17 @@ void ControlTask(void *pvParameters)
 	// startup indicatie
 	// Rood en oranje samen knipperen zolang helper tasks nog niet ready zijn
 
-	while ((xEventGroupGetBits(handle_ThreadEventGroup) & (BIT_0 | BIT_1)) != (BIT_0 | BIT_1))
-	{
-		// Oranje aan
-		port_SetLamp(LAMP_ORANGE);
-		taskSleep(200);
-
-		// Rood aan
-		port_SetLamp(LAMP_RED);
-		taskSleep(200);
-	}
-
-	port_AllLampsOff();
 
 	// wait for all tasks to get up and running:
 	threadBits = xEventGroupWaitBits(handle_ThreadEventGroup, BIT_0 | BIT_1, stayAllbits, waitForAllbits, ticksToWait);
-
 	vPrintString("> helper tasks running, ControlTask started, event group = 0x%04x\n", threadBits);
-
+	state =  STATE_FAULT;
+	
 	///////////////////////////////////////////////////////////////////////////
-	// hoofdloop
-
+	// hoofd-loop
 	while (true)
 	{
-		// Lees knopbits niet-blockerend uit
+		// Lees knopbits of er iets ingedrukt is.
 		buttonBits = xEventGroupWaitBits(handle_ButtonEventGroup,
 			BIT_START_BUTTON | BIT_STOP_BUTTON | BIT_RESET_BUTTON,
 			clearAllbits,		// ontvangen bits wissen
@@ -258,23 +158,21 @@ void ControlTask(void *pvParameters)
 		// Emergency check via Semaphore
 		if (xSemaphoreTake(handle_EmergencySemaphore, 0) == pdTRUE)
 		{
-			vPrintString("> emergency interrupt received\n");
-			state = CONTROL_STATE_FAULT;
+			vPrintString("> EMERGENCY INTERRUPT RECIEVED\n");
+			state =  STATE_FAULT;
 		}
 
 		switch (state)
 		{
 			/////////////////////////////////////////////////////////////////////
-			case CONTROL_STATE_WAIT:
+			case  STATE_WAIT:
 			{
-				SetLedsWait();
-
 				// Wachten op start of reset -> homing starten
 				if ((buttonBits & BIT_START_BUTTON) || (buttonBits & BIT_RESET_BUTTON))
 				{
-					vPrintString("> WAIT -> HOMING\n");
+					vPrintString("> WAIT -> HOMING ( Start-of Resetknop is ontvangen).\n");
 					homingDone = false;
-					state = CONTROL_STATE_HOMING;
+					state =  STATE_HOMING;
 				}
 
 				taskSleep(10);
@@ -282,79 +180,66 @@ void ControlTask(void *pvParameters)
 			}
 
 			/////////////////////////////////////////////////////////////////////
-			case CONTROL_STATE_HOMING:
+			case  STATE_HOMING:
 			{
-				SetLedsHoming();
 
-				// Homing draait op 1 ms control tick
-				if (xSemaphoreTake(TimerInterruptSemaphore, pdMS_TO_TICKS(50)) == pdTRUE)
+				//TODO: homingDone = HomingStep(); <- MotorControl.c
+
+				if (homingDone)
 				{
-					homingDone = HomingStep();
-
-					if (homingDone)
-					{
-						vPrintString("> HOMING complete -> READY\n");
-						state = CONTROL_STATE_READY;
-					}
+					vPrintString("> HOMING complete -> READY\n");
+					state =  STATE_READY;
 				}
-
 				break;
 			}
 
 			/////////////////////////////////////////////////////////////////////
-			case CONTROL_STATE_READY:
+			case  STATE_READY:
 			{
-				SetLedsReady();
-
-				// Positie vasthouden op control tick
-				if (xSemaphoreTake(TimerInterruptSemaphore, pdMS_TO_TICKS(50)) == pdTRUE)
-				{
-					HoldOnPosStep();
-				}
+				// Op vaste positie regelen op iedere control tick
+				xSemaphoreTake(TimerInterruptSemaphore, ticksToWait);
+				
+				//TODO: HoldPosition()
 
 				// Startknop -> runnen
 				if (buttonBits & BIT_START_BUTTON)
 				{
-					vPrintString("> READY -> RUNNING\n");
+					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
 					cycleDone = false;
-					state = CONTROL_STATE_RUNNING;
+					state = STATE_RUNNING;
 				}
 
 				break;
 			}
 
 			/////////////////////////////////////////////////////////////////////
-			case CONTROL_STATE_RUNNING:
+			case  STATE_RUNNING:
 			{
-				SetLedsRunning();
-
 				// Sequence draaien op control tick
-				if (xSemaphoreTake(TimerInterruptSemaphore, pdMS_TO_TICKS(50)) == pdTRUE)
-				{
-					cycleDone = RunSequenceStep();
-				}
+				xSemaphoreTake(TimerInterruptSemaphore, ticksToWait);
+	
+				//TODO: cycleDone = RunSequenceStep();
+
 
 				// Stopknop -> terug naar READY
 				if (buttonBits & BIT_STOP_BUTTON)
 				{
-					vPrintString("> RUNNING -> READY (stop button)\n");
-					state = CONTROL_STATE_READY;
+					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
+					state = STATE_READY;
 				}
 				// Cyclus klaar -> terug naar READY
 				else if (cycleDone)
 				{
-					vPrintString("> RUNNING -> READY (cycle done)\n");
-					state = CONTROL_STATE_READY;
+					vPrintString("> RUNNING -> READY (cyclus voldaan)\n");
+					state = STATE_READY;
 				}
 
 				break;
 			}
 
 			/////////////////////////////////////////////////////////////////////
-			case CONTROL_STATE_FAULT:
+			case  STATE_FAULT:
 			{
-				SetLedsFault();
-
 				// Veilig maken
 				motor_DisableESCONController();
 
@@ -363,60 +248,22 @@ void ControlTask(void *pvParameters)
 				// Alleen uit fault als reset is gedrukt EN foutsignaal weg is
 				if (buttonBits & BIT_RESET_BUTTON)
 				{
-					if (!IsEmergencyActive())
-					{
-						vPrintString("> FAULT cleared -> WAIT\n");
-						state = CONTROL_STATE_WAIT;
-					}
+					vPrintString("> FAULT cleared -> WAIT (reset ontvangen)\n");
+					state = STATE_WAIT;
 				}
-
 				break;
 			}
 
 			/////////////////////////////////////////////////////////////////////
-			default:
+			default: //Onbekende Status?
 			{
-				state = CONTROL_STATE_FAULT;
+				state = STATE_FAULT;
 				break;
 			}
 		}
 	}
-}
 
-///////////////////////////////////////////////////////////////////////////////
-// void port_AllLampsOff(void)
-
-void port_AllLampsOff(void)
-{
-	port_SetBit(LAMP_GREEN, false);
-	port_SetBit(LAMP_ORANGE, false);
-	port_SetBit(LAMP_RED, false);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// void port_SetLamp(uint8_t lampNumber)
-// Zet een lamp aan
-// 
-void port_SetLamp(uint8_t lampNumber)
-{
-	port_AllLampsOff();
-
-	if (lampNumber == LAMP_GREEN)
-	{
-		port_SetBit(LAMP_GREEN, true);
-	}
-	else if (lampNumber == LAMP_ORANGE)
-	{
-		port_SetBit(LAMP_ORANGE, true);
-	}
-	else if (lampNumber == LAMP_RED)
-	{
-		port_SetBit(LAMP_RED, true);
-	}
-	else
-	{
-		// ongeldige keuze -> alle lampen uit
-	}
+	/* Should never get here */
 }
 
 
