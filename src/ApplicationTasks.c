@@ -30,9 +30,9 @@ Deze file is de centrale opstart van de applicatie.
 ///////////////////////////////////////////////////////////////////////////////
 // application tasks handler declarations
 
-static TaskHandle_t handle_ButtonHandlerTask= NULL;
-static TaskHandle_t handle_ContolTask		= NULL;
-static TaskHandle_t handle_VisualisationTask= NULL;
+static TaskHandle_t handle_ButtonHandlerTask = NULL;
+static TaskHandle_t handle_ControlTask = NULL;
+static TaskHandle_t handle_VisualisationTask = NULL;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -87,11 +87,15 @@ void StartApplicationTasks(void)
 	
 	/**************************************************** Taken aanmaken ****************************************************/
 	// De taken worden aangemaakt en in de ready list geplaatst.
-	result = xTaskCreate(ButtonHandlerTask, "tsk_Input", (configMINIMAL_STACK_SIZE), NULL, 0, &handle_ButtonHandlerTask);
+	result = xTaskCreate(ButtonHandlerTask, "tsk_Button", (configMINIMAL_STACK_SIZE), NULL, 0, &handle_ButtonHandlerTask);
 	if (result == pdPASS )
 	{
 	}
 	result = xTaskCreate(ControlTask, "tsk_Control", (configMINIMAL_STACK_SIZE), NULL, 1, &handle_ControlTask);
+	if (result == pdPASS )
+	{
+	}
+	result = xTaskCreate(VisualisationTask, "tsk_Visualisation", (configMINIMAL_STACK_SIZE), NULL, 1, &handle_VisualisationTask);
 	if (result == pdPASS )
 	{
 	}

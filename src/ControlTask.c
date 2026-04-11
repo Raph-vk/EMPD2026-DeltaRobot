@@ -40,6 +40,34 @@
 // file globals
 
 static SemaphoreHandle_t TimerInterruptSemaphore = NULL;
+static SemaphoreHandle_t handle_EmergencySemaphore = NULL;
+static SystemState_t state = STATE_INIT;
+
+///////////////////////////////////////////////////////////////////////////////
+// void SetState(newState)
+//
+// Makes correctly the new state and communicates that.
+static void SetState(SystemState_t newState)
+{
+	if (state != newState)
+	{
+		state = newState;
+		xQueueOverwrite(handle_StateQueue, &state);
+	}
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+// bool IsFaultInputActive(void)
+//
+// Returns true if one of the fault inputs is still active.
+// Assumes active-high fault inputs.
+static bool IsFaultInputActive(void)
+{
+	return port_IsBitSet(NOODSTOP_PIN)    ||
+	port_IsBitSet(NOODSCHAKEL_PIN) ||
+	port_IsBitSet(ESCONFOUT_PIN);
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // void ClockInterruptHandler(uint32_t id, uint32_t mask)
@@ -66,7 +94,7 @@ void ClockInterruptHandler(uint32_t id, uint32_t mask)
 void EmergencyInterruptHandler(uint32_t id, uint32_t mask)
 {
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	vPrintString("> EMERGENCY INTERRUPT!!\n");
+	
 	// Direct veilig maken
 	motor_DisableESCONController();
 
@@ -89,11 +117,9 @@ Vanuit FAULT met reset + geen foutsignaal terug naar WAIT.
 */
 void ControlTask(void *pvParameters)
 {
-	SystemState_t state =  STATE_INIT;
-	
 	EventBits_t buttonBits = 0;
 	BaseType_t clearAllbits  = pdTRUE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
-	BaseType_t dontWaitForAllbits = pdFALSE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
+	BaseType_t waitForAnyBit= pdFALSE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
 
 	EventBits_t threadBits = 0;
 	BaseType_t stayAllbits  = pdFALSE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
@@ -131,35 +157,32 @@ void ControlTask(void *pvParameters)
 	interrupt_AttachHandler(EmergencyInterruptHandler, ESCONFOUT_PIN, flags);
 
 
-	vPrintString("> ControlTask waiting for helper tasks...\n");
-
-	///////////////////////////////////////////////////////////////////////////
-	// startup indicatie
-	// Rood en oranje samen knipperen zolang helper tasks nog niet ready zijn
-
 
 	// wait for all tasks to get up and running:
+	vPrintString("> ControlTask waiting for helper tasks...\n");
 	threadBits = xEventGroupWaitBits(handle_ThreadEventGroup, BIT_0 | BIT_1, stayAllbits, waitForAllbits, ticksToWait);
+	
+	// Helper taken zijn ready
 	vPrintString("> helper tasks running, ControlTask started, event group = 0x%04x\n", threadBits);
-	state =  STATE_FAULT;
+	SetState(STATE_WAIT);
 	
 	///////////////////////////////////////////////////////////////////////////
-	// hoofd-loop
+	// oneindige loop
 	while (true)
 	{
-		// Lees knopbits of er iets ingedrukt is.
+		// Lees uit of er een knop ingedrukt is.
 		buttonBits = xEventGroupWaitBits(handle_ButtonEventGroup,
 			BIT_START_BUTTON | BIT_STOP_BUTTON | BIT_RESET_BUTTON,
-			clearAllbits,		// ontvangen bits wissen
-			dontWaitForAllbits,	// één van de bits is genoeg
-			0					// niet blokkeren
+			clearAllbits,	// ontvangen bits wissen
+			waitForAnyBit,	// één van de bits is genoeg
+			0				// niet blokkeren
 		);
 
 		// Emergency check via Semaphore
 		if (xSemaphoreTake(handle_EmergencySemaphore, 0) == pdTRUE)
 		{
 			vPrintString("> EMERGENCY INTERRUPT RECIEVED\n");
-			state =  STATE_FAULT;
+			SetState(STATE_FAULT);
 		}
 
 		switch (state)
@@ -167,14 +190,15 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_WAIT:
 			{
-				// Wachten op start of reset -> homing starten
+				// Wachten op start-of resetknop
 				if ((buttonBits & BIT_START_BUTTON) || (buttonBits & BIT_RESET_BUTTON))
 				{
+
+					// Naar HomingState schakelen.
 					vPrintString("> WAIT -> HOMING ( Start-of Resetknop is ontvangen).\n");
 					homingDone = false;
-					state =  STATE_HOMING;
+					SetState(STATE_HOMING);
 				}
-
 				taskSleep(10);
 				break;
 			}
@@ -188,7 +212,7 @@ void ControlTask(void *pvParameters)
 				if (homingDone)
 				{
 					vPrintString("> HOMING complete -> READY\n");
-					state =  STATE_READY;
+					SetState(STATE_READY);
 				}
 				break;
 			}
@@ -206,7 +230,7 @@ void ControlTask(void *pvParameters)
 				{
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
 					cycleDone = false;
-					state = STATE_RUNNING;
+					SetState(STATE_RUNNING);
 				}
 
 				break;
@@ -225,22 +249,21 @@ void ControlTask(void *pvParameters)
 				if (buttonBits & BIT_STOP_BUTTON)
 				{
 					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
-					state = STATE_READY;
+					SetState(STATE_READY);
 				}
 				// Cyclus klaar -> terug naar READY
 				else if (cycleDone)
 				{
 					vPrintString("> RUNNING -> READY (cyclus voldaan)\n");
-					state = STATE_READY;
+					SetState(STATE_READY);
 				}
-
 				break;
 			}
 
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_FAULT:
 			{
-				// Veilig maken
+				// Veilig forceren
 				motor_DisableESCONController();
 
 				taskSleep(10);
@@ -248,23 +271,32 @@ void ControlTask(void *pvParameters)
 				// Alleen uit fault als reset is gedrukt EN foutsignaal weg is
 				if (buttonBits & BIT_RESET_BUTTON)
 				{
-					vPrintString("> FAULT cleared -> WAIT (reset ontvangen)\n");
-					state = STATE_WAIT;
+					if (!IsFaultInputActive())
+					{
+						vPrintString("> FAULT cleared -> WAIT (reset ontvangen, foutsignaal weg)\n");
+						SetState(STATE_WAIT);
+					}
+					else
+					{
+						vPrintString("> RESET ontvangen, maar fault input is nog actief\n");
+					}
 				}
 				break;
 			}
 
 			/////////////////////////////////////////////////////////////////////
-			default: //Onbekende Status?
+			default: // Onbekende Status?
 			{
-				state = STATE_FAULT;
+				SetState(STATE_FAULT);
 				break;
 			}
 		}
-	}
-
+	
+	}//End-WhileLoop
+	
 	/* Should never get here */
-}
+	vTaskDelete(NULL);
+}//End-ControlTask
 
 
 ///////////////////////////////////////////////////////////////////////////////
