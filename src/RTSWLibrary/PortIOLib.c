@@ -23,13 +23,13 @@
 
 static const uint8_t G_InputPins[N_INPUT_PINS] =
 {
-	PIN_30,	// LSB, bit 0
-	PIN_31,
-	PIN_32, 
-	PIN_33,		
-	PIN_34,
-	PIN_35,
-	PIN_36,
+	PIN_30,	// LSB, bit 0 // CLOCK PIN
+	PIN_31, //M1 Home
+	PIN_32, //M2 Home
+	PIN_33,	//M3 Home
+	PIN_34, // Escon overload
+	PIN_35,	// Noodstopknop
+	PIN_36, // NoodSchakelaar
 	PIN_37,	// MSB, bit 7
 };
 

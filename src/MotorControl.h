@@ -13,37 +13,28 @@
 // #includes
 #include <stdbool.h>
 #include <stdint.h>
+#include "MachinePins.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // #defines
 
-#define N_MOTORS    3
+//Outputs
+#define N_MOTORS		3
+#define ESCON_ENABLE	BIT_ESCON_ENABLE	// bit positions in control output port
+// DAC0, DAC1, DAC2; Motor analoge voltages naar EsconModule.
 
-#define BIT_M1_LIMIT		1	// bit positions in status input port
-#define BIT_M2_LIMIT		2
-#define BIT_M3_LIMIT		3
-//#define BIT_ATOM_ERROR	3
-#define BIT_ESCON_OVERLOAD	4
-
-#define BIT_ESCON_ENABLE	0	// bit positions in control output port
-#define BIT_ESCON_POWERON	1
-
-///////////////////////////////////////////////////////////////////////////////
-// typedefs
-
-//typedef enum
-//{
-//	MOVE_UP,
-//	MOVE_DOWN,
-//} motor_direction_t;
-
+//Inputs
+#define M1_LIMIT		BIT_M1_HOME
+#define M2_LIMIT		BIT_M2_HOME
+#define M3_LIMIT		BIT_M3_HOME
+#define ESCON_OVERLOAD	BIT_ESON_OVERLOAD
 
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes
 
 
-void QCEncodersSetup(void)
-void QCEncodersClearCount(uint8_t qcChannel)
+void QCEncodersSetup(void);
+void QCEncodersClearCount(uint8_t qcChannel);
 
 
 void motor_EnableESCONController(void);
@@ -51,10 +42,8 @@ void motor_DisableESCONController(void);
 bool motor_HasOverload(void);
 
 void motor_DisplayStatus(void);
-
-bool motor_IsHomeLimitActive(uint8_t motorIndex);
 //void MotorHold(uint8_t motorIndex);
 
-bool motors_Move(void);              // homing-step voor alle 3 motoren
+bool homeAllMotors(void);     // homing-step voor alle 3 motoren
 
 #endif /* MOTORCONTROL_H_ */

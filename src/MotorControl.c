@@ -31,8 +31,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
-
 #include "MotorControl.h"
+//#include "ControlTask.h"
 
 
 
@@ -43,7 +43,7 @@ static const uint8_t G_MotorDacChannel[N_MOTORS] ={0, 1, 2};
 static const uint8_t G_MotorQcChannel[N_MOTORS] ={0, 1, 2};
 
 // VUL HIER JOUW ECHTE LIMIT-BITS IN:
-static const uint8_t G_MotorHomeLimitBit[N_MOTORS] = {BIT_M1_LIMIT, BIT_M2_LIMIT, BIT_M3_LIMIT};
+static const uint8_t G_MotorHomeLimitBit[N_MOTORS] = {M1_LIMIT, M2_LIMIT, M3_LIMIT};
 
 // Homing-spanning per motor.
 // Zet het teken per motor goed afhankelijk van draairichting!
@@ -106,7 +106,7 @@ void QCEncodersClearCount(uint8_t qcChannel)
 
 void motor_EnableESCONController(void)
 {
-	port_SetBit(BIT_ESCON_ENABLE, true);
+	port_SetBit(ESCON_ENABLE, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -116,7 +116,7 @@ void motor_EnableESCONController(void)
 
 void motor_DisableESCONController(void)
 {
-	port_SetBit(BIT_ESCON_ENABLE, false);
+	port_SetBit(ESCON_ENABLE, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -125,7 +125,7 @@ bool motor_HasOverload(void)
 {
 	bool overload = true; // Assume safe
 
-	overload = port_IsBitSet(BIT_ESCON_OVERLOAD);
+	overload = port_IsBitSet(ESCON_OVERLOAD);
 	
 	return overload;
 }
@@ -146,19 +146,19 @@ void motor_DisplayStatus(void)
 
 	vPrintString("digital input = 0x%02x\n", portInValue);
 	
-	isSet = port_IsBitSet(BIT_M1_LIMIT);
+	isSet = port_IsBitSet(M1_LIMIT);
 	bitVal = isSet? 1 : 0;
 	vPrintString("Limit M1:    %d\n", bitVal);
 
-	isSet = port_IsBitSet(BIT_M2_LIMIT);
+	isSet = port_IsBitSet(M2_LIMIT);
 	bitVal = isSet? 1 : 0;
 	vPrintString("Limit M2:    %d\n", bitVal);
 
-	isSet = port_IsBitSet(BIT_M3_LIMIT);
+	isSet = port_IsBitSet(M3_LIMIT);
 	bitVal = isSet? 1 : 0;
 	vPrintString("Limit M3:     %d\n", bitVal);
 
-	isSet = port_IsBitSet(BIT_ESCON_OVERLOAD);
+	isSet = port_IsBitSet(ESCON_OVERLOAD);
 	bitVal = isSet? 1 : 0;
 	vPrintString("ESCON Overload: %d\n", bitVal);
 	
@@ -202,7 +202,7 @@ void MotorHold(uint8_t motorIndex)
 //      * motor in hold zetten
 // - return true als alle 3 klaar zijn
 
-bool motors_Move(void)
+bool homeAllMotors(void)
 {
 	uint8_t motorIndex = 0;
 	bool allHomed = true;

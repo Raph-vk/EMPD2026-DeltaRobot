@@ -1,4 +1,4 @@
-/*
+ï»¿/*
  * ControlTask.c
  *
  * Created: 11/04/2026
@@ -28,19 +28,15 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
-
-#include "PositionControllerLoad.h"
 #include "MotorControl.h"
-#include "QuadratureCounters.h"
 #include "ButtonHandlerTask.h"
 #include "ControlTask.h"
 #include "ApplicationTasks.h"
+//#include "PositionControllerLoad.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
 
-static SemaphoreHandle_t TimerInterruptSemaphore = NULL;
-static SemaphoreHandle_t handle_EmergencySemaphore = NULL;
 static SystemState_t state = STATE_INIT;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -64,9 +60,9 @@ static void SetState(SystemState_t newState)
 // Assumes active-high fault inputs.
 static bool IsFaultInputActive(void)
 {
-	return port_IsBitSet(NOODSTOP_PIN)    ||
-	port_IsBitSet(NOODSCHAKEL_PIN) ||
-	port_IsBitSet(ESCONFOUT_PIN);
+	return port_IsBitSet(BIT_ESON_OVERLOAD)
+		|| port_IsBitSet(BIT_NOODSTOP)
+		|| port_IsBitSet(BIT_NOODSCHAKELAAR);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -78,9 +74,9 @@ void ClockInterruptHandler(uint32_t id, uint32_t mask)
 {
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-	if (TimerInterruptSemaphore != NULL)
+	if (handle_TimerInterruptSemaphore != NULL)
 	{
-		xSemaphoreGiveFromISR(TimerInterruptSemaphore, &xHigherPriorityTaskWoken);
+		xSemaphoreGiveFromISR(handle_TimerInterruptSemaphore, &xHigherPriorityTaskWoken);
 	}
 
 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
@@ -119,11 +115,11 @@ void ControlTask(void *pvParameters)
 {
 	EventBits_t buttonBits = 0;
 	BaseType_t clearAllbits  = pdTRUE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
-	BaseType_t waitForAnyBit= pdFALSE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
+	BaseType_t waitForAnyBit= pdFALSE;			// FALSE = wacht totdat Ã©Ã©n v/d bits is gezet, TRUE wacht op ALLE bits.
 
 	EventBits_t threadBits = 0;
 	BaseType_t stayAllbits  = pdFALSE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
-	BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
+	BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat Ã©Ã©n v/d bits is gezet, TRUE wacht op ALLE bits.
 	
 	TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
 
@@ -139,24 +135,18 @@ void ControlTask(void *pvParameters)
 	motor_DisableESCONController();
 
 	// setup external 1 ms timer tick handler:
-	// maak Semaphore aan
-	uint32_t maxSemCount = 1;
-	uint32_t initialSemCount = 0;
-	TimerInterruptSemaphore = xSemaphoreCreateCounting(maxSemCount, initialSemCount);
-	handle_EmergencySemaphore = xSemaphoreCreateCounting(maxSemCount, initialSemCount);
+	// semaphores worden centraal beheerd in ApplicationTasks.c
 
 	
 	// Bij opkomend signaal in PIN, run ClockInterruptHandler.
 	flags = PIO_IT_RISE_EDGE;
-	interrupt_AttachHandler(ClockInterruptHandler, CLOCK_PIN, flags);
+	interrupt_AttachHandler(ClockInterruptHandler, PIN_CLOCK, flags);
 	
 	// Bij opkomend signaal in PINs, run EmergencyInterruptHandler.
 	flags = PIO_IT_RISE_EDGE;
-	interrupt_AttachHandler(EmergencyInterruptHandler, NOODSTOP_PIN, flags);
-	interrupt_AttachHandler(EmergencyInterruptHandler, NOODSCHAKEL_PIN, flags);
-	interrupt_AttachHandler(EmergencyInterruptHandler, ESCONFOUT_PIN, flags);
-
-
+	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_ESON_OVERLOAD, flags);
+	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSTOP, flags);
+	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSCHAKELAAR, flags);
 
 	// wait for all tasks to get up and running:
 	vPrintString("> ControlTask waiting for helper tasks...\n");
@@ -172,11 +162,12 @@ void ControlTask(void *pvParameters)
 	{
 		// Lees uit of er een knop ingedrukt is.
 		buttonBits = xEventGroupWaitBits(handle_ButtonEventGroup,
-			BIT_START_BUTTON | BIT_STOP_BUTTON | BIT_RESET_BUTTON,
+			EVT_START_BUTTON | EVT_STOP_BUTTON | EVT_RESET_BUTTON,
 			clearAllbits,	// ontvangen bits wissen
-			waitForAnyBit,	// één van de bits is genoeg
+			waitForAnyBit,	// Ã©Ã©n van de bits is genoeg
 			0				// niet blokkeren
 		);
+
 
 		// Emergency check via Semaphore
 		if (xSemaphoreTake(handle_EmergencySemaphore, 0) == pdTRUE)
@@ -191,7 +182,7 @@ void ControlTask(void *pvParameters)
 			case  STATE_WAIT:
 			{
 				// Wachten op start-of resetknop
-				if ((buttonBits & BIT_START_BUTTON) || (buttonBits & BIT_RESET_BUTTON))
+				if ((buttonBits & EVT_START_BUTTON) || (buttonBits & EVT_RESET_BUTTON))
 				{
 
 					// Naar HomingState schakelen.
@@ -206,9 +197,8 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_HOMING:
 			{
-				//xSemaphoreTake(TimerInterruptSemaphore, ticksToWait);
-				//homingStarted = startHoming();
-				homingAllMotorsDone = HomingStep(); //<- MotorControl.c
+
+				homingAllMotorsDone = homeAllMotors(); //<- MotorControl.c
 
 				if (homingAllMotorsDone)
 				{
@@ -222,12 +212,12 @@ void ControlTask(void *pvParameters)
 			case  STATE_READY:
 			{
 				// Op vaste positie regelen op iedere control tick
-				xSemaphoreTake(TimerInterruptSemaphore, ticksToWait);
+				xSemaphoreTake(handle_TimerInterruptSemaphore, ticksToWait);
 				
 				//TODO: HoldPosition()
 
 				// Startknop -> runnen
-				if (buttonBits & BIT_START_BUTTON)
+				if (buttonBits & EVT_START_BUTTON)
 				{
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
 					cycleDone = false;
@@ -241,13 +231,13 @@ void ControlTask(void *pvParameters)
 			case  STATE_RUNNING:
 			{
 				// Sequence draaien op control tick
-				xSemaphoreTake(TimerInterruptSemaphore, ticksToWait);
+				xSemaphoreTake(handle_TimerInterruptSemaphore, ticksToWait);
 	
 				//TODO: cycleDone = RunSequenceStep();
 
 
 				// Stopknop -> terug naar READY
-				if (buttonBits & BIT_STOP_BUTTON)
+				if (buttonBits & EVT_STOP_BUTTON)
 				{
 					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
 					SetState(STATE_READY);
@@ -270,7 +260,7 @@ void ControlTask(void *pvParameters)
 				taskSleep(10);
 
 				// Alleen uit fault als reset is gedrukt EN foutsignaal weg is
-				if (buttonBits & BIT_RESET_BUTTON)
+				if (buttonBits & EVT_RESET_BUTTON)
 				{
 					if (!IsFaultInputActive())
 					{
@@ -298,117 +288,3 @@ void ControlTask(void *pvParameters)
 	/* Should never get here */
 	vTaskDelete(NULL);
 }//End-ControlTask
-
-
-///////////////////////////////////////////////////////////////////////////////
-// void ControlTask(void *pvParameters)
-/*
-void ControlTask(void *pvParameters)
-{
-	uint32_t flags = 0;
-	uint32_t maxSemCount = 1;
-	uint32_t initialSemCount = 0;
-
-	EventBits_t uxBits = 0;
-	BaseType_t clearAllbits	  = pdFALSE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
-	BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
-	TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
-	
-	double wblFactor = 0.0;
-	
-	vPrintString("> starting ControlTask (load)\n");
-
-	// schakeld direct de motoren uit.
-	motor_DisableESCONController();
-
-	// setup external 1 ms timer tick handler:
-	// maak Semaphore aan
-	TimerInterruptSemaphore = xSemaphoreCreateCounting(maxSemCount, initialSemCount);
-	
-	// Bij opkomend signaal in PIN, run ClockInterruptHandler. 
-	flags = PIO_IT_RISE_EDGE;
-	interrupt_AttachHandler(ClockInterruptHandler, PIN_30, flags);
-	
-	vPrintString("> ControlTask waiting for helper tasks...\n");
-
-	// wait for ButtonHandlerTask and ParameterSettingTask to get up and running:
-	// Wacht tot BIT_1 AND BIT_0 TRUE zijn in handle_ThreadEventGroup, 
-	uxBits = xEventGroupWaitBits(handle_ThreadEventGroup, BIT_1 | BIT_0,
-								 clearAllbits, waitForAllbits, ticksToWait);	
-
-	vPrintString("> helper tasks running, ControlTask started, event group = 0x%04x\n", uxBits);
-	
-	// Stel de Quadraturecounters in.
-	QCEncodersSetup();
-	
-	// Schakelt de Escon in en stuurt naar home positie.
-	motor_EnableESCONController(); 
-	motor_GotoHomePosition(MOVE_LEFT); 
-
-	// zet Quadraturecounter op nul en print dit.
-	QCEncodersClearCount();
-	QCEncodersShowCount("> Initial home");
-
-	vPrintString("> ready\n");
-	vPrintString("> press button SW1 to start (watch your fingers...)\n");
-	
-	// Wacht tot reset/start knop ingedrukt wordt.
-	ticksToWait = portMAX_DELAY;
-	xSemaphoreTake(handle_RestartSemaphore, ticksToWait);	// wait for SW1 first button press
-	
-	while (true)
-	{
-		// Zoek nogmaals de home positie op, zet de QC op nul en print dit.
-		motor_GotoHomePosition(MOVE_LEFT);
-		QCEncodersClearCount();
-		QCEncodersShowCount("> HOME");
-		
-		// Check ingestelde bandbreedte waarde en print.
-		// always leave parameter value in queue! So use xQueuePeek
-		ticksToWait = 0;
-		xQueuePeek(handle_ParameterQueue, &wblFactor, ticksToWait);
-		vPrintString("> running with wblFactor: %.3f\n", wblFactor);
-		
-		// Mechanische parameters voor regeling bepalen
-		posctrlLoad_InitParameters(wblFactor);
-		
-		
-		ControlLoop();	// this loop exits by pressing button SW1
-	}
-	
-	/* Should never go here */
-	vTaskDelete(NULL);
-}
-
-
-///////////////////////////////////////////////////////////////////////////////
-//  void ControlLoop(void)
-
-void ControlLoop(void)
-{
-	vPrintString("> enter Control Loop (load)\n");
-
-	BaseType_t restart = pdFALSE;
-	BaseType_t ticksToWait = 0;
-	bool continueControlLoop = true;
-	
-	
-	while (continueControlLoop)
-	{
-		// wait for periodic 1 ms timer tick to unblock this thread and
-		// run the motion controller:
-		xSemaphoreTake(TimerInterruptSemaphore, portMAX_DELAY);
-		posctrlLoad_RunController();
-		
-		// check restart semaphore here, invoked by button press
-		restart = xSemaphoreTake(handle_RestartSemaphore, ticksToWait);
-		if (restart == pdTRUE)
-		{
-			continueControlLoop = false;
-		}
-		taskSleep(0);
-	}
-
-	vPrintString("> exit Control Loop (load)\n");
-}
-*/

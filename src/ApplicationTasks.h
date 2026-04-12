@@ -13,7 +13,9 @@
 // objects made available for external use
 
 extern EventGroupHandle_t	handle_ThreadEventGroup;
-extern SemaphoreHandle_t	handle_RestartSemaphore;
+extern EventGroupHandle_t	handle_ButtonEventGroup;
+extern SemaphoreHandle_t	handle_TimerInterruptSemaphore;
+extern SemaphoreHandle_t	handle_EmergencySemaphore;
 extern QueueHandle_t		handle_StateQueue;
 
 

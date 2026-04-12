@@ -11,15 +11,11 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////
-#define CLOCK_PIN PIN_30
-#define NOODSTOP_PIN PIN_50
-#define NOODSCHAKEL_PIN PIN_51
-#define ESCONFOUT_PIN PIN_52
+#include "MachinePins.h"
 
-
-#define LAMP_GREEN     0
-#define LAMP_ORANGE    1
-#define LAMP_RED       2
+#define LAMP_GREEN     BIT_LAMP_GREEN
+#define LAMP_ORANGE    BIT_LAMP_ORANGE
+#define LAMP_RED       BIT_LAMP_RED
 
 ///////////////////////////////////////////////////////////////////////////////
 // local type definitions
