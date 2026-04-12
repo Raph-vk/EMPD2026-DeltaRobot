@@ -717,10 +717,10 @@
     <Compile Include="src\MotorControl.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\ParameterSettingTask.c">
+    <Compile Include="src\VisualisationTask.c">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\ParameterSettingTask.h">
+    <Compile Include="src\VisualisationTask.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\PositionControllerLoad.c">

@@ -128,7 +128,7 @@ void ControlTask(void *pvParameters)
 	TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
 
 
-	bool homingDone = false;
+	bool homingAllMotorsDone = false;
 	bool cycleDone  = false;
 
 	uint32_t flags = 0;
@@ -196,7 +196,7 @@ void ControlTask(void *pvParameters)
 
 					// Naar HomingState schakelen.
 					vPrintString("> WAIT -> HOMING ( Start-of Resetknop is ontvangen).\n");
-					homingDone = false;
+					homingAllMotorsDone = false;
 					SetState(STATE_HOMING);
 				}
 				taskSleep(10);
@@ -206,10 +206,11 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_HOMING:
 			{
+				//xSemaphoreTake(TimerInterruptSemaphore, ticksToWait);
+				//homingStarted = startHoming();
+				homingAllMotorsDone = HomingStep(); //<- MotorControl.c
 
-				//TODO: homingDone = HomingStep(); <- MotorControl.c
-
-				if (homingDone)
+				if (homingAllMotorsDone)
 				{
 					vPrintString("> HOMING complete -> READY\n");
 					SetState(STATE_READY);
