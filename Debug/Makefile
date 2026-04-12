@@ -116,7 +116,7 @@ C_SRCS +=  \
 ../src/ASF/common/services/spi/sam_spi/spi_master.c \
 ../src/ButtonHandlerTask.c \
 ../src/MotorControl.c \
-../src/ParameterSettingTask.c \
+../src/VisualisationTask.c \
 ../src/PositionControllerLoad.c \
 ../src/QuadratureCounters.c \
 ../src/RTSWLibrary/ADCLib.c \
@@ -187,7 +187,7 @@ src/ControlTask.o \
 src/ASF/common/services/spi/sam_spi/spi_master.o \
 src/ButtonHandlerTask.o \
 src/MotorControl.o \
-src/ParameterSettingTask.o \
+src/VisualisationTask.o \
 src/PositionControllerLoad.o \
 src/QuadratureCounters.o \
 src/RTSWLibrary/ADCLib.o \
@@ -251,7 +251,7 @@ src/ControlTask.o \
 src/ASF/common/services/spi/sam_spi/spi_master.o \
 src/ButtonHandlerTask.o \
 src/MotorControl.o \
-src/ParameterSettingTask.o \
+src/VisualisationTask.o \
 src/PositionControllerLoad.o \
 src/QuadratureCounters.o \
 src/RTSWLibrary/ADCLib.o \
@@ -315,7 +315,7 @@ src/ControlTask.d \
 src/ASF/common/services/spi/sam_spi/spi_master.d \
 src/ButtonHandlerTask.d \
 src/MotorControl.d \
-src/ParameterSettingTask.d \
+src/VisualisationTask.d \
 src/PositionControllerLoad.d \
 src/QuadratureCounters.d \
 src/RTSWLibrary/ADCLib.d \
@@ -379,7 +379,7 @@ src/ControlTask.d \
 src/ASF/common/services/spi/sam_spi/spi_master.d \
 src/ButtonHandlerTask.d \
 src/MotorControl.d \
-src/ParameterSettingTask.d \
+src/VisualisationTask.d \
 src/PositionControllerLoad.d \
 src/QuadratureCounters.d \
 src/RTSWLibrary/ADCLib.d \
@@ -437,9 +437,9 @@ src/ASF/sam/utils/cmsis/sam3x/source/templates/gcc/startup_sam3x.d \
 src/ASF/sam/utils/cmsis/sam3x/source/templates/system_sam3x.d \
 src/ASF/sam/utils/syscalls/gcc/syscalls.d
 
-OUTPUT_FILE_PATH +=EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.elf
+OUTPUT_FILE_PATH +=EMPD2026-DeltaRobot.elf
 
-OUTPUT_FILE_PATH_AS_ARGS +=EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.elf
+OUTPUT_FILE_PATH_AS_ARGS +=EMPD2026-DeltaRobot.elf
 
 ADDITIONAL_DEPENDENCIES:=
 
@@ -487,7 +487,7 @@ src/MotorControl.o: ../src/MotorControl.c
 	@echo Finished building: $<
 	
 
-src/ParameterSettingTask.o: ../src/ParameterSettingTask.c
+src/VisualisationTask.o: ../src/VisualisationTask.c
 	@echo Building file: $<
 	@echo Invoking: ARM/GNU C Compiler : 6.3.1
 	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-gcc.exe$(QUOTE)  -x c -funsigned-char -funsigned-bitfields -mthumb -D__SAM3X8E__ -DDEBUG -DBOARD=ARDUINO_DUE_X -Dscanf=iscanf -DARM_MATH_CM3=true -Dprintf=iprintf -D__SAM3X8E__ -D__FREERTOS__  -I"../src/ASF/common/boards" -I"../src/ASF/sam/utils" -I"../src/ASF/sam/utils/header_files" -I"../src/ASF/sam/utils/preprocessor" -I"../src/ASF/thirdparty/CMSIS/Include" -I"../src/ASF/thirdparty/CMSIS/Lib/GCC" -I"../src/ASF/common/utils" -I"../src/ASF/sam/utils/cmsis/sam3x/source/templates" -I"../src/ASF/sam/utils/cmsis/sam3x/include" -I"../src/ASF/sam/boards" -I"../src/ASF/sam/boards/arduino_due_x" -I"../src/ASF/common/services/gpio" -I"../src/ASF/sam/drivers/pio" -I"../src/ASF/common/services/ioport" -I"../src/ASF/common/services/clock" -I"../src/ASF/sam/drivers/pmc" -I"../src" -I"../src/config" -I"../src/ASF/sam/drivers/pdc" -I"../src/ASF/sam/drivers/pdc/pdc_uart_example" -I"../src/ASF/sam/drivers/rtt" -I"../src/ASF/sam/drivers/tc" -I"../src/ASF/sam/drivers/uart" -I"../src/ASF/common/services/freertos/sam" -I"../src/ASF/common/services/serial/sam_uart" -I"../src/ASF/common/services/serial" -I"../src/ASF/common/services/twi" -I"../src/ASF/sam/drivers/twi" -I"../src/ASF/sam/drivers/usart" -I"../src/ASF/thirdparty/freertos/freertos-10.4.6/source/include" -I"../src/ASF/thirdparty/freertos/freertos-10.4.6/source/portable/GCC/ARM_CM3" -I"../src/OS" -I"../src/freertosCLI" -I"../src/CommandConsole" -I"../src/ASF/common/services/delay" -I"../src/ASF/sam/drivers/spi" -I"../src/ASF/sam/drivers/adc" -I"../src/ASF/common/services/spi/sam_spi" -I"../src/ASF/common/services/spi" -I"../src/RTSWLibrary"  -O1 -fdata-sections -ffunction-sections -fdata-sections -mlong-calls -g2 -Wall -mcpu=cortex-m3 -c -pipe -fno-strict-aliasing -Wall -Wstrict-prototypes -Wmissing-prototypes -Werror-implicit-function-declaration -Wpointer-arith -std=gnu99 -ffunction-sections -fdata-sections -Wchar-subscripts -Wcomment -Wformat=2 -Wimplicit-int -Wmain -Wparentheses -Wsequence-point -Wreturn-type -Wswitch -Wtrigraphs -Wunused -Wuninitialized -Wunknown-pragmas -Wfloat-equal -Wundef -Wshadow -Wbad-function-cast -Wwrite-strings -Wsign-compare -Waggregate-return  -Wmissing-declarations -Wformat -Wmissing-format-attribute -Wno-deprecated-declarations -Wpacked -Wlong-long -Wunreachable-code -Wcast-align --param max-inline-insns-single=500 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
@@ -912,14 +912,14 @@ all: $(OUTPUT_FILE_PATH) $(ADDITIONAL_DEPENDENCIES)
 $(OUTPUT_FILE_PATH): $(OBJS) $(USER_OBJS) $(OUTPUT_FILE_DEP) $(LIB_DEP) $(LINKER_SCRIPT_DEP)
 	@echo Building target: $@
 	@echo Invoking: ARM/GNU Linker : 6.3.1
-	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-gcc.exe$(QUOTE) -o$(OUTPUT_FILE_PATH_AS_ARGS) $(OBJS_AS_ARGS) $(USER_OBJS) $(LIBS) -mthumb -Wl,-Map="EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.map" -Wl,--start-group -larm_cortexM3l_math -lm  -Wl,--end-group -L"../src/ASF/thirdparty/CMSIS/Lib/GCC"  -Wl,--gc-sections -mcpu=cortex-m3 -Wl,--entry=Reset_Handler -Wl,--cref -mthumb -T../src/ASF/sam/utils/linker_scripts/sam3x/sam3x8/gcc/flash.ld  
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-gcc.exe$(QUOTE) -o$(OUTPUT_FILE_PATH_AS_ARGS) $(OBJS_AS_ARGS) $(USER_OBJS) $(LIBS) -mthumb -Wl,-Map="EMPD2026-DeltaRobot.map" -Wl,--start-group -larm_cortexM3l_math -lm  -Wl,--end-group -L"../src/ASF/thirdparty/CMSIS/Lib/GCC"  -Wl,--gc-sections -mcpu=cortex-m3 -Wl,--entry=Reset_Handler -Wl,--cref -mthumb -T../src/ASF/sam/utils/linker_scripts/sam3x/sam3x8/gcc/flash.ld  
 	@echo Finished building target: $@
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O binary "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.elf" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.bin"
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O ihex -R .eeprom -R .fuse -R .lock -R .signature  "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.elf" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.hex"
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.elf" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.eep" || exit 0
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objdump.exe" -h -S "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.elf" > "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.lss"
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O srec -R .eeprom -R .fuse -R .lock -R .signature  "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.elf" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.srec"
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-size.exe" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.elf"
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O binary "EMPD2026-DeltaRobot.elf" "EMPD2026-DeltaRobot.bin"
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O ihex -R .eeprom -R .fuse -R .lock -R .signature  "EMPD2026-DeltaRobot.elf" "EMPD2026-DeltaRobot.hex"
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary "EMPD2026-DeltaRobot.elf" "EMPD2026-DeltaRobot.eep" || exit 0
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objdump.exe" -h -S "EMPD2026-DeltaRobot.elf" > "EMPD2026-DeltaRobot.lss"
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O srec -R .eeprom -R .fuse -R .lock -R .signature  "EMPD2026-DeltaRobot.elf" "EMPD2026-DeltaRobot.srec"
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-size.exe" "EMPD2026-DeltaRobot.elf"
 	
 	
 
@@ -931,5 +931,5 @@ $(OUTPUT_FILE_PATH): $(OBJS) $(USER_OBJS) $(OUTPUT_FILE_DEP) $(LIB_DEP) $(LINKER
 clean:
 	-$(RM) $(OBJS_AS_ARGS) $(EXECUTABLES)  
 	-$(RM) $(C_DEPS_AS_ARGS)   
-	rm -rf "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.elf" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.a" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.hex" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.bin" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.lss" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.eep" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.map" "EMPD_Test_028_ControlLoop_LastRegeling_AdjustableBW.srec"
+	rm -rf "EMPD2026-DeltaRobot.elf" "EMPD2026-DeltaRobot.a" "EMPD2026-DeltaRobot.hex" "EMPD2026-DeltaRobot.bin" "EMPD2026-DeltaRobot.lss" "EMPD2026-DeltaRobot.eep" "EMPD2026-DeltaRobot.map" "EMPD2026-DeltaRobot.srec"
 	

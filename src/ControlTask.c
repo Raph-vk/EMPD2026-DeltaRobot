@@ -32,7 +32,7 @@
 #include "ButtonHandlerTask.h"
 #include "ControlTask.h"
 #include "ApplicationTasks.h"
-//#include "PositionControllerLoad.h"
+#include "PositionControllerLoad.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
@@ -125,7 +125,7 @@ void ControlTask(void *pvParameters)
 
 
 	bool homingAllMotorsDone = false;
-	bool cycleDone  = false;
+	bool sequenceDone  = false;
 
 	uint32_t flags = 0;
 	
@@ -202,6 +202,7 @@ void ControlTask(void *pvParameters)
 
 				if (homingAllMotorsDone)
 				{
+					Init_ControlParameters();
 					vPrintString("> HOMING complete -> READY\n");
 					SetState(STATE_READY);
 				}
@@ -214,11 +215,12 @@ void ControlTask(void *pvParameters)
 				// Op vaste positie regelen op iedere control tick
 				xSemaphoreTake(handle_TimerInterruptSemaphore, ticksToWait);
 				
-				//TODO: HoldPosition()
+				HoldPosition(0.0, 0.0, 0.0);	// TODO: Replace with desired hold angles.
 
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
 				{
+					StartMoveTo(0.0, 0.0, 0.0, 2000U);	// TODO: Replace with desired move target and move time.
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
 					cycleDone = false;
 					SetState(STATE_RUNNING);
@@ -233,8 +235,7 @@ void ControlTask(void *pvParameters)
 				// Sequence draaien op control tick
 				xSemaphoreTake(handle_TimerInterruptSemaphore, ticksToWait);
 	
-				//TODO: cycleDone = RunSequenceStep();
-
+				sequenceDone = RunSequence();
 
 				// Stopknop -> terug naar READY
 				if (buttonBits & EVT_STOP_BUTTON)
@@ -243,7 +244,7 @@ void ControlTask(void *pvParameters)
 					SetState(STATE_READY);
 				}
 				// Cyclus klaar -> terug naar READY
-				else if (cycleDone)
+				else if (sequenceDone)
 				{
 					vPrintString("> RUNNING -> READY (cyclus voldaan)\n");
 					SetState(STATE_READY);
@@ -281,7 +282,8 @@ void ControlTask(void *pvParameters)
 				SetState(STATE_FAULT);
 				break;
 			}
-		}
+			
+		}//End-SwitchCase
 	
 	}//End-WhileLoop
 	

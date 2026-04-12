@@ -195,9 +195,10 @@ src/ControlTask.d src/ControlTask.o: ../src/ControlTask.c \
  ../src/CommandConsole/vPrintString.h ../src/RTSWLibrary/TaskSleep.h \
  ../src/RTSWLibrary/DeviceIOLib.h ../src/RTSWLibrary/InterruptLib.h \
  ../src/RTSWLibrary/DeviceIOLib.h ../src/RTSWLibrary/bits.h \
- ../src/PositionControllerLoad.h ../src/MotorControl.h \
- ../src/QuadratureCounters.h ../src/ButtonHandlerTask.h \
- ../src/ControlTask.h ../src/ApplicationTasks.h
+ ../src/MotorControl.h ../src/MachinePins.h \
+ ../src/RTSWLibrary/PortIOLib.h ../src/RTSWLibrary/SwitchLib.h \
+ ../src/ButtonHandlerTask.h ../src/ControlTask.h \
+ ../src/ApplicationTasks.h ../src/PositionControllerLoad.h
 
 ../src/RTSWLibrary/asf.h:
 
@@ -609,14 +610,18 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/RTSWLibrary/bits.h:
 
-../src/PositionControllerLoad.h:
-
 ../src/MotorControl.h:
 
-../src/QuadratureCounters.h:
+../src/MachinePins.h:
+
+../src/RTSWLibrary/PortIOLib.h:
+
+../src/RTSWLibrary/SwitchLib.h:
 
 ../src/ButtonHandlerTask.h:
 
 ../src/ControlTask.h:
 
 ../src/ApplicationTasks.h:
+
+../src/PositionControllerLoad.h:

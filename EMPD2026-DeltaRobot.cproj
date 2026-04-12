@@ -711,6 +711,9 @@
     <Compile Include="src\ControlTask.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\MachinePins.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\MotorControl.c">
       <SubType>compile</SubType>
     </Compile>

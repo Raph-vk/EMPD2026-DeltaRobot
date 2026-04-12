@@ -1,6 +1,6 @@
-src/ApplicationTasks.d src/ApplicationTasks.o: ../src/ApplicationTasks.c \
- ../src/RTSWLibrary/asf.h ../src/ASF/sam/drivers/adc/adc.h \
- ../src/ASF/sam/utils/compiler.h \
+src/VisualisationTask.d src/VisualisationTask.o: \
+ ../src/VisualisationTask.c ../src/RTSWLibrary/asf.h \
+ ../src/ASF/sam/drivers/adc/adc.h ../src/ASF/sam/utils/compiler.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stddef.h \
  ../src/ASF/common/utils/parts.h \
  ../src/ASF/sam/utils/preprocessor/preprocessor.h \
@@ -190,14 +190,15 @@ src/ApplicationTasks.d src/ApplicationTasks.o: ../src/ApplicationTasks.c \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\string.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\xlocale.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h \
  ../src/CommandConsole/CommandConsole.h \
  ../src/CommandConsole/vPrintString.h \
  ../src/CommandConsole/vPrintString.h ../src/RTSWLibrary/TaskSleep.h \
- ../src/ApplicationTasks.h ../src/ButtonHandlerTask.h \
- ../src/RTSWLibrary/bits.h ../src/VisualisationTask.h \
+ ../src/RTSWLibrary/I2CLib.h ../src/ApplicationTasks.h \
  ../src/ControlTask.h ../src/MachinePins.h \
  ../src/RTSWLibrary/DeviceIOLib.h ../src/RTSWLibrary/PortIOLib.h \
- ../src/RTSWLibrary/SwitchLib.h
+ ../src/RTSWLibrary/SwitchLib.h ../src/VisualisationTask.h \
+ ../src/RTSWLibrary/bits.h
 
 ../src/RTSWLibrary/asf.h:
 
@@ -593,6 +594,8 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h:
 
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h:
+
 ../src/CommandConsole/CommandConsole.h:
 
 ../src/CommandConsole/vPrintString.h:
@@ -601,13 +604,9 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/RTSWLibrary/TaskSleep.h:
 
+../src/RTSWLibrary/I2CLib.h:
+
 ../src/ApplicationTasks.h:
-
-../src/ButtonHandlerTask.h:
-
-../src/RTSWLibrary/bits.h:
-
-../src/VisualisationTask.h:
 
 ../src/ControlTask.h:
 
@@ -618,3 +617,7 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../src/RTSWLibrary/PortIOLib.h:
 
 ../src/RTSWLibrary/SwitchLib.h:
+
+../src/VisualisationTask.h:
+
+../src/RTSWLibrary/bits.h:

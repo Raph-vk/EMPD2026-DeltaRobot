@@ -12,7 +12,7 @@ src\ButtonHandlerTask.c
 
 src\MotorControl.c
 
-src\ParameterSettingTask.c
+src\VisualisationTask.c
 
 src\PositionControllerLoad.c
 
