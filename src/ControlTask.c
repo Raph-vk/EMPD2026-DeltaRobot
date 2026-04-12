@@ -1,7 +1,7 @@
 ﻿/*
  * ControlTask.c
  *
- * Created: 11/04/2026
+ * Created: 10/04/2026
  * Author: Raph van Koeveringe
  */
 
@@ -32,7 +32,7 @@
 #include "ButtonHandlerTask.h"
 #include "ControlTask.h"
 #include "ApplicationTasks.h"
-#include "PositionControllerLoad.h"
+#include "MotionEngine.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
@@ -74,9 +74,9 @@ void ClockInterruptHandler(uint32_t id, uint32_t mask)
 {
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-	if (handle_TimerInterruptSemaphore != NULL)
+	if (handle_ControlTask != NULL)
 	{
-		xSemaphoreGiveFromISR(handle_TimerInterruptSemaphore, &xHigherPriorityTaskWoken);
+		vTaskNotifyGiveFromISR(handle_ControlTask, &xHigherPriorityTaskWoken);
 	}
 
 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
@@ -131,19 +131,16 @@ void ControlTask(void *pvParameters)
 	
 	vPrintString("> starting ControlTask.\n");
 
+	SetState(STATE_INIT);
+	
 	// schakeld direct de motoren uit.
 	motor_DisableESCONController();
-
-	// setup external 1 ms timer tick handler:
-	// semaphores worden centraal beheerd in ApplicationTasks.c
-
 	
 	// Bij opkomend signaal in PIN, run ClockInterruptHandler.
-	flags = PIO_IT_RISE_EDGE;
+	flags = PIO_IT_RISE_EDGE; // PIO_IT_FALL_EDGE
 	interrupt_AttachHandler(ClockInterruptHandler, PIN_CLOCK, flags);
 	
 	// Bij opkomend signaal in PINs, run EmergencyInterruptHandler.
-	flags = PIO_IT_RISE_EDGE;
 	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_ESON_OVERLOAD, flags);
 	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSTOP, flags);
 	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSCHAKELAAR, flags);
@@ -197,12 +194,13 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_HOMING:
 			{
-
+				taskSleep(1);
 				homingAllMotorsDone = homeAllMotors(); //<- MotorControl.c
-
+				
 				if (homingAllMotorsDone)
 				{
-					Init_ControlParameters();
+					MotionEngine_Init();
+					MotionEngine_HoldCurrentPosition();
 					vPrintString("> HOMING complete -> READY\n");
 					SetState(STATE_READY);
 				}
@@ -213,16 +211,14 @@ void ControlTask(void *pvParameters)
 			case  STATE_READY:
 			{
 				// Op vaste positie regelen op iedere control tick
-				xSemaphoreTake(handle_TimerInterruptSemaphore, ticksToWait);
-				
-				HoldPosition(0.0, 0.0, 0.0);	// TODO: Replace with desired hold angles.
+				ulTaskNotifyTake(pdTRUE, ticksToWait);
+				MotionEngine_RunTick();
 
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
 				{
-					StartMoveTo(0.0, 0.0, 0.0, 2000U);	// TODO: Replace with desired move target and move time.
+					MotionEngine_ResetSequence();
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
-					cycleDone = false;
 					SetState(STATE_RUNNING);
 				}
 
@@ -233,19 +229,22 @@ void ControlTask(void *pvParameters)
 			case  STATE_RUNNING:
 			{
 				// Sequence draaien op control tick
-				xSemaphoreTake(handle_TimerInterruptSemaphore, ticksToWait);
-	
-				sequenceDone = RunSequence();
+				ulTaskNotifyTake(pdTRUE, ticksToWait);
+				MotionEngine_RunTick();
+				sequenceDone = MotionEngine_RunSequence();
 
 				// Stopknop -> terug naar READY
 				if (buttonBits & EVT_STOP_BUTTON)
 				{
+					MotionEngine_ResetSequence();
+					MotionEngine_HoldCurrentPosition();
 					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
 					SetState(STATE_READY);
 				}
 				// Cyclus klaar -> terug naar READY
 				else if (sequenceDone)
 				{
+					MotionEngine_HoldCurrentPosition();
 					vPrintString("> RUNNING -> READY (cyclus voldaan)\n");
 					SetState(STATE_READY);
 				}
@@ -256,6 +255,7 @@ void ControlTask(void *pvParameters)
 			case  STATE_FAULT:
 			{
 				// Veilig forceren
+				MotionEngine_Disable();
 				motor_DisableESCONController();
 
 				taskSleep(10);

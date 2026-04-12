@@ -191,12 +191,11 @@ src/PositionControllerLoad.d src/PositionControllerLoad.o: \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\xlocale.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h \
- ../src/CommandConsole/CommandConsole.h \
- ../src/CommandConsole/vPrintString.h \
- ../src/CommandConsole/vPrintString.h ../src/RTSWLibrary/TaskSleep.h \
- ../src/RTSWLibrary/DAC4921Lib.h ../src/RTSWLibrary/QC7366Lib.h \
- ../src/RTSWLibrary/bits.h ../src/PositionControllerLoad.h \
- ../src/RTSWLibrary/map.h
+ ../src/PositionControllerLoad.h ../src/MotorControl.h \
+ ../src/MachinePins.h ../src/RTSWLibrary/DeviceIOLib.h \
+ ../src/RTSWLibrary/PortIOLib.h ../src/RTSWLibrary/SwitchLib.h \
+ ../src/RTSWLibrary/Map.h ../src/RTSWLibrary/DAC4921Lib.h \
+ ../src/RTSWLibrary/QC7366Lib.h ../src/RTSWLibrary/bits.h
 
 ../src/RTSWLibrary/asf.h:
 
@@ -594,20 +593,22 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h:
 
-../src/CommandConsole/CommandConsole.h:
+../src/PositionControllerLoad.h:
 
-../src/CommandConsole/vPrintString.h:
+../src/MotorControl.h:
 
-../src/CommandConsole/vPrintString.h:
+../src/MachinePins.h:
 
-../src/RTSWLibrary/TaskSleep.h:
+../src/RTSWLibrary/DeviceIOLib.h:
+
+../src/RTSWLibrary/PortIOLib.h:
+
+../src/RTSWLibrary/SwitchLib.h:
+
+../src/RTSWLibrary/Map.h:
 
 ../src/RTSWLibrary/DAC4921Lib.h:
 
 ../src/RTSWLibrary/QC7366Lib.h:
 
 ../src/RTSWLibrary/bits.h:
-
-../src/PositionControllerLoad.h:
-
-../src/RTSWLibrary/map.h:

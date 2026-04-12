@@ -33,10 +33,6 @@
 // function prototypes
 
 
-void QCEncodersSetup(void);
-void QCEncodersClearCount(uint8_t qcChannel);
-
-
 void motor_EnableESCONController(void);
 void motor_DisableESCONController(void);
 bool motor_HasOverload(void);

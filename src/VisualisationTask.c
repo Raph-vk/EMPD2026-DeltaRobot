@@ -163,7 +163,7 @@ void VisualisationTask(void *pvParameters)
 				break;				
 			}
 		}
-		taskSleep(10);
+	
 		
 		//Loop teller voor blink, praktisch; 37, 38, 39, 0, 1, 2 ....
 		i = (i + 1) % 40;;
@@ -184,6 +184,8 @@ void VisualisationTask(void *pvParameters)
 			displayTick = 0;
 		}
 		*/
+		
+		taskSleep(10);
 	}
 	
 	

@@ -1,4 +1,4 @@
-/*
+ï»¿/*
  * MotorControl.c
  *
  * Created: 10-04-2026
@@ -32,6 +32,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
 #include "MotorControl.h"
+#include "QuadratureCounters.h"
 //#include "ControlTask.h"
 
 
@@ -46,57 +47,15 @@ static const uint8_t G_MotorQcChannel[N_MOTORS] ={0, 1, 2};
 static const uint8_t G_MotorHomeLimitBit[N_MOTORS] = {M1_LIMIT, M2_LIMIT, M3_LIMIT};
 
 // Homing-spanning per motor.
-// Zet het teken per motor goed afhankelijk van draairichting!
-static const float G_MotorHomeVoltage[N_MOTORS] = {4.0f, 4.0f, 4.0f};
+static const float Home_uDac[N_MOTORS] = {4.0f, 4.0f, 4.0f};
 
 // Hold-spanning per motor: ongeveer zwaartekracht compenseren.
-// Deze waardes moet je praktisch afregelen.
-static const float G_MotorHoldVoltage[N_MOTORS] ={0.60f, 0.60f, 0.60f};
+static const float Hold_uDac[N_MOTORS] ={0.60f, 0.60f, 0.60f};
 
-static bool G_MotorHomed[N_MOTORS] = { false, false, false };
-static bool G_HomingStarted = false;
+static bool MotorHomed[N_MOTORS] = { false, false, false };
+static bool HomingStarted = false;
 
 // dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], voltage);
-
-
-///////////////////////////////////////////////////////////////////////////////
-// void QCEncodersSetup(void)
-// Zet de juiste instellingen voor de quadratureCounters.
-
-void QCEncodersSetup(void)
-{
-	uint8_t qcChannel     = 0;
-	uint8_t	qcDefaultMode = 0;
-	mode_register_t qcModeRegister = QC_MODE_REGISTER_0;
-	
-	// bitmask, meerdere configuratiebits gecombineerd worden tot één configuratiewaarde.
-	// MODE_QC_4 = vier signalen, stijgende en vallende edges van A en B channel. Dus maximale resolutie.
-	// MODE_FREERUNNING = teller blijft doorlopen.
-	// INDEX_DISABLE = Z-kanaal wordt niet gebruikt.
-	// INDEX_ASYNC = index wordt direct verwerkt, niet gesynchroniseerd. (maar doet niks want disabled).
-	// FILTERCLOCK_DIV_2 = digitale input filter, bepaald minimum pulsbreedte. (filter clock = system clock / 2)
-	qcDefaultMode = MODE_QC_4 | MODE_FREERUNNING | INDEX_DISABLE | INDEX_ASYNC | FILTERCLOCK_DIV_2;
-
-	// Voor alle beschikbare encoderkanalen:
-	for (qcChannel = 0; qcChannel <= QC_MAX_CHANNEL; qcChannel++)
-	{
-		//mode instellen, counter aanzetten, teller resetten.
-		qc_WriteModeRegister(qcChannel, qcModeRegister, qcDefaultMode);
-		qc_EnableCounter(qcChannel);
-		qc_ClearCountRegister(qcChannel);
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// void QCEncodersClearCount(uint8_t qcChannel)
-// Zet 1 specifieke quadraturecounter op nul.
-void QCEncodersClearCount(uint8_t qcChannel)
-{
-	if (qcChannel <= QC_MAX_CHANNEL)
-	{
-		qc_ClearCountRegister(qcChannel);
-	}
-}
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -178,23 +137,10 @@ static bool motor_IsHomeLimitActive(uint8_t motorIndex)
 	return port_IsBitSet(G_MotorHomeLimitBit[motorIndex]);
 }
 
-/*
-///////////////////////////////////////////////////////////////////////////////
-// void MotorHold(uint8_t motorIndex)
-//
-// Behoud motor op ongeveer zwaartekrachtkoppel. 
-void MotorHold(uint8_t motorIndex)
-{
-	if (motorIndex < N_MOTORS)
-	{
-		dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], G_MotorHoldVoltage[motorIndex]);
-	}
-}
-*/
 
 
 ///////////////////////////////////////////////////////////////////////////////
-// bool motors_Move(void)
+// bool homeAllMotors(void)
 //
 // - Motoren die nog niet op home zitten, omhoog aansturen
 // - Zodra limiet van die motor binnenkomt:
@@ -205,12 +151,10 @@ void MotorHold(uint8_t motorIndex)
 bool homeAllMotors(void)
 {
 	uint8_t motorIndex = 0;
-	bool allHomed = true;
-	
 	//motor_DisplayStatus();
 
 	// Eerste keer: initialiseren / starten
-	if (G_HomingStarted == false)
+	if (HomingStarted == false)
 	{
 		// DAC-spanning eerst op 0 forceren
 		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
@@ -219,26 +163,26 @@ bool homeAllMotors(void)
 		}
 		
 		// Aandrijving inschakelen				
-		G_HomingStarted = true;
+		HomingStarted = true;
 		QCEncodersSetup();
 		motor_EnableESCONController();
 		
 		// Voor iedere motor spanning opzetten, als deze nog niet op eindpositie is.
 		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 		{
-			G_MotorHomed[motorIndex] = false;
+			MotorHomed[motorIndex] = false;
 
 			// Als motor al op limit staat bij start:
 			if (motor_IsHomeLimitActive(motorIndex))
 			{
 				//Zet op nul en houdt op positie.
-				QCEncodersClearCount(G_MotorQcChannel[motorIndex]);
-				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], G_MotorHoldVoltage[motorIndex]);
-				G_MotorHomed[motorIndex] = true;
+				qc_ClearCountRegister(G_MotorQcChannel[motorIndex]);
+				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], Hold_uDac[motorIndex]);
+				MotorHomed[motorIndex] = true;
 			}
 			else
 			{
-				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], G_MotorHomeVoltage[motorIndex]);
+				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], Home_uDac[motorIndex]);
 			}
 		}
 	}
@@ -252,18 +196,21 @@ bool homeAllMotors(void)
 		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 		{
 			dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], 0.0f);
-			G_MotorHomed[motorIndex] = false;
+			MotorHomed[motorIndex] = false;
 		}
 
-		G_HomingStarted = false;
+		HomingStarted = false;
 		// motor_DisableESCONController();  // (gebeurd al in emergencyinterrupt)
 		return false;
 	}
 
+
+	
 	// Homing per motor afhandelen
+	bool allHomed = true; //assume safe
 	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 	{
-		if (G_MotorHomed[motorIndex] == false)
+		if (MotorHomed[motorIndex] == false)
 		{
 			if (motor_IsHomeLimitActive(motorIndex))
 			{
@@ -272,17 +219,17 @@ bool homeAllMotors(void)
 				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], 0.0f);
 
 				// Encoder van die motor op nul
-				QCEncodersClearCount(G_MotorQcChannel[motorIndex]);
+				qc_ClearCountRegister(G_MotorQcChannel[motorIndex]);
 
 				// Daarna hold-koppel geven
-				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], G_MotorHoldVoltage[motorIndex]);
+				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], Hold_uDac[motorIndex]);
 
-				G_MotorHomed[motorIndex] = true;
+				MotorHomed[motorIndex] = true;
 			}
 			else
 			{
 				// Blijf homing-spanning uitsturen
-				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], G_MotorHomeVoltage[motorIndex]);
+				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], Home_uDac[motorIndex]);
 				allHomed = false;
 			}
 		}
@@ -291,18 +238,19 @@ bool homeAllMotors(void)
 	// Check of echt alles klaar is
 	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 	{
-		if (G_MotorHomed[motorIndex] == false)
+		if (MotorHomed[motorIndex] == false)
 		{
 			allHomed = false;
 			break;
 		}
 	}
 
+	// Als alles gehomed is
 	if (allHomed)
 	{
-		G_HomingStarted = false;
+		HomingStarted = false;
 		led_DisplayValue(0x0F);  //Alle ledjes aan.
 	}
-
+		
 	return allHomed;
 }

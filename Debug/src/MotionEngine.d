@@ -1,4 +1,4 @@
-src/ControlTask.d src/ControlTask.o: ../src/ControlTask.c \
+src/MotionEngine.d src/MotionEngine.o: ../src/MotionEngine.c \
  ../src/RTSWLibrary/asf.h ../src/ASF/sam/drivers/adc/adc.h \
  ../src/ASF/sam/utils/compiler.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\lib\gcc\arm-none-eabi\6.3.1\include\stddef.h \
@@ -187,18 +187,12 @@ src/ControlTask.d src/ControlTask.o: ../src/ControlTask.c \
  ../src/ASF/common/services/serial/sam_uart/uart_serial.h \
  ../src/ASF/sam/drivers/usart/usart.h ../src/config/conf_uart_serial.h \
  ../src/ASF/sam/drivers/pio/pio_handler.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\string.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\xlocale.h \
- c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h \
- ../src/CommandConsole/CommandConsole.h \
- ../src/CommandConsole/vPrintString.h \
- ../src/CommandConsole/vPrintString.h ../src/RTSWLibrary/TaskSleep.h \
- ../src/RTSWLibrary/DeviceIOLib.h ../src/RTSWLibrary/InterruptLib.h \
- ../src/RTSWLibrary/DeviceIOLib.h ../src/RTSWLibrary/bits.h \
- ../src/MotorControl.h ../src/MachinePins.h \
- ../src/RTSWLibrary/PortIOLib.h ../src/RTSWLibrary/SwitchLib.h \
- ../src/ButtonHandlerTask.h ../src/ControlTask.h \
- ../src/ApplicationTasks.h ../src/MotionEngine.h
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h \
+ ../src/MotionEngine.h ../src/MotorControl.h ../src/MachinePins.h \
+ ../src/RTSWLibrary/DeviceIOLib.h ../src/RTSWLibrary/PortIOLib.h \
+ ../src/RTSWLibrary/SwitchLib.h ../src/DeltaKinematics.h \
+ ../src/RTSWLibrary/Map.h ../src/RTSWLibrary/DAC4921Lib.h \
+ ../src/RTSWLibrary/QC7366Lib.h ../src/RTSWLibrary/bits.h
 
 ../src/RTSWLibrary/asf.h:
 
@@ -588,40 +582,26 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/ASF/sam/drivers/pio/pio_handler.h:
 
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\string.h:
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h:
 
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\xlocale.h:
-
-c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h:
-
-../src/CommandConsole/CommandConsole.h:
-
-../src/CommandConsole/vPrintString.h:
-
-../src/CommandConsole/vPrintString.h:
-
-../src/RTSWLibrary/TaskSleep.h:
-
-../src/RTSWLibrary/DeviceIOLib.h:
-
-../src/RTSWLibrary/InterruptLib.h:
-
-../src/RTSWLibrary/DeviceIOLib.h:
-
-../src/RTSWLibrary/bits.h:
+../src/MotionEngine.h:
 
 ../src/MotorControl.h:
 
 ../src/MachinePins.h:
 
+../src/RTSWLibrary/DeviceIOLib.h:
+
 ../src/RTSWLibrary/PortIOLib.h:
 
 ../src/RTSWLibrary/SwitchLib.h:
 
-../src/ButtonHandlerTask.h:
+../src/DeltaKinematics.h:
 
-../src/ControlTask.h:
+../src/RTSWLibrary/Map.h:
 
-../src/ApplicationTasks.h:
+../src/RTSWLibrary/DAC4921Lib.h:
 
-../src/MotionEngine.h:
+../src/RTSWLibrary/QC7366Lib.h:
+
+../src/RTSWLibrary/bits.h:

@@ -14,9 +14,9 @@
 
 extern EventGroupHandle_t	handle_ThreadEventGroup;
 extern EventGroupHandle_t	handle_ButtonEventGroup;
-extern SemaphoreHandle_t	handle_TimerInterruptSemaphore;
 extern SemaphoreHandle_t	handle_EmergencySemaphore;
 extern QueueHandle_t		handle_StateQueue;
+extern TaskHandle_t			handle_ControlTask;
 
 
 ///////////////////////////////////////////////////////////////////////////////

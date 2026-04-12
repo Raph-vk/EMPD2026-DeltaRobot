@@ -1,10 +1,12 @@
+﻿@ -1,299 +0,0 @@
 ﻿/*
- *  PositionControllerLoad.c
+ *  MotionEngine.c
  *
- *  Position control on the motor side.
- *  Rough implementation lines for hold and move control on a 1 ms tick.
+ *  
+ *  wordt op 1 kHz, interrupt getriggerd
+ *	De stappen en motorregeling  
  *
- *  Created: 12/04/2026
+ *  Created: 10/04/2026
  *  Authors: Raph van Koeveringe (/ Robbe)
  */
 
@@ -19,9 +21,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
-
-//#include "MotorControl.h"
-#include "PositionControllerLoad.h"
+#include "MotionEngine.h"
+#include "DeltaKinematics.h"
 
 #include "Map.h" // voor constrain() and fmap()
 

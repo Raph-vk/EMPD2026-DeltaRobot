@@ -31,7 +31,6 @@ Deze file is de centrale opstart van de applicatie.
 // application tasks handler declarations
 
 static TaskHandle_t handle_ButtonHandlerTask = NULL;
-static TaskHandle_t handle_ControlTask = NULL;
 static TaskHandle_t handle_VisualisationTask = NULL;
 
 
@@ -41,10 +40,10 @@ static TaskHandle_t handle_VisualisationTask = NULL;
 EventGroupHandle_t handle_ThreadEventGroup = NULL;
 EventGroupHandle_t handle_ButtonEventGroup = NULL;
 
-SemaphoreHandle_t  handle_TimerInterruptSemaphore = NULL;
 SemaphoreHandle_t  handle_EmergencySemaphore = NULL;
 
 QueueHandle_t      handle_StateQueue = NULL;
+TaskHandle_t       handle_ControlTask = NULL;
 
 
 
@@ -54,8 +53,6 @@ void StartApplicationTasks(void)
 {
 	BaseType_t result = pdFAIL;
 	UBaseType_t StateQueueSize = 1;
-	UBaseType_t maxSemCount = 1;
-	UBaseType_t initialSemCount = 0;
 
 	// Aanmaken van "SystemState queue"
 	// Geeft de actuele status waarin de machine zich bevindt door.
@@ -63,13 +60,6 @@ void StartApplicationTasks(void)
 	if (handle_StateQueue == NULL)
 	{
 		//Foutafhandeling is leeggelaten
-	}
-	
-	// Semaphore voor externe control-ticks.
-	handle_TimerInterruptSemaphore = xSemaphoreCreateCounting(maxSemCount, initialSemCount);
-	if (handle_TimerInterruptSemaphore == NULL)
-	{
-		// Foutafhandeling is leeggelaten
 	}
 	
 	// EmergencySmephore aanmaken

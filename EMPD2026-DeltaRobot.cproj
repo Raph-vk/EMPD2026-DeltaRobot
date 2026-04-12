@@ -726,10 +726,16 @@
     <Compile Include="src\VisualisationTask.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\PositionControllerLoad.c">
+    <Compile Include="src\MotionEngine.c">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\PositionControllerLoad.h">
+    <Compile Include="src\MotionEngine.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\DeltaKinematics.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\DeltaKinematics.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\QuadratureCounters.c">
