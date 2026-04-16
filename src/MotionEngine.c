@@ -163,9 +163,7 @@ Bool sequenceDone = false;
 
 bool RunSequence(void) 
 {
-	if ((stap == 0) &&		MoveTo(0.0, 0.0, -200.0, 1.1))		stap = 1;
-	else if ((stap == 1) && MoveTo(-100.0, 100.0, -200.0, 3.0))	stap = 2;
-	else if ((stap == 2) && MoveTo(100.0, -100.0, -200.0, 1.1))
+	Move_ToSetpoint(100,100,-300, 1.1) // x,y,z,Tmax -> setpoint
 	{
 		sequenceDone = true;
 		stap = 0;
@@ -175,28 +173,27 @@ bool RunSequence(void)
 
 
 ///////////////////////////////////////////////////////////////////////////////
-// bool MoveTo(void)
+// bool Move_ToSetpoint(void)
 //
 // Called once per 1 ms tick. Evaluates the move profile and controls the motors.
 Bool setupMotionProfileDone = false;
 static double grijperEindPos[N_MOTORS]	= {0.0, 0.0, 0.0};	// Berekende output
 
-static const double  xMax = 0.0; // [m]
-static const double  vMax = 1.0; // [m/s]
-static const double  aMax = 1.0; // [m/s2]
-static const double  aMax = 1.0; // [m/s2]
+static const double  xMax = 0.0; // [m] eind positie
+static const double  vMax = 1.0; // [m/s] maximale snelheid
+static const double  aMax = 1.0; // [m/s2] maximale acceleratie
+static const double  rMax = NULL; // [m/s3] maximale RUK
 
 
-
-
-Bool MoveTo(double x_eindPos, double y_eindPos, double z_eindPos, double Tmax)
+Bool Move_ToSetpoint(double x_eindPos, double y_eindPos, double z_eindPos, double Tmax)
 {
 	motorIndex = 0;
 	
 	// Uitlezen van actuele positie
 	actualUpperArmPos = ReadUpperArmPositions();
 	
-
+	// Bepalen van (motorhoek) eindpositie.
+	grijperEindPos = InverseKinematica(double x_eindPos, double y_eindPos, double z_eindPos); // inversekinematica
 	
 	
 	// Eenmalig nieuw bewegingsprofiel berekenen.

@@ -19,16 +19,16 @@
 #define BIT_M1_HOME			1 // PIN_31
 #define BIT_M2_HOME			2 // PIN_32
 #define BIT_M3_HOME			3 // PIN_33
-#define BIT_ESON_OVERLOAD	4 // PIN_34
-#define BIT_NOODSTOP		5 // PIN_35
-//#define BIT_NOODSCHAKELAAR  6 // PIN_36
-//#define INPUT_BIT_  7
+#define BIT_NOOD			4 // PIN_34
+#define BIT_START			5 // PIN_35
+//#define BIT_STOP  6 // PIN_36
+//#define BIT_RESET  7
 
 //PINS for Attach_InterruptHandler() function
 #define PIN_CLOCK			PIN_30
-#define PIN_ESON_OVERLOAD	PIN_34
-#define PIN_NOODSTOP		PIN_35
-#define PIN_NOODSCHAKELAAR  PIN_36
+#define PIN_NOOD			PIN_34
+//#define PIN_NOODSTOP		PIN_35
+//#define PIN_NOODSCHAKELAAR  PIN_36
 
 ///////////////////////////////////////////////////////////////////////////////
 // 8-bit output port layout on the RTSW board (handeld by PortIOLib.h)
