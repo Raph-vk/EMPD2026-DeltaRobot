@@ -141,6 +141,7 @@ void ControlTask(void *pvParameters)
 	interrupt_AttachHandler(ClockInterruptHandler, PIN_CLOCK, flags);
 	
 	// Bij opkomend signaal in PINs, run EmergencyInterruptHandler.
+	flags = PIO_IT_FALL_EDGE; // PIO_IT_FALL_EDGE
 	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_ESON_OVERLOAD, flags);
 	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSTOP, flags);
 	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSCHAKELAAR, flags);

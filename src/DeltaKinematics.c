@@ -24,6 +24,9 @@
 #define DELTA_TAN60			(1.7320508075688772935f)
 #define DELTA_SIN30			(0.5f)
 
+#define T_sample			(0.001f)
+
+
 typedef struct
 {
 	float baseRadius_mm;
@@ -46,6 +49,40 @@ static const DeltaGeometry_t RobotGeometry =
 	0.0f,	// bovenarm lengte
 	0.0f	// onderarm lengte
 };
+
+
+//////////////////////////////////////////////////////////////////////////////
+/* PID controller waarden 
+ * error input -> returnwaarde = gewenste spanning 
+ */
+// Regelaarconstanten
+static const float Kp = 1.0f;
+static const float Ki = 0.0f;
+static const float Kd = 0.0f;
+
+// Interne geheugens
+static float integral = 0.0f;
+static float prevError = 0.0f;
+
+float PID_Controller(float error)
+{
+	float derivative;
+	float voltage;
+	
+	// I-actie
+	integral += error * T_sample;
+
+	// D-actie
+	derivative = (error - prevError) / T_sample;
+
+	// PID uitgang
+	voltage = (Kp * error) + (Ki * integral) + (Kd * derivative);
+
+	// Vorige error opslaan
+	prevError = error;
+
+	return voltage;
+}
 
 static bool GeometryIsValid(const DeltaGeometry_t *geometry)
 {
@@ -102,11 +139,6 @@ static int DeltaKinematics_CalcAngleYZ(const DeltaGeometry_t *geometry, float x0
 	}
 
 	return 0;
-}
-
-bool DeltaKinematics_IsGeometryValid(void)
-{
-	return GeometryIsValid(&RobotGeometry);
 }
 
 bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float jointAnglesRad[3])

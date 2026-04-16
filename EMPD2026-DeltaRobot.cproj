@@ -711,6 +711,12 @@
     <Compile Include="src\ControlTask.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\DeltaKinematics.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\DeltaKinematics.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\MachinePins.h">
       <SubType>compile</SubType>
     </Compile>
@@ -730,12 +736,6 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\MotionEngine.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\DeltaKinematics.c">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\DeltaKinematics.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\QuadratureCounters.c">

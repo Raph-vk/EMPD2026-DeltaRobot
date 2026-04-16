@@ -132,10 +132,10 @@ void HoldPosition(double rad_arm1, double rad_arm2, double rad_arm3)
 		// Fout bepalen
 		angleError[motorIndex] = holdUpperArmPos[motorIndex] - actualUpperArmPos[motorIndex];
 		
-		// Voltage berekenen
-		motorControlOutput[motorIndex] = (Kp * angleError[motorIndex]); // output [V] = Kp [V/rad] * error [rad] (wellicht nog D en Iactie toevoegen?S
+		// Voltage berekenen mbv PID_Controller
+		motorControlOutput[motorIndex] = PID_Controller( angleError[motorIndex]) );
 
-		//Als te fout nog extreem is, rustig aan naar toe verplaatsen.
+		//Als de fout extreem is, rustig naar referentie punt toe verplaatsen.
 		if (fabs(angleError[motorIndex]) > largeErrorThreshold)
 		{
 			// Als fout positief is, voltage positief en visa versa.

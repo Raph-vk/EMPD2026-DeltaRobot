@@ -21,9 +21,10 @@
 #define BIT_M3_HOME			3 // PIN_33
 #define BIT_ESON_OVERLOAD	4 // PIN_34
 #define BIT_NOODSTOP		5 // PIN_35
-#define BIT_NOODSCHAKELAAR  6 // PIN_36
+//#define BIT_NOODSCHAKELAAR  6 // PIN_36
 //#define INPUT_BIT_  7
 
+//PINS for Attach_InterruptHandler() function
 #define PIN_CLOCK			PIN_30
 #define PIN_ESON_OVERLOAD	PIN_34
 #define PIN_NOODSTOP		PIN_35
@@ -32,7 +33,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // 8-bit output port layout on the RTSW board (handeld by PortIOLib.h)
 
-#define BIT_ESCON_ENABLE    0 // PIN_38 (alle escon's aan)
+//#define BIT_ESCON_ENABLE    0 // PIN_38 (alle escon's aan)
 #define BIT_LAMP_GREEN		1 // PIN_39
 #define BIT_LAMP_ORANGE		2 // PIN_40
 #define	BIT_LAMP_RED		3 // PIN_41
@@ -40,6 +41,15 @@
 //#define   5 // PIN_43
 //#define   6 // PIN_44
 //#define   7 // PIN_45
+
+///////////////////////////////////////////////////////////////////////////////
+// I2C ports
+// Scherm1
+// Scherm2
+
+///////////////////////////////////////////////////////////////////////////////
+// DAC -> Escon (ook via SPI)
+// 3x DAC escon
 
 ///////////////////////////////////////////////////////////////////////////////
 // PCB push buttons (handled by SwitchLib)
