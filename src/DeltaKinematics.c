@@ -84,6 +84,23 @@ float PID_Controller(float error)
 	return voltage;
 }
 
+//////////////////////////////////////////////////////////////////////////////
+/* FeedForward waarden bepalen 
+ * gewenste hoekacceleratie (bovenarm) input -> returnwaarde = gewenste spanning 
+ */
+// Regelaarconstanten
+static const double Je_totaal = 0.0;
+static const double KaKt = 0.0;
+static double uFF = NULL;
+
+float FeedForward(double alpha_Gewenst)
+{
+	//((Je1L+Je2L)*(alfag)/C2);
+	uFF = (Je_totaal * alpha_Gewenst)/KaKt;
+
+	return uFF;
+}
+
 
 
 bool DeltaKinematics_Inverse(const double tcpPosition_mm[3]) //XYZ
