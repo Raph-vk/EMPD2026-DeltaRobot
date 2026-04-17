@@ -4,39 +4,11 @@
  * Created: 10/04/2026
  * Author: Raph van Koeveringe
  */
-
 ///////////////////////////////////////////////////////////////////////////////
-// system includes
-
-#include <asf.h>
-#include <string.h>
-#include <stdbool.h>
-
-///////////////////////////////////////////////////////////////////////////////
-// FreeRTOS includes
-
-#include "CommandConsole.h"
-#include "vPrintString.h"
-#include "TaskSleep.h"
-
-///////////////////////////////////////////////////////////////////////////////
-// HAL includes for RTSW board
-
-#include "DeviceIOLib.h"
-#include "InterruptLib.h"
-#include "bits.h"
-
-///////////////////////////////////////////////////////////////////////////////
-// application includes
-#include "MotorControl.h"
-#include "ButtonHandlerTask.h"
 #include "ControlTask.h"
-#include "ApplicationTasks.h"
-#include "MotionEngine.h"
-
 ///////////////////////////////////////////////////////////////////////////////
-// file globals
 
+// file globals
 static SystemState_t state = STATE_INIT;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -60,9 +32,7 @@ static void SetState(SystemState_t newState)
 // Assumes active-high fault inputs.
 static bool IsFaultInputActive(void)
 {
-	return port_IsBitSet(BIT_ESON_OVERLOAD)
-		|| port_IsBitSet(BIT_NOODSTOP)
-		|| port_IsBitSet(BIT_NOODSCHAKELAAR);
+	return port_IsBitSet(BIT_NOOD);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -123,9 +93,8 @@ void ControlTask(void *pvParameters)
 	
 	TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
 
-
-	bool homingAllMotorsDone = false;
-	bool sequenceDone  = false;
+	Bool homingAllMotorsDone = false;
+	Bool sequenceDone  = false;
 
 	uint32_t flags = 0;
 	
@@ -142,9 +111,9 @@ void ControlTask(void *pvParameters)
 	
 	// Bij opkomend signaal in PINs, run EmergencyInterruptHandler.
 	flags = PIO_IT_FALL_EDGE; // PIO_IT_FALL_EDGE
-	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_ESON_OVERLOAD, flags);
-	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSTOP, flags);
-	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSCHAKELAAR, flags);
+	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOOD, flags);
+	//interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSTOP, flags);
+	//interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSCHAKELAAR, flags);
 
 	// wait for all tasks to get up and running:
 	vPrintString("> ControlTask waiting for helper tasks...\n");

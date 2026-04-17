@@ -1,45 +1,42 @@
 /*
  * MotionEngine.h
  *
- * Motion planning and joint servo entry points for the 1 ms control loop.
+ * Motion planning and motor-servo entry points for the 1 ms control loop.
  */
 
 #ifndef MOTIONENGINE_H_
 #define MOTIONENGINE_H_
 
+///////////////////////////////////////////////////////////////////////////////
+// system includes
+#include <asf.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
+#include <math.h>
 
-#include "MotorControl.h"
+///////////////////////////////////////////////////////////////////////////////
+// application includes
+#include "DeltaKinematics.h"
+#include "MachinePins.h"
 
-typedef enum
-{
-	MOTION_MODE_DISABLED = 0,
-	MOTION_MODE_HOLD,
-	MOTION_MODE_MOVE_JOINTS,
-	MOTION_MODE_MOVE_TCP,
-	MOTION_MODE_WAIT,
-	MOTION_MODE_GRIPPER
-} MotionMode_t;
+#include "vPrintString.h" 
+#include "Map.h" // voor constrain() and fmap()
 
-void MotionEngine_Init(void);
-void MotionEngine_Disable(void);
-void MotionEngine_RunTick(void);
+///////////////////////////////////////////////////////////////////////////////
+// HAL includes for RTSW board
 
-bool MotionEngine_HasValidKinematics(void);
+#include "DAC4921Lib.h"
+#include "QC7366Lib.h"
+///////////////////////////////////////////////////////////////////////////
+// Function prototypes
 
-void MotionEngine_HoldPosition(float q1, float q2, float q3);
-void MotionEngine_HoldCurrentPosition(void);
+void ReadMotorPositions(float motorPos_Rad[N_MOTORS]);
 
-bool MotionEngine_StartMoveToTcp(float x, float y, float z, uint32_t moveTimeMs);
-bool MotionEngine_StartMoveToJoints(float q1, float q2, float q3, uint32_t moveTimeMs);
-bool MotionEngine_StartWait(uint32_t waitTimeMs);
-void MotionEngine_SetGripperCommand(bool closed);
+void HoldPosition(float holdMotorPos_RadInput[N_MOTORS]);
 
-void MotionEngine_ResetSequence(void);
-bool MotionEngine_RunSequence(void);
+Bool RunSequence(void);
 
-bool MotionEngine_IsBusy(void);
-MotionMode_t MotionEngine_GetMode(void);
+Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tmax);
 
 #endif /* MOTIONENGINE_H_ */

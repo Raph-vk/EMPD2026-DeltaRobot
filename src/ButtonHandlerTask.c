@@ -24,7 +24,7 @@
 
 #include "SwitchLib.h"
 #include "ButtonHandlerTask.h"
-//#include "bits.h"
+#include "bits.h"
 //#include "PortIOLib.h"
 #include "MachinePins.h"
 

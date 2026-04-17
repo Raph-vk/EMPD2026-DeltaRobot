@@ -10,11 +10,13 @@ src\ASF\common\services\spi\sam_spi\spi_master.c
 
 src\ButtonHandlerTask.c
 
+src\DeltaKinematics.c
+
 src\MotorControl.c
 
 src\VisualisationTask.c
 
-src\PositionControllerLoad.c
+src\MotionEngine.c
 
 src\QuadratureCounters.c
 

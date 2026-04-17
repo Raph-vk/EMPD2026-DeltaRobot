@@ -4,18 +4,35 @@
  * Created: 10-04-2026
  *  Author: Raph van Koeveringe
  */ 
-
-
 #ifndef CONTROLTASK_H_
 #define CONTROLTASK_H_
 
+///////////////////////////////////////////////////////////////////////////////
+// system includes
+#include <asf.h>
+#include <string.h>
+#include <stdbool.h>
 
 ///////////////////////////////////////////////////////////////////////////////
-#include "MachinePins.h"
+// FreeRTOS includes
+#include "CommandConsole.h"
+#include "vPrintString.h"
+#include "TaskSleep.h"
 
-#define LAMP_GREEN     BIT_LAMP_GREEN
-#define LAMP_ORANGE    BIT_LAMP_ORANGE
-#define LAMP_RED       BIT_LAMP_RED
+///////////////////////////////////////////////////////////////////////////////
+// HAL includes for RTSW board
+
+#include "DeviceIOLib.h"
+#include "InterruptLib.h"
+#include "bits.h"
+
+///////////////////////////////////////////////////////////////////////////////
+// application includes
+#include "MotorControl.h"
+#include "ButtonHandlerTask.h"
+#include "ControlTask.h"
+#include "ApplicationTasks.h"
+#include "MachinePins.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // local type definitions

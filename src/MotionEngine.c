@@ -1,149 +1,92 @@
 ﻿﻿/*
  *  MotionEngine.c
- *
  *  
- *  wordt op 1 kHz, interrupt getriggerd
- *	De stappen en motorregeling  
+ *  MotionEngine for controlling the delta robot's motors to follow a desired trajectory.
  *
  *  Created: 10/04/2026
  *  Authors: Raph van Koeveringe (/ Robbe)
  */
-
 ///////////////////////////////////////////////////////////////////////////////
-// system includes
-
-#include <asf.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <string.h>
-#include <math.h>
-
-///////////////////////////////////////////////////////////////////////////////
-// application includes
 #include "MotionEngine.h"
-#include "DeltaKinematics.h"
-
-#include "Map.h" // voor constrain() and fmap()
-
-///////////////////////////////////////////////////////////////////////////////
-// HAL includes for RTSW board
-
-#include "DAC4921Lib.h"
-#include "QC7366Lib.h"
-
 ///////////////////////////////////////////////////////////////////////////////
 // globals
-double g_time = 0.0;               // time in seconds
-uint64_t g_tickCount = 0;          // clock tick count from 1 ms hardware clock
-uint16_t g_TicksPerSecond = 0;     // = 1 / sample time
+static float Ts = 0.001f;           // sample time, must match external clock
+static uint32_t TicksPerSecond = 1000.0f;     // = 1 / sample time
 
-static uint8_t motorIndex = 0;
-static uint32_t encoderCounts = 0;
-static double motorPos = 0;
+static float g_time = 0.0;               // totale tijd sinds opstarten van de robot in seconden
+static uint64_t tickCount = 0;          // clock tick count from 1 ms hardware clock
 
 ///////////////////////////////////////////////////////////////////////////////
 // general settings
-
-const double Ts = 0.001;           // sample time, must match external clock
-const double pi = 3.14159;
-
+static uint8_t mI = 0; //Motor index
 static const uint8_t MotorQcChannel[N_MOTORS] = {0, 1, 2};
 static const uint8_t MotorDacChannel[N_MOTORS] = {0, 1, 2};
 
-static const double EncoderCountsPerRevolution = 4096.0;
-static const double itwk = 47.0;
+static const float EncoderCountsPerRevolution = 2048.0f; // 2048 counts per revolution of the motor shaft
 
 ///////////////////////////////////////////////////////////////////////////////
-// controller settings
-
-double maxVelocityUpperArm = 1.0;          // TODO: <Set maximum upper arm velocity [rad/s].>
-double maxAccelerationUpperArm = 1.0;      // TODO: <Set maximum upper arm acceleration [rad/s^2].>
-
-double Kp = 1.0;                           // TODO: <Tune proportional gain.>
-double C2 = 1.0;                           // TODO: <Set motor/drive stiffness term.>
-double JeqUpperArm = 0.0;                  // TODO: <Equivalent inertia seen in upper arm coordinates.>
-
-
-double maxControlVoltage = 4.0;            // TODO: <Set absolute maximum motor voltage.>
-
-///////////////////////////////////////////////////////////////////////////////
-// position / motion state
-static double motorControlOutput[N_MOTORS]	= {0.0, 0.0, 0.0};	// Berekende output
-static double uDac[N_MOTORS]				= {0.0, 0.0, 0.0};	// Gelimiteerde uDac output [V] met uDac = Constraint(g,min,max)
+// position control variables
+static float motorControlOutput[N_MOTORS]	= {0.0, 0.0, 0.0};	// Berekende output
+static float uDac[N_MOTORS]				= {0.0, 0.0, 0.0};	// Gelimiteerde uDac output [V] met uDac = Constraint(g,min,max)
 	
-static double angleError[N_MOTORS]			= {0.0, 0.0, 0.0};	// Berekende fout [rad]
-static double actualUpperArmPos[N_MOTORS]	= {0.0, 0.0, 0.0};	// Gemeten arm positie [rad]
-
-static uint32_t moveTick = 0;
-static uint32_t moveTicksTotal = 0;
+static float hoekFout[N_MOTORS]			= {0.0f, 0.0f, 0.0f};	// Berekende fout in motor-rad
+static float motorPos_Rad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Gemeten motor-as positie [rad]
 
 
 
 ///////////////////////////////////////////////////////////////////////////////
-// static void ReadUpperArmPositions(double measuredUpperArmPosition[N_MOTORS])
+// static void ReadMotorPositions(float motorPos_Rad[N_MOTORS])
 //
-// Reads motor encoders and converts the motor rotor angle to upper arm angle.
-// Horizontaal is nul-positie.
-
-static double *ReadUpperArmPositions(void)
+// Lees motorenposities uit, en slaat deze op in de array "motorPos_Rad" in motor-radialen.
+static uint64_t encoderCounts = 0;
+void ReadMotorPositions(float motorPos_Rad[N_MOTORS])
 {
-	motorIndex = 0;
-
-	// Voor iedere motor
-	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
-	{
-		// encouderCount uitlezen en naar hoekpositie omrekenen
-		encoderCounts = qc_ReadCountRegister(MotorQcChannel[motorIndex]);
-		motorPos =((double)encoderCounts / EncoderCountsPerRevolution) * 2.0 * pi; //hoeveel radialen verplaatst t.o.v. (0, oftewel horizontaal)
-		actualUpperArmPos[motorIndex] = (motorPos / itwk);
-	}
-	
-	return actualUpperArmPos;
+    for (mI = 0; mI < N_MOTORS; mI++)
+    {
+        encoderCounts = qc_ReadCountRegister(MotorQcChannel[mI]);
+        motorPos_Rad[mI] = ((float)encoderCounts / EncoderCountsPerRevolution) * 2.0 * PI;
+    }
 }
 
 
-
 ///////////////////////////////////////////////////////////////////////////////
-// void HoldPosition(double q1, double q2, double q3)
+// void HoldPosition(float q1, float q2, float q3)
 //
-// Wordt na iedere 1 ms tick opgeroepen. 
-// behoud de alle bovenarmen op gewenste hoekposities.
+// Wordt na iedere 1 ms tick opgeroepen.
+// Behoudt alle motorassen op gewenste motorhoeken.
 
-double largeErrorThreshold		= 0.1;	// Wanneer fout groter is dan 0.1 [Rad]
-double slowApproachVoltage		= 0.75;	// [V] Gewenste voltage voor langzame verplaatsing
-static double holdUpperArmPos[N_MOTORS]		= {0.0, 0.0, 0.0};	// Vast te houden positie [rad]
+static float largeErrorThreshold		= 0.1f;	// Wanneer fout groter is dan 0.1 motor-rad
+static float slowApproachVoltage		= 0.75f;	// [V] Gewenste voltage voor langzame verplaatsing
+static float holdMotorPos_Rad[N_MOTORS];	// Vast te houden motorpositie [rad]
 
-void HoldPosition(double rad_arm1, double rad_arm2, double rad_arm3)
+void HoldPosition(float holdMotorPos_RadInput[N_MOTORS])
 {
-	motorIndex = 0;
+	mI = 0;
 
-	// Sla gewenste posities op
-	holdUpperArmPos[0] = rad_arm1;
-	holdUpperArmPos[1] = rad_arm2;
-	holdUpperArmPos[2] = rad_arm3;
-
-	// Lees bovenarmposities uit.
-	actualUpperArmPos = ReadUpperArmPositions();
+	// Lees motorposities uit.
+	ReadMotorPositions(motorPos_Rad);
 
 	// Voor iedere motor
-	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+	for (mI = 0; mI < N_MOTORS; mI++)
 	{
+		holdMotorPos_Rad[mI] = holdMotorPos_RadInput[mI];
+
 		// Fout bepalen
-		angleError[motorIndex] = holdUpperArmPos[motorIndex] - actualUpperArmPos[motorIndex];
+		hoekFout[mI] = holdMotorPos_Rad[mI] - motorPos_Rad[mI];
 		
 		// Voltage berekenen mbv PID_Controller
-		motorControlOutput[motorIndex] = PID_Controller( angleError[motorIndex]) );
+		motorControlOutput[mI] = PID_Controller( hoekFout[mI] );
 
 		//Als de fout extreem is, rustig naar referentie punt toe verplaatsen.
-		if (fabs(angleError[motorIndex]) > largeErrorThreshold)
+		if (fabs(hoekFout[mI]) > largeErrorThreshold)
 		{
 			// Als fout positief is, voltage positief en visa versa.
-			motorControlOutput[motorIndex] = (angleError[motorIndex] >= 0.0) ? slowApproachVoltage : -slowApproachVoltage;
+			motorControlOutput[mI] = (hoekFout[mI] >= 0.0) ? slowApproachVoltage : -slowApproachVoltage;
 		}
 
 		// Zorg dat waarde niet groter is dan maximale DAC-waarde, en output.
-		uDac[motorIndex] = constrain(motorControlOutput[motorIndex], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // min/max ongeveer +/-10V.
-		dac_SetOutputVoltage(MotorDacChannel[motorIndex], motorControlOutput[motorIndex]);
+		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // min/max ongeveer +/-10V.
+		dac_SetOutputVoltage(MotorDacChannel[mI], motorControlOutput[mI]);
 	}
 	
 }//End HoldPosition();
@@ -160,14 +103,15 @@ void HoldPosition(double rad_arm1, double rad_arm2, double rad_arm3)
 uint8_t stap = 0;
 Bool sequenceDone = false;
 
-bool RunSequence(void) 
+Bool RunSequence(void) 
 {
-	Move_ToSetpoint(100,100,-300, 1.1) // x,y,z,Tmax -> setpoint
+	if (Move_ToSetpoint(100,100,-300, 1.1)) // x,y,z,Tmax -> setpoint
 	{
 		sequenceDone = true;
 		stap = 0;
 	}
-	return sequenceDone
+
+	return sequenceDone;
 }//end runSequence();
 
 
@@ -176,132 +120,170 @@ bool RunSequence(void)
 //
 // Called once per 1 ms tick. Evaluates the move profile and controls the motors.
 Bool setupMotionProfileDone = false;
-static double EindPos[N_MOTORS]	= {0.0, 0.0, 0.0};	// Berekende output
+static Bool verplaatsingKlaar = false;
 
-static const double  xMax = 0.0; // [m] eind positie
-static const double  vMax = 1.0; // [m/s] maximale snelheid
-static const double  aMax = 1.0; // [m/s2] maximale acceleratie
-static const double  rMax = NULL; // [m/s3] maximale RUK
+static float motorTargetRad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Berekende motor-eindpositie [rad]
 
-static Bool MotionEnded = false;
-static double t1, t2, tstart = 0.0;
-static double alphag, omegag, thetag;
+static const float  xMax = 0.0; // [m] eind positie
+static const float  vMax = 1.0; // [m/s] maximale snelheid
+static const float  aMax = 1.0; // [m/s2] maximale acceleratie
+static const float  rMax = 0.0; // [m/s3] maximale RUK
 
-Bool Move_ToSetpoint(double x_eindPos, double y_eindPos, double z_eindPos, double Tmax)
+static float thetaStart[N_MOTORS];		// Motorpositie aan het begin van de beweging [rad]
+static float thetaMax_inc[N_MOTORS];	// Totale incrementele motorverplaatsing [rad]
+static float rPiek[N_MOTORS];			// Piek-ruk in motorruimte [rad/s^3]
+static float alphaMax[N_MOTORS];		// Piek-hoekacceleratie in motorruimte [rad/s^2]
+static float alpha0[N_MOTORS], alpha1[N_MOTORS], alpha2[N_MOTORS], alpha3[N_MOTORS];
+
+static float thetaRef[N_MOTORS];		// Incrementele motorpositie referentie [rad]
+static float omegaRef[N_MOTORS];		// Motor-snelheidsreferentie [rad/s]
+static float alphaRef[N_MOTORS];		// Motor-acceleratiereferentie [rad/s^2]
+
+static float t0 = 0.0;
+static float t1 = 0.0;
+static float t2 = 0.0;
+
+static float tau = 0.0; // [s] tijd sinds start van beweging
+static float k = 0.0; //
+static float dt = 0.0;
+
+Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tmax)
 {
-	motorIndex = 0;
-	
+	mI = 0;
+
+	// Validatie van input parameters
+	if (Tmax <= 0.0)
+	{
+		return false;
+	}
+
 	// Uitlezen van actuele positie
-	actualUpperArmPos = ReadUpperArmPositions();
-	
-	// Bepalen van (motorhoek) eindpositie.
-	EindPos = DeltaKinematics_Inverse(double x_eindPos, double y_eindPos, double z_eindPos); // inversekinematica
-	
-	
+	ReadMotorPositions(motorPos_Rad);
+
 	// Eenmalig nieuw bewegingsprofiel berekenen.
 	if(!setupMotionProfileDone)
 	{
-		//double eindPos_M0, eindPos_M1, eindPos_M2 = NULL;
+		t0 = g_time; // starttijd van de beweging
 
-		
-		//TODO: actuele grijper positie bepalen  (armPos -> grijperPos transformatie)
-		//TODO: Te verplaatsen in X,Y,Z richting.
-		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+		//float eindPos_M0, eindPos_M1, eindPos_M2 = NULL;
+		float tcpTarget[3] = { x_eindPos, y_eindPos, z_eindPos };
+	
+		// Bepalen van de gewenste motor-eindpositie in motor-radialen.
+		if (!DeltaKinematics_Inverse(tcpTarget, motorTargetRad)) // inverse kinematica
 		{
-			// totaal te verplaatsen hoekbepalen
-			double path = actualUpperArmPos[motorIndex] - EindPos[motorIndex]
-			
-			double alpha0, alpha1, alpha2, alpha3, alphaMax = NULL;
-			double rMax = path * 32.0/pow(Tmax, 3);	// maximale ruk [m/s3]
-
-
-
-			// translatie bewegingsprofiel opstellen (positie derdegraads)
-			alpha0 = 0.0;
-			alpha1 = rMax*Tmax/4.0;
-			alpha2 = -rMax*Tmax/4.0;
-			alpha3 = 0.0;
-	
-			alphaMax	= rMax*Tmax/4.0;
-	
-			t1 = Tmax/4.0;
-			t2 = 3.0*Tmax/4.0;
+			//Indien positie buitenbereik is;
+			verplaatsingKlaar = true;
+			vPrintString("FOUT: ongeldige eindpositie voor inverse kinematica.\n");
+			setupMotionProfileDone = false;
+			return true;
 		}
 		
-		setupMotionProfileDone = true
+		// Bepalen van totaal incrementeel te verplaatsen motorhoek per motor
+		for (mI = 0; mI < N_MOTORS; mI++)
+		{
+			// Totaal te verplaatsen motorhoek bepalen.
+			thetaStart[mI] = motorPos_Rad[mI];
+			
+			thetaMax_inc[mI] = motorTargetRad[mI] - motorPos_Rad[mI];
+			
+			// Bepalen van maximale RUK per motor, zodat binnen Tmax blijft.
+			rPiek[mI] = thetaMax_inc[mI] * 32.0/(Tmax*Tmax*Tmax);	// maximale ruk [m/s3]
+			alphaMax[mI]	= rPiek[mI]*Tmax/4.0;
+		}
+		
+		t1 = 0.25f * Tmax; // Tmax / 4.0;
+		t2 = 0.75f * Tmax; // 3.0 * Tmax / 4.0;
+
+		setupMotionProfileDone = true;
 	}
 	
 	
-	
-	
-	// output voltage voor iedere motor bepalen t.o.v. referentiebewegingsprofiel
-	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+	// output voltage voor iedere motor bepalen t.o.v. incrementele referentiebewegingsprofiel
+	tau = g_time - t0;
+	dt = tau - t2;
+	for (mI = 0; mI < N_MOTORS; mI++)
 	{
+		// eenmalig bepalen
+		k = alphaMax[mI]/Tmax;
+
 		// opstellen van een referentiebewegingsprofiel voor de regeling
-		// Zolang de huidige tijd nog voor het startmoment ligt:
-		if (g_time <= 0)		// 1
+		// 1; Zolang de huidige tijd nog voor het startmoment ligt:
+		if (tau <= 0.0)
 		{
-			alphag  = 0.0;
-			omegag = 0.0;
-			thetag = 0.0;
-			MotionEnded = false;
+			alphaRef[mI]  = 0.0f;
+			omegaRef[mI] = 0.0f;
+			thetaRef[mI] = 0.0f;
+
+			verplaatsingKlaar = false;
 		}
-		// Eerste kwart van de beweging: versnelling opbouwen
-		else if ( g_time <= (Tmax/4.0) + tstart )		//	2
+		// 2; Eerste kwart van de beweging: versnelling opbouwen
+		else if ( tau <= t1 )		//	2
 		{
-			alphag	= (4.0 * alphaMax/Tmax) * (g_time-tstart);			// feed forward
-			omegag	= 2.0 * (alphaMax/Tmax) * pow(g_time-tstart, 2.0);	// feed forward
-			thetag	= (2.0/3.0) * (alphaMax/Tmax) * pow(g_time-tstart, 3.0);
+			alphaRef[mI]	= (4.0f * k) * (tau);			
+			omegaRef[mI]	= 2.0f * k * (tau*tau);
+			thetaRef[mI]	= (2.0f/3.0f) * k * (tau*tau*tau);
 			
-			MotionEnded = false;
+			verplaatsingKlaar = false;
 		}
 		// 3; van versnellen naar vertragen
-		else if ( g_time <= (3.0*Tmax/4.0) + tstart )	//	3
+		else if ( tau <= t2)	//	3
 		{
-			alphag	=	alphaMax - 4.0*(alphaMax/Tmax)*(g_time-(t1+tstart));
-			omegag	=	alphaMax * (g_time-(t1+tstart))
-			-2.0 * (alphaMax/Tmax) * pow((g_time-(t1+tstart)), 2.0)
-			+ (1.0/8.0)*alphaMax*Tmax;
-			thetag	=	0.5 * alphaMax * pow( (g_time-(t1+tstart)), 2.0)
-			- (2.0/3.0) * (alphaMax/Tmax) * pow( (g_time-(t1+tstart)), 3.0)
-			+ (1.0/8.0)*alphaMax*Tmax*(g_time-(t1+tstart))
-			+ (2.0/(3.0*64.0))*alphaMax*pow(Tmax, 2.0);
+			alphaRef[mI]	=	alphaMax[mI] - 4.0f*k*(tau);
+
+			omegaRef[mI]	=	alphaMax[mI] * (tau) -2.0f * k * ((tau)*(tau)) 
+							+ (1.0f/8.0f)*alphaMax[mI]*Tmax;
 			
-			MotionEnded = false;
+			thetaRef[mI]	=	0.5 * alphaMax[mI] * ((tau)*(tau)) 
+							- (2.0f/3.0f) * (k) * ((tau)*(tau)*(tau))
+							+ (1.0f/8.0f)*alphaMax[mI]*Tmax*(tau)
+							+ (2.0f/(3.0f*64.0f))*alphaMax[mI]*(Tmax*Tmax);
+			
+			verplaatsingKlaar = false;
 		}
 		// 4; van vertraging terug naar stilstand, actief remmen tot steeds minder remmen.
-		else if ( g_time <= (Tmax + tstart) )
+		else if ( tau <= Tmax )
 		{
-			alphag	=	-alphaMax + 4.0*(alphaMax/Tmax) * (g_time-(t2+tstart));
-			omegag	=	-alphaMax * (g_time-(t2+tstart))
-			+ 2.0*(alphaMax/Tmax) * pow((g_time-(t2+tstart)), 2.0)
-			+ (1.0/8.0)*alphaMax*Tmax;
-			thetag	=	-(alphaMax/2.0) * pow((g_time-(t2+tstart)), 2.0)
-			+ (2.0/3.0) * (alphaMax/Tmax) * pow( (g_time-(t2+tstart)), 3.0 )
-			+ (1.0/8.0) * alphaMax*Tmax*(g_time-(t2+tstart))
-			+ (22.0/(3.0*64.0)) * alphaMax*pow(Tmax, 2.0);
-			MotionEnded = false;
+			alphaRef[mI]	=	-alphaMax[mI] + 4.0*(k) * (dt);
+
+			omegaRef[mI]	=	-alphaMax[mI] * (dt)
+							+ 2.0f*(k) * ((dt)*(dt))
+							+ (0.125f)*alphaMax[mI]*Tmax;
+
+			thetaRef[mI]	=	-(alphaMax[mI]/2.0f) * ((dt)*(dt))
+							+ (2.0f/3.0f) * (k) * ((dt)*(dt)*(dt))
+							+ (0.125f) * alphaMax[mI]*Tmax*(dt)
+							+ (22.0f/(192.0f))*alphaMax[mI]*(Tmax*Tmax);
+
+			verplaatsingKlaar = false;
 		}
 		//	5; op eindpunt en Tmax verstreken.
 		else
 		{
-			alphag	=	0.0;
-			omegag	=	0.0;
-			thetag	=	EindPos[motorIndex];
-			MotionEnded = true;
+			alphaRef[mI]	=	0.0f;
+			omegaRef[mI]	=	0.0f;
+			thetaRef[mI]	=	thetaMax_inc[mI];
+
+			verplaatsingKlaar = true;
 			setupMotionProfileDone = false;
 		}
 
-		angleError[motorIndex] = alphag - actualUpperArmPos[motorIndex]
-		uDac[motorIndex] = PID_Controller(angleError[motorIndex]) + FeedForward(alphag);
-		uDac[motorIndex] = constrain(uDac[motorIndex], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE)
+		// Bepalen van output voltage mbv Fout, PID_Controller + FeedForward
+		hoekFout[mI] = (thetaRef[mI] + thetaStart[mI]) - motorPos_Rad[mI];
+		motorControlOutput[mI] = PID_Controller(hoekFout[mI]) + FeedForward(alphaRef[mI]);
+		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE);
 	}
 	
-	// tegelijk Daadwerkelijk iedere motor outputvoltage zetten.
-	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+	// Daadwerkelijk iedere motor outputvoltage zetten.
+	for (mI = 0; mI < N_MOTORS; mI++)
 	{
-		dac_SetOutputVoltage(motorIndex, uDac[motorIndex]);
+		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
 	}
 	
-	return MotionEnded;
+	//Tijd bijhouden
+	tickCount++;
+	g_time = ((float)tickCount) / TicksPerSecond;
+
+	// Return true als beweging klaar is, anders false.
+	return verplaatsingKlaar;
+
 }//END-function

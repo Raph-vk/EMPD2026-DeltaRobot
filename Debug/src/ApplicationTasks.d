@@ -195,9 +195,10 @@ src/ApplicationTasks.d src/ApplicationTasks.o: ../src/ApplicationTasks.c \
  ../src/CommandConsole/vPrintString.h ../src/RTSWLibrary/TaskSleep.h \
  ../src/ApplicationTasks.h ../src/ButtonHandlerTask.h \
  ../src/RTSWLibrary/bits.h ../src/VisualisationTask.h \
- ../src/ControlTask.h ../src/MachinePins.h \
- ../src/RTSWLibrary/DeviceIOLib.h ../src/RTSWLibrary/PortIOLib.h \
- ../src/RTSWLibrary/SwitchLib.h
+ ../src/ControlTask.h ../src/RTSWLibrary/DeviceIOLib.h \
+ ../src/RTSWLibrary/InterruptLib.h ../src/RTSWLibrary/DeviceIOLib.h \
+ ../src/MotorControl.h ../src/MachinePins.h \
+ ../src/RTSWLibrary/PortIOLib.h ../src/RTSWLibrary/SwitchLib.h
 
 ../src/RTSWLibrary/asf.h:
 
@@ -611,9 +612,15 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/ControlTask.h:
 
-../src/MachinePins.h:
+../src/RTSWLibrary/DeviceIOLib.h:
+
+../src/RTSWLibrary/InterruptLib.h:
 
 ../src/RTSWLibrary/DeviceIOLib.h:
+
+../src/MotorControl.h:
+
+../src/MachinePins.h:
 
 ../src/RTSWLibrary/PortIOLib.h:
 

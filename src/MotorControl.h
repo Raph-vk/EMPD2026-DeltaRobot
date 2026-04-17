@@ -19,7 +19,6 @@
 // #defines
 
 //Outputs
-#define N_MOTORS		3
 #define ESCON_ENABLE	BIT_ESCON_ENABLE	// bit positions in control output port
 // DAC0, DAC1, DAC2; Motor analoge voltages naar EsconModule.
 

@@ -33,6 +33,7 @@
 // application includes
 #include "MotorControl.h"
 #include "QuadratureCounters.h"
+#include "MachinePins.h"
 //#include "ControlTask.h"
 
 
@@ -55,14 +56,12 @@ static const float Hold_uDac[N_MOTORS] ={0.60f, 0.60f, 0.60f};
 static bool MotorHomed[N_MOTORS] = { false, false, false };
 static bool HomingStarted = false;
 
-// dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], voltage);
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // void motor_EnableESCONController(void)
 //
 //enable ESCON controller via output port bit 0
-
+/*
 void motor_EnableESCONController(void)
 {
 	port_SetBit(ESCON_ENABLE, true);
@@ -77,6 +76,8 @@ void motor_DisableESCONController(void)
 {
 	port_SetBit(ESCON_ENABLE, false);
 }
+*/
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // bool motor_HasOverload(void)
@@ -84,7 +85,7 @@ bool motor_HasOverload(void)
 {
 	bool overload = true; // Assume safe
 
-	overload = port_IsBitSet(ESCON_OVERLOAD);
+	overload = port_IsBitSet(BIT_NOOD);
 	
 	return overload;
 }
@@ -117,9 +118,9 @@ void motor_DisplayStatus(void)
 	bitVal = isSet? 1 : 0;
 	vPrintString("Limit M3:     %d\n", bitVal);
 
-	isSet = port_IsBitSet(ESCON_OVERLOAD);
+	isSet = port_IsBitSet(BIT_NOOD);
 	bitVal = isSet? 1 : 0;
-	vPrintString("ESCON Overload: %d\n", bitVal);
+	vPrintString("NOODSTOP / ESCON Overload: %d\n", bitVal);
 	
 	vPrintString("\n");
 }

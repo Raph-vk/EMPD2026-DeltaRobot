@@ -13,6 +13,11 @@
 #include "SwitchLib.h"
 
 ///////////////////////////////////////////////////////////////////////////////
+// Hoeveelheid motoren
+#define N_MOTORS		3
+#define i_twk			(47.0f) // 47:1 reductie tandwielkast
+
+///////////////////////////////////////////////////////////////////////////////
 // 8-bit input port layout on the RTSW board (handeld by PortIOLib.h)
 
 #define BIT_CLOCK			0 // PIN_30
