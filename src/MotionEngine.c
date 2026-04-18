@@ -1,4 +1,4 @@
-﻿﻿/*
+/*
  *  MotionEngine.c
  *  
  *  MotionEngine for controlling the delta robot's motors to follow a desired trajectory.
@@ -15,6 +15,8 @@ static uint32_t TicksPerSecond = 1000.0f;     // = 1 / sample time
 
 static float g_time = 0.0;               // totale tijd sinds opstarten van de robot in seconden
 static uint64_t tickCount = 0;          // clock tick count from 1 ms hardware clock
+static float holdTargetPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+static Bool holdTargetValid = false;
 
 ///////////////////////////////////////////////////////////////////////////////
 // general settings
@@ -31,6 +33,63 @@ static float uDac[N_MOTORS]				= {0.0, 0.0, 0.0};	// Gelimiteerde uDac output [V
 	
 static float hoekFout[N_MOTORS]			= {0.0f, 0.0f, 0.0f};	// Berekende fout in motor-rad
 static float motorPos_Rad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Gemeten motor-as positie [rad]
+static uint8_t stap = 0;
+static Bool sequenceDone = false;
+static Bool setupMotionProfileDone = false;
+static Bool verplaatsingKlaar = false;
+
+///////////////////////////////////////////////////////////////////////////////
+// High-level entry points expected by ControlTask
+
+void MotionEngine_Init(void)
+{
+	tickCount = 0;
+	g_time = 0.0f;
+	MotionEngine_ResetSequence();
+	MotionEngine_HoldCurrentPosition();
+}
+
+void MotionEngine_HoldCurrentPosition(void)
+{
+	ReadMotorPositions(holdTargetPos_Rad);
+	holdTargetValid = true;
+	HoldPosition(holdTargetPos_Rad);
+}
+
+void MotionEngine_RunTick(void)
+{
+	if (holdTargetValid)
+	{
+		HoldPosition(holdTargetPos_Rad);
+	}
+}
+
+void MotionEngine_ResetSequence(void)
+{
+	stap = 0;
+	sequenceDone = false;
+	setupMotionProfileDone = false;
+	verplaatsingKlaar = false;
+	holdTargetValid = false;
+}
+
+Bool MotionEngine_RunSequence(void)
+{
+	holdTargetValid = false;
+	return RunSequence();
+}
+
+void MotionEngine_Disable(void)
+{
+	uint8_t motorIndex = 0;
+
+	MotionEngine_ResetSequence();
+
+	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+	{
+		dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
+	}
+}
 
 
 
@@ -100,8 +159,6 @@ void HoldPosition(float holdMotorPos_RadInput[N_MOTORS])
 //
 // Called once per 1 ms tick.
 // Beslist welke stap er uitgevoerd moeten worden.
-uint8_t stap = 0;
-Bool sequenceDone = false;
 
 Bool RunSequence(void) 
 {
@@ -119,9 +176,6 @@ Bool RunSequence(void)
 // bool Move_ToSetpoint(void)
 //
 // Called once per 1 ms tick. Evaluates the move profile and controls the motors.
-Bool setupMotionProfileDone = false;
-static Bool verplaatsingKlaar = false;
-
 static float motorTargetRad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Berekende motor-eindpositie [rad]
 
 static const float  xMax = 0.0; // [m] eind positie

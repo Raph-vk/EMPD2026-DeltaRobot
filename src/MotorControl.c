@@ -56,12 +56,11 @@ static const float Hold_uDac[N_MOTORS] ={0.60f, 0.60f, 0.60f};
 static bool MotorHomed[N_MOTORS] = { false, false, false };
 static bool HomingStarted = false;
 
-
+/*
 ///////////////////////////////////////////////////////////////////////////////
 // void motor_EnableESCONController(void)
 //
 //enable ESCON controller via output port bit 0
-/*
 void motor_EnableESCONController(void)
 {
 	port_SetBit(ESCON_ENABLE, true);
@@ -77,7 +76,6 @@ void motor_DisableESCONController(void)
 	port_SetBit(ESCON_ENABLE, false);
 }
 */
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // bool motor_HasOverload(void)
@@ -166,7 +164,7 @@ bool homeAllMotors(void)
 		// Aandrijving inschakelen				
 		HomingStarted = true;
 		QCEncodersSetup();
-		motor_EnableESCONController();
+		//motor_EnableESCONController();
 		
 		// Voor iedere motor spanning opzetten, als deze nog niet op eindpositie is.
 		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)

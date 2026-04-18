@@ -30,9 +30,10 @@
 // application includes
 #include "MotorControl.h"
 #include "ButtonHandlerTask.h"
-#include "ControlTask.h"
+#include "MotionEngine.h"
 #include "ApplicationTasks.h"
 #include "MachinePins.h"
+#include "MotionEngine.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // local type definitions

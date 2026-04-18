@@ -62,7 +62,7 @@ void EmergencyInterruptHandler(uint32_t id, uint32_t mask)
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	
 	// Direct veilig maken
-	motor_DisableESCONController();
+	//motor_DisableESCONController();
 
 	if (handle_EmergencySemaphore != NULL)
 	{
@@ -103,7 +103,7 @@ void ControlTask(void *pvParameters)
 	SetState(STATE_INIT);
 	
 	// schakeld direct de motoren uit.
-	motor_DisableESCONController();
+	//motor_DisableESCONController();
 	
 	// Bij opkomend signaal in PIN, run ClockInterruptHandler.
 	flags = PIO_IT_RISE_EDGE; // PIO_IT_FALL_EDGE
@@ -226,7 +226,7 @@ void ControlTask(void *pvParameters)
 			{
 				// Veilig forceren
 				MotionEngine_Disable();
-				motor_DisableESCONController();
+				//motor_DisableESCONController();
 
 				taskSleep(10);
 

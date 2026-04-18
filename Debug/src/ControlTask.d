@@ -197,7 +197,11 @@ src/ControlTask.d src/ControlTask.o: ../src/ControlTask.c \
  ../src/RTSWLibrary/DeviceIOLib.h ../src/RTSWLibrary/bits.h \
  ../src/MotorControl.h ../src/MachinePins.h \
  ../src/RTSWLibrary/PortIOLib.h ../src/RTSWLibrary/SwitchLib.h \
- ../src/ButtonHandlerTask.h ../src/ApplicationTasks.h
+ ../src/ButtonHandlerTask.h ../src/MotionEngine.h \
+ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h \
+ ../src/DeltaKinematics.h ../src/RTSWLibrary/Map.h \
+ ../src/RTSWLibrary/DAC4921Lib.h ../src/RTSWLibrary/QC7366Lib.h \
+ ../src/RTSWLibrary/bits.h ../src/ApplicationTasks.h
 
 ../src/ControlTask.h:
 
@@ -620,5 +624,19 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../src/RTSWLibrary/SwitchLib.h:
 
 ../src/ButtonHandlerTask.h:
+
+../src/MotionEngine.h:
+
+c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\math.h:
+
+../src/DeltaKinematics.h:
+
+../src/RTSWLibrary/Map.h:
+
+../src/RTSWLibrary/DAC4921Lib.h:
+
+../src/RTSWLibrary/QC7366Lib.h:
+
+../src/RTSWLibrary/bits.h:
 
 ../src/ApplicationTasks.h:

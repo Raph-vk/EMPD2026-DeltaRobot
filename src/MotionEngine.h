@@ -31,6 +31,13 @@
 ///////////////////////////////////////////////////////////////////////////
 // Function prototypes
 
+void MotionEngine_Init(void);
+void MotionEngine_HoldCurrentPosition(void);
+void MotionEngine_RunTick(void);
+void MotionEngine_ResetSequence(void);
+Bool MotionEngine_RunSequence(void);
+void MotionEngine_Disable(void);
+
 void ReadMotorPositions(float motorPos_Rad[N_MOTORS]);
 
 void HoldPosition(float holdMotorPos_RadInput[N_MOTORS]);

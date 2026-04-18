@@ -26,7 +26,7 @@
 #define M1_LIMIT		BIT_M1_HOME
 #define M2_LIMIT		BIT_M2_HOME
 #define M3_LIMIT		BIT_M3_HOME
-#define ESCON_OVERLOAD	BIT_ESON_OVERLOAD
+#define ESCON_OVERLOAD	BIT_NOOD
 
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes
