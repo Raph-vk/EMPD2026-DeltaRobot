@@ -86,3 +86,7 @@ void QCEncodersClearCount(void)
 		qc_ClearCountRegister(qcChannel);
 	}
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Zet specifieke encoder op nul.
+//qc_ClearCountRegister(uint8_t channel)

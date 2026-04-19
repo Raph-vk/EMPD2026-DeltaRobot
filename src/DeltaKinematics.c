@@ -33,16 +33,6 @@ typedef struct
 static uint8_t motorIndex = 0; // Motor index voor iteraties, 0,1,2 voor M1,M2,M3
 ///////////////////////////////////////////////////////////////////////////////////////
 
-//////////////////////////////////////////////////////////////////////////////////////
-// @ROBBE vul de robotgeometrie waarden in, in millimeters.
-static const DeltaGeometry_t RobotGeometry =
-{
-	0.0f,	// elleboogRadius [mm]
-	0.0f,	// polsRadius [mm]
-	0.0f,	// bovenarm lengte [mm]
-	0.0f	// onderarm lengte [mm]
-};
-
 
 //////////////////////////////////////////////////////////////////////////////
 /* PID controller waarden 
@@ -96,6 +86,16 @@ float FeedForward(float alphaRad)
 	return uFF;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////
+// @ROBBE vul de robotgeometrie waarden in, in millimeters.
+static const DeltaGeometry_t RobotGeometry =
+{
+	200.0f,	// schouderRadius [mm]
+	40.0f,	// polsRadius [mm]
+	210.0f,	// bovenarm lengte [mm]
+	550.0f	// onderarm lengte [mm]
+};
+
 
 //////////////////////////////////////////////////////////////////////////////
 /* bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float jointAnglesRad[3])
@@ -109,7 +109,11 @@ float FeedForward(float alphaRad)
 // intern geheugen
 static float x= 0.0f;
 static float y= 0.0f;
-static float z= 0.0f;
+static float z= 0.0f;	
+
+static const Bovenarm_thetaMaxDeg = 40;
+static const Bovenarm_thetaMaxDeg = -80;
+
 static float jointPos[N_MOTORS]; // bovenarmhoeken in radialen (M1,M2,M3)
 static bool positionValid = false; // true als positie binnen bereik is, false als onbereikbaar
 
@@ -120,6 +124,11 @@ bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 	x = tcpPosition_mm[0];
 	y = tcpPosition_mm[1];
 	z = tcpPosition_mm[2];
+	
+	float rBase = RobotGeometry[0];    // basisradius,schouderpunt [mm]
+	float rPols = RobotGeometry[1];        // platformradius [mm]
+	float LengteBovenarm = RobotGeometry[2];   // bovenarm [mm]
+	float LengteOnderarm = RobotGeometry[3];   // onderarm [mm]
 
 	//////////////////////////////////////////////////////////////////////////
 	// @ROBBE/TESSA TODO: Berekeningen XYZ -> M1,M2,M3

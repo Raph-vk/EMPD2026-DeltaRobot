@@ -4,57 +4,7 @@
  * Created: 10-04-2026
  *  Author: Raph van Koeveringe
  */ 
-
-///////////////////////////////////////////////////////////////////////////////
-// system includes
-
-#include <asf.h>
-#include <string.h>
-#include <stdbool.h>
-#include <stdint.h>
-
-///////////////////////////////////////////////////////////////////////////////
-// application includes
-
-#include "CommandConsole.h"
-#include "vPrintString.h"
-#include "TaskSleep.h"
-
-///////////////////////////////////////////////////////////////////////////////
-// HAL includes for RTSW board
-
-#include "LEDLib.h"
-#include "PortIOLib.h"
-#include "DAC4921Lib.h"
-#include "QC7366Lib.h" // LS7366R encoder counter
-
-
-///////////////////////////////////////////////////////////////////////////////
-// application includes
 #include "MotorControl.h"
-#include "QuadratureCounters.h"
-#include "MachinePins.h"
-//#include "ControlTask.h"
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// motor configuratie
-
-static const uint8_t G_MotorDacChannel[N_MOTORS] ={0, 1, 2};
-static const uint8_t G_MotorQcChannel[N_MOTORS] ={0, 1, 2};
-
-// VUL HIER JOUW ECHTE LIMIT-BITS IN:
-static const uint8_t G_MotorHomeLimitBit[N_MOTORS] = {M1_LIMIT, M2_LIMIT, M3_LIMIT};
-
-// Homing-spanning per motor.
-static const float Home_uDac[N_MOTORS] = {4.0f, 4.0f, 4.0f};
-
-// Hold-spanning per motor: ongeveer zwaartekracht compenseren.
-static const float Hold_uDac[N_MOTORS] ={0.60f, 0.60f, 0.60f};
-
-static bool MotorHomed[N_MOTORS] = { false, false, false };
-static bool HomingStarted = false;
 
 /*
 ///////////////////////////////////////////////////////////////////////////////
@@ -79,13 +29,12 @@ void motor_DisableESCONController(void)
 
 ///////////////////////////////////////////////////////////////////////////////
 // bool motor_HasOverload(void)
-bool motor_HasOverload(void)
+Bool fault = true;
+Bool isFaultInput(void)
 {
-	bool overload = true; // Assume safe
-
-	overload = port_IsBitSet(BIT_NOOD);
-	
-	return overload;
+	fault = true; // Assume safe
+	fault = port_IsBitSet(BIT_NOOD);
+	return fault;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -94,7 +43,7 @@ void motor_DisplayStatus(void)
 {
 	uint8_t portInValue = 0;
 	uint8_t bitVal		= 0;
-	bool isSet			= false;
+	Bool isSet			= false;
 	
 	// non-inverting input port, pull-up resistors
 	
@@ -126,16 +75,30 @@ void motor_DisplayStatus(void)
 ///////////////////////////////////////////////////////////////////////////////
 // static bool motor_IsHomeLimitActive(uint8_t motorIndex)
 
-static bool motor_IsHomeLimitActive(uint8_t motorIndex)
+static Bool motor_IsHomeLimitActive(uint8_t motorIndex)
 {
 	if (motorIndex >= N_MOTORS)
 	{
 		return true;    // safe default
 	}
 
-	return port_IsBitSet(G_MotorHomeLimitBit[motorIndex]);
+	return port_IsBitSet(MotorHomeLimitBit[motorIndex]);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Check of er nog een homeswitch actief is.
+static Bool anyHomeSwitchActive(void)
+{
+	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+	{
+		if (motor_IsHomeLimitActive(motorIndex))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -146,110 +109,182 @@ static bool motor_IsHomeLimitActive(uint8_t motorIndex)
 //      * encoder van die motor op nul
 //      * motor in hold zetten
 // - return true als alle 3 klaar zijn
+static const float Home_uDac[N_MOTORS] = {4.0f, 4.0f, 4.0f};	// Homing-spanning per motor (omhoog gaande kopper).
+static const float backoff_uDac[N_MOTORS] ={0.50f, 0.50f, 0.50f}; // Iets minder dan zwaartekracht
+static const float slowHome_uDac[N_MOTORS] = {1.0f, 1.0f, 1.0f};	// Homing-spanning per motor (omhoog gaande kopper).
+static const float Hold_uDac[N_MOTORS] ={0.60f, 0.60f, 0.60f};	// Hold-spanning per motor: ongeveer zwaartekracht compenseren.
 
-bool homeAllMotors(void)
+static Bool HomingStarted = false;
+static Bool readyPos[N_MOTORS] = { false, false, false };
+static Bool allReady = false;
+static Bool motorHomed[N_MOTORS] = { false, false, false };
+static Bool allHomed = false;
+
+static uint32_t i = 0;
+ 
+Bool homeAllMotors(void)
 {
-	uint8_t motorIndex = 0;
+	 motorIndex = 0;
 	//motor_DisplayStatus();
 
 	// Eerste keer: initialiseren / starten
 	if (HomingStarted == false)
 	{
-		// DAC-spanning eerst op 0 forceren
+		// DAC-spanning eerst op 0 forceren en alles false zetten
 		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 		{
-			dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], 0.0f);
+			dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
+			readyPos[motorIndex] = false;
+			motorHomed[motorIndex] = false;
 		}
+		allReady = false;
+		allHomed = false;
 		
-		// Aandrijving inschakelen				
+		//Setup QCcounters.
 		HomingStarted = true;
 		QCEncodersSetup();
-		//motor_EnableESCONController();
 		
 		// Voor iedere motor spanning opzetten, als deze nog niet op eindpositie is.
 		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 		{
-			MotorHomed[motorIndex] = false;
-
-			// Als motor al op limit staat bij start:
+			// Motor hoort niet al op limit te staan bij start:
 			if (motor_IsHomeLimitActive(motorIndex))
 			{
 				//Zet op nul en houdt op positie.
-				qc_ClearCountRegister(G_MotorQcChannel[motorIndex]);
-				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], Hold_uDac[motorIndex]);
-				MotorHomed[motorIndex] = true;
+				dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
+				vPrintString("> Bij starten van Homing is er al een home-switch actief!\n");
+				HomingStarted = false;
+				ToState(STATE_FAULT);
+				return false;
 			}
 			else
 			{
-				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], Home_uDac[motorIndex]);
+				dac_SetOutputVoltage(MotorDacChannel[motorIndex], Home_uDac[motorIndex]);
 			}
 		}
 	}
 
-
-	// Een motor een overload signaal geeft
-	if (motor_HasOverload())
+	///////////////////////////////////////////////
+	// extra Check of systeem in fout staat
+	if (isFaultInput())
 	{
-		vPrintString("> Motor has Overloaded!!\n");
+		vPrintString("> Er is een fout input actief!!\n");
 
+		//Iedere motor spanning afnemen.
 		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 		{
-			dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], 0.0f);
-			MotorHomed[motorIndex] = false;
+			dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
 		}
 
 		HomingStarted = false;
-		// motor_DisableESCONController();  // (gebeurd al in emergencyinterrupt)
 		return false;
 	}
 
 
-	
-	// Homing per motor afhandelen
-	bool allHomed = true; //assume safe
-	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+	///////////////////////////////////////////////////////////////////////////////
+	// Eerst sensor opzoeken, als deze is op readyPositie zakken.
+	if (!allReady)
 	{
-		if (MotorHomed[motorIndex] == false)
+		allReady = true; // Veilig aannemen
+	
+		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 		{
-			if (motor_IsHomeLimitActive(motorIndex))
+			// Als motor nog niet op ready Positie is.
+			if (readyPos[motorIndex] == false)
 			{
-				vPrintString("Motor: %u is at limit.\n", (unsigned int)motorIndex);
-				// Eerst even stil / veilig schakelen
-				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], 0.0f);
+				// Als home switch actief is.
+				if (motor_IsHomeLimitActive(motorIndex))
+				{
+					vPrintString("Motor: %u is at limit.\n", (unsigned int)motorIndex);
+				
+					// Motor een hangend-koppel geven
+					dac_SetOutputVoltage(MotorDacChannel[motorIndex], backoff_uDac[motorIndex]);
+					readyPos[motorIndex] = true;
+				}
+				else
+				{
+					// Blijf homing-spanning uitsturen
+					dac_SetOutputVoltage(MotorDacChannel[motorIndex], Home_uDac[motorIndex]);
+					allReady = false;
+				}
+			}
+		}// Eind forloop
 
-				// Encoder van die motor op nul
-				qc_ClearCountRegister(G_MotorQcChannel[motorIndex]);
-
-				// Daarna hold-koppel geven
-				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], Hold_uDac[motorIndex]);
-
-				MotorHomed[motorIndex] = true;
+		//Als allReady nog True is en iedere arm ready
+		if(allReady)
+		{
+			//Wachten tot all switches geen arm meer zien.
+			if(anyHomeSwitchActive())
+			{
+				allReady = false;
+				i = 0;
 			}
 			else
 			{
-				// Blijf homing-spanning uitsturen
-				dac_SetOutputVoltage(G_MotorDacChannel[motorIndex], Home_uDac[motorIndex]);
+				//Delay voor extra ruimte.
+				if (i > 1000) //1000 = 1s delay (bij 1kHz triggering)
+				{
+					allReady = true;
+					i = 0;
+				}
+				else{i++;}
+			}	
+		}
+	}// einde AllReady statement
+	///////////////////////////////////////////////////////////////////////////////
+	// Langzaam nulpositie benaderen, en vasthouden als is bereikt.
+	else if (!allHomed)
+	{
+		allHomed = true; // Veilig aannemen
+		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+		{
+			// Als motor nog niet genult is.
+			if (motorHomed[motorIndex] == false)
+			{
+				// Als home switch actief is.
+				if (motor_IsHomeLimitActive(motorIndex))
+				{
+					vPrintString("Motor: %u is at Home.\n", (unsigned int)motorIndex);
+					
+					// Motor stil zetten en nullen
+					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
+					qc_ClearCountRegister(MotorQcChannel[motorIndex]);
+
+					// Motor een vasthoud-koppel geven
+					dac_SetOutputVoltage(MotorDacChannel[motorIndex], Hold_uDac[motorIndex]);
+					motorHomed[motorIndex] = true;
+				}
+				else
+				{
+					// Blijf homing-spanning uitsturen
+					dac_SetOutputVoltage(MotorDacChannel[motorIndex], slowHome_uDac[motorIndex]);
+					allHomed = false;
+				}
+			}
+		}// Eind forloop
+	}// einde AllHomed statement
+	///////////////////////////////////////////////////////////////////////////////
+	// Zekerheids check of echt alles klaar is
+	else
+	{	
+		//Voor iedere motor
+		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+		{
+			if (motorHomed[motorIndex] == false)
+			{
 				allHomed = false;
+				break;
 			}
 		}
 	}
-
-	// Check of echt alles klaar is
-	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
-	{
-		if (MotorHomed[motorIndex] == false)
-		{
-			allHomed = false;
-			break;
-		}
-	}
-
-	// Als alles gehomed is
+	
+	///////////////////////////////////////////////////////////////////////////////
+	// Als alles genult is.
 	if (allHomed)
 	{
 		HomingStarted = false;
-		led_DisplayValue(0x0F);  //Alle ledjes aan.
+		led_DisplayValue(0x0F);  //Alle ledjes op PCB aan.
 	}
-		
+
 	return allHomed;
-}
+}//end-fuction

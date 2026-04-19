@@ -12,10 +12,10 @@
 static SystemState_t state = STATE_INIT;
 
 ///////////////////////////////////////////////////////////////////////////////
-// void SetState(newState)
+// void ToState(newState)
 //
 // Makes correctly the new state and communicates that.
-static void SetState(SystemState_t newState)
+static void ToState(SystemState_t newState)
 {
 	if (state != newState)
 	{
@@ -100,7 +100,7 @@ void ControlTask(void *pvParameters)
 	
 	vPrintString("> starting ControlTask.\n");
 
-	SetState(STATE_INIT);
+	ToState(STATE_INIT);
 	
 	// schakeld direct de motoren uit.
 	//motor_DisableESCONController();
@@ -121,7 +121,7 @@ void ControlTask(void *pvParameters)
 	
 	// Helper taken zijn ready
 	vPrintString("> helper tasks running, ControlTask started, event group = 0x%04x\n", threadBits);
-	SetState(STATE_WAIT);
+	ToState(STATE_WAIT);
 	
 	///////////////////////////////////////////////////////////////////////////
 	// oneindige loop
@@ -140,7 +140,7 @@ void ControlTask(void *pvParameters)
 		if (xSemaphoreTake(handle_EmergencySemaphore, 0) == pdTRUE)
 		{
 			vPrintString("> EMERGENCY INTERRUPT RECIEVED\n");
-			SetState(STATE_FAULT);
+			ToState(STATE_FAULT);
 		}
 
 		switch (state)
@@ -155,7 +155,7 @@ void ControlTask(void *pvParameters)
 					// Naar HomingState schakelen.
 					vPrintString("> WAIT -> HOMING ( Start-of Resetknop is ontvangen).\n");
 					homingAllMotorsDone = false;
-					SetState(STATE_HOMING);
+					ToState(STATE_HOMING);
 				}
 				taskSleep(10);
 				break;
@@ -172,7 +172,7 @@ void ControlTask(void *pvParameters)
 					MotionEngine_Init();
 					MotionEngine_HoldCurrentPosition();
 					vPrintString("> HOMING complete -> READY\n");
-					SetState(STATE_READY);
+					ToState(STATE_READY);
 				}
 				break;
 			}
@@ -189,7 +189,7 @@ void ControlTask(void *pvParameters)
 				{
 					MotionEngine_ResetSequence();
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
-					SetState(STATE_RUNNING);
+					ToState(STATE_RUNNING);
 				}
 
 				break;
@@ -209,14 +209,14 @@ void ControlTask(void *pvParameters)
 					MotionEngine_ResetSequence();
 					MotionEngine_HoldCurrentPosition();
 					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
-					SetState(STATE_READY);
+					ToState(STATE_READY);
 				}
 				// Cyclus klaar -> terug naar READY
 				else if (sequenceDone)
 				{
 					MotionEngine_HoldCurrentPosition();
 					vPrintString("> RUNNING -> READY (cyclus voldaan)\n");
-					SetState(STATE_READY);
+					ToState(STATE_READY);
 				}
 				break;
 			}
@@ -236,7 +236,7 @@ void ControlTask(void *pvParameters)
 					if (!IsFaultInputActive())
 					{
 						vPrintString("> FAULT cleared -> WAIT (reset ontvangen, foutsignaal weg)\n");
-						SetState(STATE_WAIT);
+						ToState(STATE_WAIT);
 					}
 					else
 					{
@@ -249,7 +249,7 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			default: // Onbekende Status?
 			{
-				SetState(STATE_FAULT);
+				ToState(STATE_FAULT);
 				break;
 			}
 			

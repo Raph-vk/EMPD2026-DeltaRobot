@@ -53,8 +53,9 @@
 // Scherm2
 
 ///////////////////////////////////////////////////////////////////////////////
-// DAC -> Escon (ook via SPI)
-// 3x DAC escon
+// motor configuratie DAC en QC
+static const uint8_t MotorDacChannel[N_MOTORS] = {0, 1, 2};
+static const uint8_t MotorQcChannel[N_MOTORS] = {0, 1, 2};
 
 ///////////////////////////////////////////////////////////////////////////////
 // PCB push buttons (handled by SwitchLib)

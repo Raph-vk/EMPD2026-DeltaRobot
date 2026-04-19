@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  MotionEngine.c
  *  
  *  MotionEngine for controlling the delta robot's motors to follow a desired trajectory.
@@ -21,9 +21,6 @@ static Bool holdTargetValid = false;
 ///////////////////////////////////////////////////////////////////////////////
 // general settings
 static uint8_t mI = 0; //Motor index
-static const uint8_t MotorQcChannel[N_MOTORS] = {0, 1, 2};
-static const uint8_t MotorDacChannel[N_MOTORS] = {0, 1, 2};
-
 static const float EncoderCountsPerRevolution = 2048.0f; // 2048 counts per revolution of the motor shaft
 
 ///////////////////////////////////////////////////////////////////////////////
