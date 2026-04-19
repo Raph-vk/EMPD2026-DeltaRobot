@@ -49,11 +49,14 @@ typedef enum
 
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes
+void ToState(SystemState_t newState);
+Bool IsFaultInputActive(void);
 
 void ClockInterruptHandler(uint32_t id, uint32_t mask);
 void EmergencyInterruptHandler(uint32_t id, uint32_t mask);
 void ControlTask(void *pvParameters);
 
-void port_AllLampsOff(void);
+
+
 
 #endif /* CONTROLTASK_H_ */

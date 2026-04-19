@@ -15,7 +15,7 @@ static SystemState_t state = STATE_INIT;
 // void ToState(newState)
 //
 // Makes correctly the new state and communicates that.
-static void ToState(SystemState_t newState)
+void ToState(SystemState_t newState)
 {
 	if (state != newState)
 	{
@@ -30,7 +30,7 @@ static void ToState(SystemState_t newState)
 //
 // Returns true if one of the fault inputs is still active.
 // Assumes active-high fault inputs.
-static bool IsFaultInputActive(void)
+Bool IsFaultInputActive(void)
 {
 	return port_IsBitSet(BIT_NOOD);
 }
@@ -56,7 +56,6 @@ void ClockInterruptHandler(uint32_t id, uint32_t mask)
 // void EmergencyInterruptHandler(uint32_t id, uint32_t mask)
 //
 // emergency input interrupt
-
 void EmergencyInterruptHandler(uint32_t id, uint32_t mask)
 {
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -84,15 +83,16 @@ Vanuit FAULT met reset + geen foutsignaal terug naar WAIT.
 void ControlTask(void *pvParameters)
 {
 	EventBits_t buttonBits = 0;
-	BaseType_t clearAllbits  = pdTRUE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
-	BaseType_t waitForAnyBit= pdFALSE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
+	const BaseType_t clearAllbits  = pdTRUE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
+	const BaseType_t waitForAnyBit= pdFALSE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
 
 	EventBits_t threadBits = 0;
-	BaseType_t stayAllbits  = pdFALSE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
-	BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
+	const BaseType_t stayAllbits  = pdFALSE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
+	const BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
 	
-	TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
-
+	const TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
+	const float RustPostitie[N_MOTORS] = {20.0f,20.0f,20.0f};
+		
 	Bool homingAllMotorsDone = false;
 	Bool sequenceDone  = false;
 
@@ -109,11 +109,9 @@ void ControlTask(void *pvParameters)
 	flags = PIO_IT_RISE_EDGE; // PIO_IT_FALL_EDGE
 	interrupt_AttachHandler(ClockInterruptHandler, PIN_CLOCK, flags);
 	
-	// Bij opkomend signaal in PINs, run EmergencyInterruptHandler.
-	flags = PIO_IT_FALL_EDGE; // PIO_IT_FALL_EDGE
+	// Bij wegnemend signaal in PINs, run EmergencyInterruptHandler.
+	flags = PIO_IT_LOW_LEVEL;
 	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOOD, flags);
-	//interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSTOP, flags);
-	//interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOODSCHAKELAAR, flags);
 
 	// wait for all tasks to get up and running:
 	vPrintString("> ControlTask waiting for helper tasks...\n");
@@ -171,6 +169,7 @@ void ControlTask(void *pvParameters)
 				{
 					MotionEngine_Init();
 					MotionEngine_HoldCurrentPosition();
+					
 					vPrintString("> HOMING complete -> READY\n");
 					ToState(STATE_READY);
 				}
@@ -182,7 +181,8 @@ void ControlTask(void *pvParameters)
 			{
 				// Op vaste positie regelen op iedere control tick
 				ulTaskNotifyTake(pdTRUE, ticksToWait);
-				MotionEngine_RunTick();
+				
+				HoldPosition(RustPostitie);
 
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
@@ -200,7 +200,8 @@ void ControlTask(void *pvParameters)
 			{
 				// Sequence draaien op control tick
 				ulTaskNotifyTake(pdTRUE, ticksToWait);
-				MotionEngine_RunTick();
+				
+				// Uitvoeren van bepaalde stappen.
 				sequenceDone = MotionEngine_RunSequence();
 
 				// Stopknop -> terug naar READY
@@ -224,11 +225,13 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_FAULT:
 			{
-				// Veilig forceren
-				MotionEngine_Disable();
-				//motor_DisableESCONController();
+				//Iedere motor geen kracht forceren.
+				for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+				{
+					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
+				}
 
-				taskSleep(10);
+				taskSleep(100);
 
 				// Alleen uit fault als reset is gedrukt EN foutsignaal weg is
 				if (buttonBits & EVT_RESET_BUTTON)

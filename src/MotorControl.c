@@ -6,6 +6,13 @@
  */ 
 #include "MotorControl.h"
 
+///////////////////////////////////////////////////////////////////////////////
+// globals
+static const float degToRad = 0.01745329251994329576923690768489f; //PI / 180.0f; // conversiefactor van graden naar radialen
+static const float RadToDeg = 57.295779513082320876798154814105f; // 180.0f / PI; // conversiefactor van radialen naar graden
+
+static float motorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
+static uint8_t motorIndex;
 /*
 ///////////////////////////////////////////////////////////////////////////////
 // void motor_EnableESCONController(void)
@@ -26,16 +33,6 @@ void motor_DisableESCONController(void)
 	port_SetBit(ESCON_ENABLE, false);
 }
 */
-
-///////////////////////////////////////////////////////////////////////////////
-// bool motor_HasOverload(void)
-Bool fault = true;
-Bool isFaultInput(void)
-{
-	fault = true; // Assume safe
-	fault = port_IsBitSet(BIT_NOOD);
-	return fault;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 // void motor_DisplayStatus(void)
@@ -73,9 +70,9 @@ void motor_DisplayStatus(void)
 }
 		
 ///////////////////////////////////////////////////////////////////////////////
-// static bool motor_IsHomeLimitActive(uint8_t motorIndex)
+// bool motor_IsHomeLimitActive(uint8_t motorIndex)
 
-static Bool motor_IsHomeLimitActive(uint8_t motorIndex)
+Bool motor_IsHomeLimitActive(uint8_t motorIndex)
 {
 	if (motorIndex >= N_MOTORS)
 	{
@@ -86,9 +83,9 @@ static Bool motor_IsHomeLimitActive(uint8_t motorIndex)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Check of er nog een homeswitch actief is.
-static Bool anyHomeSwitchActive(void)
-{
+// Check of er nog een homeswitch actief is. 
+Bool anyHomeSwitchActive(void)
+{	
 	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 	{
 		if (motor_IsHomeLimitActive(motorIndex))
@@ -109,11 +106,13 @@ static Bool anyHomeSwitchActive(void)
 //      * encoder van die motor op nul
 //      * motor in hold zetten
 // - return true als alle 3 klaar zijn
-static const float Home_uDac[N_MOTORS] = {4.0f, 4.0f, 4.0f};	// Homing-spanning per motor (omhoog gaande kopper).
-static const float backoff_uDac[N_MOTORS] ={0.50f, 0.50f, 0.50f}; // Iets minder dan zwaartekracht
-static const float slowHome_uDac[N_MOTORS] = {1.0f, 1.0f, 1.0f};	// Homing-spanning per motor (omhoog gaande kopper).
-static const float Hold_uDac[N_MOTORS] ={0.60f, 0.60f, 0.60f};	// Hold-spanning per motor: ongeveer zwaartekracht compenseren.
 
+static const float readyArmAngle[N_MOTORS] = {-10.0f, -10.0f, -10.0f}; //degrees, gewenste armpositie voordat homing benadering begint
+static const float Home_uDac[N_MOTORS] = {4.0f, 4.0f, 4.0f};	// Homing-spanning per motor (omhoog gaande kopper).
+static const float slowHome_uDac[N_MOTORS] = {1.0f, 1.0f, 1.0f};	// Homing-spanning per motor (omhoog gaande kopper).
+static const float Hold_uDac = 0.5f;
+
+static float motorControlOutput = 0.0f;
 static Bool HomingStarted = false;
 static Bool readyPos[N_MOTORS] = { false, false, false };
 static Bool allReady = false;
@@ -121,11 +120,13 @@ static Bool motorHomed[N_MOTORS] = { false, false, false };
 static Bool allHomed = false;
 
 static uint32_t i = 0;
+
  
 Bool homeAllMotors(void)
 {
-	 motorIndex = 0;
-	//motor_DisplayStatus();
+	motorIndex = 0;
+	 
+	motor_DisplayStatus();
 
 	// Eerste keer: initialiseren / starten
 	if (HomingStarted == false)
@@ -153,8 +154,8 @@ Bool homeAllMotors(void)
 				//Zet op nul en houdt op positie.
 				dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
 				vPrintString("> Bij starten van Homing is er al een home-switch actief!\n");
+				//fault trigger?
 				HomingStarted = false;
-				ToState(STATE_FAULT);
 				return false;
 			}
 			else
@@ -166,7 +167,7 @@ Bool homeAllMotors(void)
 
 	///////////////////////////////////////////////
 	// extra Check of systeem in fout staat
-	if (isFaultInput())
+	if (IsFaultInputActive())
 	{
 		vPrintString("> Er is een fout input actief!!\n");
 
@@ -175,7 +176,6 @@ Bool homeAllMotors(void)
 		{
 			dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
 		}
-
 		HomingStarted = false;
 		return false;
 	}
@@ -186,7 +186,7 @@ Bool homeAllMotors(void)
 	if (!allReady)
 	{
 		allReady = true; // Veilig aannemen
-	
+		ReadMotorPositions(motorPos_Rad);
 		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 		{
 			// Als motor nog niet op ready Positie is.
@@ -195,10 +195,12 @@ Bool homeAllMotors(void)
 				// Als home switch actief is.
 				if (motor_IsHomeLimitActive(motorIndex))
 				{
+					// Motor stil zetten en nullen
+					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
+					qc_ClearCountRegister(MotorQcChannel[motorIndex]);
+
 					vPrintString("Motor: %u is at limit.\n", (unsigned int)motorIndex);
-				
-					// Motor een hangend-koppel geven
-					dac_SetOutputVoltage(MotorDacChannel[motorIndex], backoff_uDac[motorIndex]);
+
 					readyPos[motorIndex] = true;
 				}
 				else
@@ -208,34 +210,28 @@ Bool homeAllMotors(void)
 					allReady = false;
 				}
 			}
-		}// Eind forloop
-
-		//Als allReady nog True is en iedere arm ready
-		if(allReady)
-		{
-			//Wachten tot all switches geen arm meer zien.
-			if(anyHomeSwitchActive())
-			{
-				allReady = false;
-				i = 0;
-			}
+			// Motor op ReadyPositie
 			else
 			{
-				//Delay voor extra ruimte.
-				if (i > 1000) //1000 = 1s delay (bij 1kHz triggering)
-				{
-					allReady = true;
-					i = 0;
-				}
-				else{i++;}
-			}	
+				// Op positie behouden met PID
+				motorControlOutput = Hold_uDac + PID_Controller(motorPos_Rad[motorIndex]);
+				motorControlOutput = constrain(motorControlOutput, DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // ongeveer +/-10V begrenzen.
+				dac_SetOutputVoltage(MotorDacChannel[motorIndex], motorControlOutput);
+			}
+		}// Eind per Motor For-loop
+
+		//Als alles Ready is, naar Backoff Positie gaan tot die positie bereikt is.
+		if(allReady)
+		{
+			allReady = HoldPosition(readyArmAngle);
 		}
 	}// einde AllReady statement
 	///////////////////////////////////////////////////////////////////////////////
 	// Langzaam nulpositie benaderen, en vasthouden als is bereikt.
-	else if (!allHomed)
+	else if (!allHomed && allReady)
 	{
 		allHomed = true; // Veilig aannemen
+
 		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 		{
 			// Als motor nog niet genult is.
@@ -248,15 +244,15 @@ Bool homeAllMotors(void)
 					
 					// Motor stil zetten en nullen
 					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
-					qc_ClearCountRegister(MotorQcChannel[motorIndex]);
 
-					// Motor een vasthoud-koppel geven
-					dac_SetOutputVoltage(MotorDacChannel[motorIndex], Hold_uDac[motorIndex]);
+					qc_ClearCountRegister(MotorQcChannel[motorIndex]);
+					
+					// Motor in hold zetten
+					dac_SetOutputVoltage(MotorDacChannel[motorIndex], Hold_uDac);
 					motorHomed[motorIndex] = true;
 				}
-				else
+				else // Blijf langzaam naar home positie bewegen
 				{
-					// Blijf homing-spanning uitsturen
 					dac_SetOutputVoltage(MotorDacChannel[motorIndex], slowHome_uDac[motorIndex]);
 					allHomed = false;
 				}

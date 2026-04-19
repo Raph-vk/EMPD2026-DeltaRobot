@@ -41,7 +41,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
 #include "QuadratureCounters.h"
+#include "MotionEngine.h"
+#include "ControlTask.h"
 #include "MachinePins.h"
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // #defines
@@ -58,8 +61,6 @@ static const uint8_t MotorHomeLimitBit[N_MOTORS] = {M1_LIMIT, M2_LIMIT, M3_LIMIT
 
 //void motor_EnableESCONController(void);
 //void motor_DisableESCONController(void);
-
-Bool isFaultInput(void)
 
 void motor_DisplayStatus(void);
 

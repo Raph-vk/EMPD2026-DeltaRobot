@@ -10,12 +10,10 @@
 #include "MotionEngine.h"
 ///////////////////////////////////////////////////////////////////////////////
 // globals
-static float Ts = 0.001f;           // sample time, must match external clock
-static uint32_t TicksPerSecond = 1000.0f;     // = 1 / sample time
+static const float Ts = 0.001f;      // sample time, must match external clock
 
-static float g_time = 0.0;               // totale tijd sinds opstarten van de robot in seconden
-static uint64_t tickCount = 0;          // clock tick count from 1 ms hardware clock
-static float holdTargetPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+static float g_time = 0.0f;          // totale tijd sinds opstarten van de robot in seconden
+static float holdTargetPos[N_MOTORS] = {0.0f, 0.0f, 0.0f};
 static Bool holdTargetValid = false;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -28,46 +26,39 @@ static const float EncoderCountsPerRevolution = 2048.0f; // 2048 counts per revo
 static float motorControlOutput[N_MOTORS]	= {0.0, 0.0, 0.0};	// Berekende output
 static float uDac[N_MOTORS]				= {0.0, 0.0, 0.0};	// Gelimiteerde uDac output [V] met uDac = Constraint(g,min,max)
 	
-static float hoekFout[N_MOTORS]			= {0.0f, 0.0f, 0.0f};	// Berekende fout in motor-rad
+static float Fout_motorRad[N_MOTORS]			= {0.0f, 0.0f, 0.0f};	// Berekende fout in motor-rad
 static float motorPos_Rad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Gemeten motor-as positie [rad]
 static uint8_t stap = 0;
 static Bool sequenceDone = false;
 static Bool setupMotionProfileDone = false;
 static Bool verplaatsingKlaar = false;
 
+static const float degToRad = 0.01745329251994329576923690768489f; //PI / 180.0f; // conversiefactor van graden naar radialen
+static const float RadToDeg = 57.295779513082320876798154814105f; // 180.0f / PI; // conversiefactor van radialen naar graden
+
 ///////////////////////////////////////////////////////////////////////////////
 // High-level entry points expected by ControlTask
 
 void MotionEngine_Init(void)
 {
-	tickCount = 0;
 	g_time = 0.0f;
-	MotionEngine_ResetSequence();
-	MotionEngine_HoldCurrentPosition();
-}
-
-void MotionEngine_HoldCurrentPosition(void)
-{
-	ReadMotorPositions(holdTargetPos_Rad);
-	holdTargetValid = true;
-	HoldPosition(holdTargetPos_Rad);
-}
-
-void MotionEngine_RunTick(void)
-{
-	if (holdTargetValid)
-	{
-		HoldPosition(holdTargetPos_Rad);
-	}
-}
-
-void MotionEngine_ResetSequence(void)
-{
 	stap = 0;
 	sequenceDone = false;
 	setupMotionProfileDone = false;
 	verplaatsingKlaar = false;
 	holdTargetValid = false;
+}
+
+void MotionEngine_HoldCurrentPosition(void)
+{
+	ReadMotorPositions(motorPos_Rad);
+
+	for (mI = 0; mI < N_MOTORS; mI++)
+	{
+		holdTargetPos[mI] = (motorPos_Rad[mI] / 47.0f) / RadToDeg; // Omzetten naar gewenste armhoek in graden, rekening houdend met reductie.
+	}
+	holdTargetValid = true;
+	HoldPosition(holdTargetPos);
 }
 
 Bool MotionEngine_RunSequence(void)
@@ -78,78 +69,13 @@ Bool MotionEngine_RunSequence(void)
 
 void MotionEngine_Disable(void)
 {
-	uint8_t motorIndex = 0;
-
 	MotionEngine_ResetSequence();
 
-	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
-	{
-		dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
-	}
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// static void ReadMotorPositions(float motorPos_Rad[N_MOTORS])
-//
-// Lees motorenposities uit, en slaat deze op in de array "motorPos_Rad" in motor-radialen.
-static uint64_t encoderCounts = 0;
-void ReadMotorPositions(float motorPos_Rad[N_MOTORS])
-{
-    for (mI = 0; mI < N_MOTORS; mI++)
-    {
-        encoderCounts = qc_ReadCountRegister(MotorQcChannel[mI]);
-        motorPos_Rad[mI] = ((float)encoderCounts / EncoderCountsPerRevolution) * 2.0 * PI;
-    }
-}
-
-
-///////////////////////////////////////////////////////////////////////////////
-// void HoldPosition(float q1, float q2, float q3)
-//
-// Wordt na iedere 1 ms tick opgeroepen.
-// Behoudt alle motorassen op gewenste motorhoeken.
-
-static float largeErrorThreshold		= 0.1f;	// Wanneer fout groter is dan 0.1 motor-rad
-static float slowApproachVoltage		= 0.75f;	// [V] Gewenste voltage voor langzame verplaatsing
-static float holdMotorPos_Rad[N_MOTORS];	// Vast te houden motorpositie [rad]
-
-void HoldPosition(float holdMotorPos_RadInput[N_MOTORS])
-{
-	mI = 0;
-
-	// Lees motorposities uit.
-	ReadMotorPositions(motorPos_Rad);
-
-	// Voor iedere motor
 	for (mI = 0; mI < N_MOTORS; mI++)
 	{
-		holdMotorPos_Rad[mI] = holdMotorPos_RadInput[mI];
-
-		// Fout bepalen
-		hoekFout[mI] = holdMotorPos_Rad[mI] - motorPos_Rad[mI];
-		
-		// Voltage berekenen mbv PID_Controller
-		motorControlOutput[mI] = PID_Controller( hoekFout[mI] );
-
-		//Als de fout extreem is, rustig naar referentie punt toe verplaatsen.
-		if (fabs(hoekFout[mI]) > largeErrorThreshold)
-		{
-			// Als fout positief is, voltage positief en visa versa.
-			motorControlOutput[mI] = (hoekFout[mI] >= 0.0) ? slowApproachVoltage : -slowApproachVoltage;
-		}
-
-		// Zorg dat waarde niet groter is dan maximale DAC-waarde, en output.
-		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // min/max ongeveer +/-10V.
-		dac_SetOutputVoltage(MotorDacChannel[mI], motorControlOutput[mI]);
+		dac_SetOutputVoltage(MotorDacChannel[mI], 0.0f);
 	}
-	
-}//End HoldPosition();
-
-
-
-
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // bool RunSequence(void)
@@ -157,7 +83,7 @@ void HoldPosition(float holdMotorPos_RadInput[N_MOTORS])
 // Called once per 1 ms tick.
 // Beslist welke stap er uitgevoerd moeten worden.
 
-Bool RunSequence(void) 
+Bool RunSequence(void)
 {
 	if (Move_ToSetpoint(100,100,-300, 1.1)) // x,y,z,Tmax -> setpoint
 	{
@@ -168,6 +94,53 @@ Bool RunSequence(void)
 	return sequenceDone;
 }//end runSequence();
 
+
+///////////////////////////////////////////////////////////////////////////////
+// void HoldPosition(array HoekBoven)
+//
+// Wordt na iedere 1 ms tick opgeroepen.
+// Behoudt alle motorassen op gewenste motorhoeken.
+static const float largeErrorThreshold		= 0.1f;	// Wanneer fout groter is dan 0.1 motor-rad
+static const float slowApproachVoltage		= 0.75f;	// [V] Gewenste voltage voor langzame verplaatsing
+static float holdMotorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
+Bool nearReference = true;
+
+Bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
+{
+	mI = 0;
+	
+	// Lees motorposities uit.
+	ReadMotorPositions(motorPos_Rad);
+
+	// Voor iedere motor
+	for (mI = 0; mI < N_MOTORS; mI++)
+	{
+ 		// Gewenste armpositie omzetten naar radialen en rekening houden met reducties		
+		holdMotorPos_Rad[mI] = i_twk * (holdArmPos_DegInput[mI] * degToRad);
+
+		// Fout bepalen
+		Fout_motorRad[mI] = holdMotorPos_Rad[mI] - motorPos_Rad[mI];
+
+		//Als de fout extreem is, rustig naar referentie punt toe verplaatsen.
+		if (fabsf(Fout_motorRad[mI]) > largeErrorThreshold)
+		{
+			// Als fout positief is, voltage positief en visa versa.
+			motorControlOutput[mI] = (Fout_motorRad[mI] >= 0.0f) ? slowApproachVoltage : -slowApproachVoltage;
+			nearReference = false;
+		}
+		else
+		{
+			// Voltage berekenen mbv PID_Controller
+			motorControlOutput[mI] = PID_Controller( Fout_motorRad[mI] );
+		}
+
+		// Zorg dat waarde niet groter is dan maximale DAC-waarde, en output.
+		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // min/max ongeveer +/-10V.
+		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
+	}
+
+	return nearReference;
+}//End HoldPosition();
 
 ///////////////////////////////////////////////////////////////////////////////
 // bool Move_ToSetpoint(void)
@@ -203,7 +176,7 @@ Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 	mI = 0;
 
 	// Validatie van input parameters
-	if (Tmax <= 0.0)
+	if (Tmax <= 0.0f)
 	{
 		return false;
 	}
@@ -259,7 +232,7 @@ Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 
 		// opstellen van een referentiebewegingsprofiel voor de regeling
 		// 1; Zolang de huidige tijd nog voor het startmoment ligt:
-		if (tau <= 0.0)
+		if (tau <= 0.0f)
 		{
 			alphaRef[mI]  = 0.0f;
 			omegaRef[mI] = 0.0f;
@@ -319,8 +292,8 @@ Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 		}
 
 		// Bepalen van output voltage mbv Fout, PID_Controller + FeedForward
-		hoekFout[mI] = (thetaRef[mI] + thetaStart[mI]) - motorPos_Rad[mI];
-		motorControlOutput[mI] = PID_Controller(hoekFout[mI]) + FeedForward(alphaRef[mI]);
+		Fout_motorRad[mI] = (thetaRef[mI] + thetaStart[mI]) - motorPos_Rad[mI];
+		motorControlOutput[mI] = PID_Controller(Fout_motorRad[mI]) + FeedForward(alphaRef[mI]);
 		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE);
 	}
 	
@@ -331,8 +304,7 @@ Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 	}
 	
 	//Tijd bijhouden
-	tickCount++;
-	g_time = ((float)tickCount) / TicksPerSecond;
+	g_time += Ts;
 
 	// Return true als beweging klaar is, anders false.
 	return verplaatsingKlaar;

@@ -40,7 +40,7 @@ void MotionEngine_Disable(void);
 
 void ReadMotorPositions(float motorPos_Rad[N_MOTORS]);
 
-void HoldPosition(float holdMotorPos_RadInput[N_MOTORS]);
+Bool HoldPosition(const float holdMotorPos_DegInput[N_MOTORS]);
 
 Bool RunSequence(void);
 

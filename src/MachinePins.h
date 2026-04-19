@@ -20,25 +20,23 @@
 ///////////////////////////////////////////////////////////////////////////////
 // 8-bit input port layout on the RTSW board (handeld by PortIOLib.h)
 
-#define BIT_CLOCK			0 // PIN_30
-#define BIT_M1_HOME			1 // PIN_31
-#define BIT_M2_HOME			2 // PIN_32
-#define BIT_M3_HOME			3 // PIN_33
-#define BIT_NOOD			4 // PIN_34
-#define BIT_START			5 // PIN_35
-//#define BIT_STOP  6 // PIN_36
-//#define BIT_RESET  7
+#define BIT_CLOCK	0 // PIN_30
+#define BIT_M1_HOME	1 // PIN_31
+#define BIT_M2_HOME	2 // PIN_32
+#define BIT_M3_HOME	3 // PIN_33
+#define BIT_NOOD	4 // PIN_34
+#define BIT_START	5 // PIN_35
+#define BIT_STOP	6 // PIN_36
+#define BIT_RESET	7 // PIN_37
 
 //PINS for Attach_InterruptHandler() function
 #define PIN_CLOCK			PIN_30
 #define PIN_NOOD			PIN_34
-//#define PIN_NOODSTOP		PIN_35
-//#define PIN_NOODSCHAKELAAR  PIN_36
 
 ///////////////////////////////////////////////////////////////////////////////
 // 8-bit output port layout on the RTSW board (handeld by PortIOLib.h)
 
-//#define BIT_ESCON_ENABLE    0 // PIN_38 (alle escon's aan)
+//#define BIT_ESCON_ENABLE    0 // PIN_38 (alle escon's aan) In hardware noodstopcircuit opgenomen.
 #define BIT_LAMP_GREEN		1 // PIN_39
 #define BIT_LAMP_ORANGE		2 // PIN_40
 #define	BIT_LAMP_RED		3 // PIN_41
@@ -49,8 +47,9 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // I2C ports
-// Scherm1
-// Scherm2
+// ch1 - Scherm1
+// ch2 - Optical Flow Sensor 1 & 2
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // motor configuratie DAC en QC

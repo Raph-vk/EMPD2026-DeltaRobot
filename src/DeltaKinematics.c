@@ -24,7 +24,7 @@
 // typedefs
 typedef struct
 {
-	float elleboogRadius_mm;
+	float schouderRadius_mm;
 	float polsRadius_mm;
 	float bovenarmLengte_mm;
 	float onderarmLengte_mm;
@@ -111,34 +111,46 @@ static float x= 0.0f;
 static float y= 0.0f;
 static float z= 0.0f;	
 
-static const Bovenarm_thetaMaxDeg = 40;
-static const Bovenarm_thetaMaxDeg = -80;
+static const float Bovenarm_thetaMaxDeg = 40.0f;
+static const float Bovenarm_thetaMinDeg = -80.0f;
 
-static float jointPos[N_MOTORS]; // bovenarmhoeken in radialen (M1,M2,M3)
-static bool positionValid = false; // true als positie binnen bereik is, false als onbereikbaar
+static float jointPosDeg[N_MOTORS]; // bovenarmhoeken in radialen (M1,M2,M3)
+static float jointPosRad[N_MOTORS]; // bovenarmhoeken in radialen (M1,M2,M3)
+static Bool positionValid = false; // true als positie binnen bereik is, false als onbereikbaar
 
-bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOTORS]) // 
+Bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOTORS]) // 
 {
 	//////////////////////////////////////////////////////////////////////////
 	// functie declaraties
 	x = tcpPosition_mm[0];
 	y = tcpPosition_mm[1];
 	z = tcpPosition_mm[2];
-	
-	float rBase = RobotGeometry[0];    // basisradius,schouderpunt [mm]
-	float rPols = RobotGeometry[1];        // platformradius [mm]
-	float LengteBovenarm = RobotGeometry[2];   // bovenarm [mm]
-	float LengteOnderarm = RobotGeometry[3];   // onderarm [mm]
+
+	float rBase = RobotGeometry.schouderRadius_mm;			// basisradius,schouderpunt [mm]
+	float rPols = RobotGeometry.polsRadius_mm;				// platformradius [mm]
+	float LengteBovenarm = RobotGeometry.bovenarmLengte_mm; // bovenarm [mm]
+	float LengteOnderarm = RobotGeometry.onderarmLengte_mm; // onderarm [mm]
 
 	//////////////////////////////////////////////////////////////////////////
 	// @ROBBE/TESSA TODO: Berekeningen XYZ -> M1,M2,M3
 	
 	//////////////////////////////////////////////////////////////////////////
-	// Returnen van de motorhoeken in radialen
+	// Controleren of hoekposities valide zijn binnen bereik
+	positionValid = true;
+    for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+    {
+	    if (jointPosDeg[motorIndex] > Bovenarm_thetaMaxDeg && jointPosDeg[motorIndex] < Bovenarm_thetaMinDeg) 
+		{
+			positionValid = false;
+		}
+		
+    }
 
+	//////////////////////////////////////////////////////////////////////////
+	// Returnen van de motorhoeken in radialen
     for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
     {
-        motorRad[motorIndex] = (jointPos[motorIndex] * i_twk);
+        motorRad[motorIndex] = (jointPosRad[motorIndex] * i_twk);
     }
 
 	return positionValid;

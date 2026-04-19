@@ -90,3 +90,17 @@ void QCEncodersClearCount(void)
 ///////////////////////////////////////////////////////////////////////////////
 // Zet specifieke encoder op nul.
 //qc_ClearCountRegister(uint8_t channel)
+
+///////////////////////////////////////////////////////////////////////////////
+// static void ReadMotorPositions(float motorPos_Rad[N_MOTORS])
+//
+// Lees motorenposities uit, en slaat deze op in de array "motorPos_Rad" in motor-radialen.
+static float countsToRad = 12867.963509103793104742987297913f; // = (2.0f * PI) / EncoderCountsPerRevolution;
+static uint8_t mI = 0;
+void ReadMotorPositions(float motorPos_Rad[N_MOTORS])
+{
+	for (mI = 0; mI < N_MOTORS; mI++)
+	{
+		motorPos_Rad[mI] = qc_ReadCountRegister(MotorQcChannel[mI]) * countsToRad;
+	}
+}
