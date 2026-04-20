@@ -3,6 +3,11 @@
  *
  * Created: 14-10-2022 15:00:12
  *  Author: Roel Smeets
+ *
+ * RASM, changed 16-04-2026:
+ * changed QC_N_CHANNELS from 2 to 4 for use with external counters on
+ * the SPI bus
+ *
  */ 
 
 // library & definitions for LS7366R quadrature counter
@@ -12,7 +17,7 @@
 
 #include "bits.h"
 
-#define QC_N_CHANNELS	2
+#define QC_N_CHANNELS	4
 #define QC_MAX_CHANNEL	(QC_N_CHANNELS - 1)
 
 

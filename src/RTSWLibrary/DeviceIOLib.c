@@ -3,6 +3,10 @@
  *
  * Created: 1-10-2022 15:55:47
  *  Author: Roel Smeets
+ *
+ * RASM, changed 16-04-2026:
+ * added PIN_TX3 and PIN_RX3 for use with external SPI bus
+ *
  */ 
 
 
@@ -51,6 +55,9 @@ void dio_Init(void)
 	G_dioPins[PIN_TX1]	 = IOPORT_CREATE_PIN(PIOA, 11);
 	G_dioPins[PIN_RX1]	 = IOPORT_CREATE_PIN(PIOA, 10);
 
+	G_dioPins[PIN_TX3]	 = IOPORT_CREATE_PIN(PIOD, 4);
+	G_dioPins[PIN_RX3]   = IOPORT_CREATE_PIN(PIOD, 5);	
+	
 	G_dioPins[PIN_STATUS_LED] =  IOPORT_CREATE_PIN(PIOB,  27);
 
 	// TWI (= I2C) pins on Arduino Due

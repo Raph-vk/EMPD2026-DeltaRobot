@@ -3,6 +3,9 @@
  *
  * Created: 14-10-2022 15:51:36
  *  Author: Roel Smeets
+ 
+ * RASM, changed 16-04-2026:
+ * added PIN_TX3 and PIN_RX3 as select signals for use with external SPI bus
  */ 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -25,8 +28,10 @@
 
 static const uint8_t G_QCSelectPins[QC_N_CHANNELS] =
 {
-	PIN_47,
-	PIN_49,
+	PIN_47,		// QUADSEL0*, onboard counter channel 0
+	PIN_49,		// QUADSEL1*, onboard counter channel 1
+	PIN_TX3,	// SPISEL6*, external counter channel 2
+	PIN_RX3,	// SPISEL7*, external counter channel 3
 };
 
 ///////////////////////////////////////////////////////////////////////////////

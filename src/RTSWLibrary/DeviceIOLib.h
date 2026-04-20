@@ -3,6 +3,10 @@
  *
  * Created: 1-10-2022 16:02:48
  *  Author: Roel Smeets
+ *
+ * RASM, changed 16-04-2026:
+ * added PIN_TX3 and PIN_RX3 for use with external SPI bus
+ *
  */ 
 
 
@@ -56,6 +60,9 @@ typedef enum pin_number_t
 	
 	PIN_TX1,
 	PIN_RX1,
+
+	PIN_TX3,	// SPISEL6*
+	PIN_RX3,	// SPISEL7*
 	
 	PIN_SDA0,	// I2C port 0
 	PIN_SCL0,
