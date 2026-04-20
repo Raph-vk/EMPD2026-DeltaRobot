@@ -36,7 +36,7 @@
 #include "MotionEngine.h"
 
 ///////////////////////////////////////////////////////////////////////////////
-// local type definitions
+// local type definitions STATEMACHINE
 typedef enum
 {
 	STATE_INIT = 0,
@@ -46,6 +46,7 @@ typedef enum
 	STATE_RUNNING,
 	STATE_FAULT
 } SystemState_t;
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes

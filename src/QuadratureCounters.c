@@ -31,16 +31,14 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // void QCEncodersSetup(void)
-
 // 
-
 void QCEncodersSetup(void)
 {
 	uint8_t qcChannel     = 0;
 	uint8_t	qcDefaultMode = 0;
 	mode_register_t qcModeRegister = QC_MODE_REGISTER_0;
 	
-	// bitmask, meerdere configuratiebits gecombineerd worden tot één configuratiewaarde.
+	// bitmask, meerdere configuratiebits gecombineerd worden tot ï¿½ï¿½n configuratiewaarde.
 	// MODE_QC_4 = vier signalen, stijgende en vallende edges van A en B channel. Dus maximale resolutie.
 	// MODE_FREERUNNING = teller blijft doorlopen.
 	// INDEX_DISABLE = Z-kanaal wordt niet gebruikt.
@@ -95,7 +93,7 @@ void QCEncodersClearCount(void)
 // static void ReadMotorPositions(float motorPos_Rad[N_MOTORS])
 //
 // Lees motorenposities uit, en slaat deze op in de array "motorPos_Rad" in motor-radialen.
-static float countsToRad = 12867.963509103793104742987297913f; // = (2.0f * PI) / EncoderCountsPerRevolution;
+static float countsToRad = 0.00306796157577128245943617517898f; // = (2.0f * PI) / EncoderCountsPerRevolution;
 static uint8_t mI = 0;
 void ReadMotorPositions(float motorPos_Rad[N_MOTORS])
 {

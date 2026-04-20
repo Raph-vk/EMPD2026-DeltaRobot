@@ -14,7 +14,6 @@ static const float Ts = 0.001f;      // sample time, must match external clock
 
 static float g_time = 0.0f;          // totale tijd sinds opstarten van de robot in seconden
 static float holdTargetPos[N_MOTORS] = {0.0f, 0.0f, 0.0f};
-static Bool holdTargetValid = false;
 
 ///////////////////////////////////////////////////////////////////////////////
 // general settings
@@ -28,85 +27,34 @@ static float uDac[N_MOTORS]				= {0.0, 0.0, 0.0};	// Gelimiteerde uDac output [V
 	
 static float Fout_motorRad[N_MOTORS]			= {0.0f, 0.0f, 0.0f};	// Berekende fout in motor-rad
 static float motorPos_Rad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Gemeten motor-as positie [rad]
-static uint8_t stap = 0;
-static Bool sequenceDone = false;
 static Bool setupMotionProfileDone = false;
 static Bool verplaatsingKlaar = false;
+static Bool holdSetupDone = false;
+static Bool gripperSetupDone = false;
+static uint16_t currentStep = 0;
+static float t0 = 0.0f;
+static float t1 = 0.0f;
+static float t2 = 0.0f;
+static float tau = 0.0f; // [s] tijd sinds start van beweging
+static float k = 0.0f;
+static float dt = 0.0f;
 
 static const float degToRad = 0.01745329251994329576923690768489f; //PI / 180.0f; // conversiefactor van graden naar radialen
 static const float RadToDeg = 57.295779513082320876798154814105f; // 180.0f / PI; // conversiefactor van radialen naar graden
 
-///////////////////////////////////////////////////////////////////////////////
-// High-level entry points expected by ControlTask
-
-void MotionEngine_Init(void)
-{
-	g_time = 0.0f;
-	stap = 0;
-	sequenceDone = false;
-	setupMotionProfileDone = false;
-	verplaatsingKlaar = false;
-	holdTargetValid = false;
-}
-
-void MotionEngine_HoldCurrentPosition(void)
-{
-	ReadMotorPositions(motorPos_Rad);
-
-	for (mI = 0; mI < N_MOTORS; mI++)
-	{
-		holdTargetPos[mI] = (motorPos_Rad[mI] / 47.0f) / RadToDeg; // Omzetten naar gewenste armhoek in graden, rekening houdend met reductie.
-	}
-	holdTargetValid = true;
-	HoldPosition(holdTargetPos);
-}
-
-Bool MotionEngine_RunSequence(void)
-{
-	holdTargetValid = false;
-	return RunSequence();
-}
-
-void MotionEngine_Disable(void)
-{
-	MotionEngine_ResetSequence();
-
-	for (mI = 0; mI < N_MOTORS; mI++)
-	{
-		dac_SetOutputVoltage(MotorDacChannel[mI], 0.0f);
-	}
-}
 
 ///////////////////////////////////////////////////////////////////////////////
-// bool RunSequence(void)
-//
-// Called once per 1 ms tick.
-// Beslist welke stap er uitgevoerd moeten worden.
-
-Bool RunSequence(void)
-{
-	if (Move_ToSetpoint(100,100,-300, 1.1)) // x,y,z,Tmax -> setpoint
-	{
-		sequenceDone = true;
-		stap = 0;
-	}
-
-	return sequenceDone;
-}//end runSequence();
-
-
-///////////////////////////////////////////////////////////////////////////////
-// void HoldPosition(array HoekBoven)
-//
+// helperfunctie; void HoldPosition(array HoekBoven)
+// 
 // Wordt na iedere 1 ms tick opgeroepen.
 // Behoudt alle motorassen op gewenste motorhoeken.
 static const float largeErrorThreshold		= 0.1f;	// Wanneer fout groter is dan 0.1 motor-rad
 static const float slowApproachVoltage		= 0.75f;	// [V] Gewenste voltage voor langzame verplaatsing
 static float holdMotorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
-Bool nearReference = true;
 
 Bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
 {
+	Bool nearReference = true;
 	mI = 0;
 	
 	// Lees motorposities uit.
@@ -142,6 +90,77 @@ Bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
 	return nearReference;
 }//End HoldPosition();
 
+
+///////////////////////////////////////////////////////////////////////////////
+// Beginnen en nullen van alle variabelen
+void InitSequence(void)
+{
+	g_time = 0.0f;
+	currentStep = 0;
+	setupMotionProfileDone = false;
+	verplaatsingKlaar = false;
+	holdSetupDone = false;
+	gripperSetupDone = false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Standstill
+Bool HoldCurrentPosition(float Twait)
+{
+	if (!holdSetupDone)
+	{
+		ReadMotorPositions(motorPos_Rad);
+		for (mI = 0; mI < N_MOTORS; mI++)
+		{
+			holdTargetPos[mI] = (motorPos_Rad[mI] / i_twk) * RadToDeg;
+		}
+
+		t0 = g_time;
+		holdSetupDone = true;
+	}
+
+	HoldPosition(holdTargetPos);
+
+	if (g_time - t0 >= Twait)
+	{
+		holdSetupDone = false;
+		g_time += Ts;
+		return true; // Hold positie voldaan
+	}
+
+	//Tijd bijhouden
+	g_time += Ts;
+	return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Standstill
+static Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait)
+{
+	//eerste keer
+	if (!gripperSetupDone)
+	{
+		port_SetBit(GRIPPER, Grab);
+
+		CaptureCurrentPositionAsHoldTarget();
+		t0 = g_time;
+		gripperSetupDone = true;
+	}
+	// Als tijd voorbij is
+	else if (g_time - t0 >= Twait)
+	{
+		gripperSetupDone = false;
+		g_time += Ts;
+		return true; // Hold positie voldaan
+	}
+
+	HoldPosition(holdTargetPos);
+
+	//Tijd bijhouden
+	g_time += Ts;
+	return false;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // bool Move_ToSetpoint(void)
 //
@@ -162,14 +181,6 @@ static float alpha0[N_MOTORS], alpha1[N_MOTORS], alpha2[N_MOTORS], alpha3[N_MOTO
 static float thetaRef[N_MOTORS];		// Incrementele motorpositie referentie [rad]
 static float omegaRef[N_MOTORS];		// Motor-snelheidsreferentie [rad/s]
 static float alphaRef[N_MOTORS];		// Motor-acceleratiereferentie [rad/s^2]
-
-static float t0 = 0.0;
-static float t1 = 0.0;
-static float t2 = 0.0;
-
-static float tau = 0.0; // [s] tijd sinds start van beweging
-static float k = 0.0; //
-static float dt = 0.0;
 
 Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tmax)
 {
@@ -310,3 +321,58 @@ Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 	return verplaatsingKlaar;
 
 }//END-function
+
+///////////////////////////////////////////////////////////////////////////////
+static const SequenceStep pickPlaceSeq[] =
+{
+    MOVE(100.0f, 100.0f, -300.0f, 1.1f),
+    GRIP(true, 0.5f),
+    MOVE(200.0f,   0.0f, -300.0f, 1.1f),
+    HOLD(0.1f),
+    GRIP(false, 0.5f),
+    MOVE(100.0f, 100.0f, -300.0f, 1.1f),
+    END_SEQ()
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+// bool RunSequence(void)
+//
+// Called once per 1 ms tick.
+// Beslist welke stap er uitgevoerd moeten worden.
+Bool RunSequence(void)
+{
+    const SequenceStep *s = &pickPlaceSeq[currentStep];
+    Bool done = false;
+
+    switch (s->type)
+    {
+    case STEP_MOVE:
+        done = Move_ToSetpoint(s->x, s->y, s->z, s->Tmax);
+        break;
+
+    case STEP_HOLD:
+        done = HoldCurrentPosition(s->Twait);
+        break;
+
+    case STEP_GRIPPER:
+        done = GripperAtCurrentPosition(s->grab, s->Twait);
+        break;
+
+    case STEP_END:
+        currentStep = 0;
+        return true;
+
+    default:
+        currentStep = 0;
+        return true;
+    }
+
+    if (done)
+    {
+        currentStep++;
+    }
+
+    return false;
+}
+//end runSequence();

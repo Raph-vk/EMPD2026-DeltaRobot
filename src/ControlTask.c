@@ -167,8 +167,7 @@ void ControlTask(void *pvParameters)
 				
 				if (homingAllMotorsDone)
 				{
-					MotionEngine_Init();
-					MotionEngine_HoldCurrentPosition();
+					HoldCurrentPosition();
 					
 					vPrintString("> HOMING complete -> READY\n");
 					ToState(STATE_READY);
@@ -187,7 +186,7 @@ void ControlTask(void *pvParameters)
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
 				{
-					MotionEngine_ResetSequence();
+					InitSequence();
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
 					ToState(STATE_RUNNING);
 				}
@@ -202,20 +201,19 @@ void ControlTask(void *pvParameters)
 				ulTaskNotifyTake(pdTRUE, ticksToWait);
 				
 				// Uitvoeren van bepaalde stappen.
-				sequenceDone = MotionEngine_RunSequence();
+				sequenceDone = RunSequence();
 
 				// Stopknop -> terug naar READY
 				if (buttonBits & EVT_STOP_BUTTON)
 				{
-					MotionEngine_ResetSequence();
-					MotionEngine_HoldCurrentPosition();
+					HoldCurrentPosition(0);
 					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
 					ToState(STATE_READY);
 				}
 				// Cyclus klaar -> terug naar READY
 				else if (sequenceDone)
 				{
-					MotionEngine_HoldCurrentPosition();
+					HoldCurrentPosition(0);
 					vPrintString("> RUNNING -> READY (cyclus voldaan)\n");
 					ToState(STATE_READY);
 				}
