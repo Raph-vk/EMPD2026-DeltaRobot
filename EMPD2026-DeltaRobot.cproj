@@ -717,6 +717,9 @@
     <Compile Include="src\DeltaKinematics.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\IMUTask.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\MachinePins.h">
       <SubType>compile</SubType>
     </Compile>
@@ -724,6 +727,9 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\MotorControl.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\IMUTask.c">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\VisualisationTask.c">

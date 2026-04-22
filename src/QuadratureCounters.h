@@ -19,4 +19,7 @@ void QCEncodersSetup(void);
 void QCEncodersShowCount(const char *idString);
 void QCEncodersClearCount(void);
 
+void ReadMotorPositions(float motorPos_Rad[N_MOTORS]);
+
+
 #endif /* QUADRATURECOUNTERS_H_ */

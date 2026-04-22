@@ -6,12 +6,14 @@
  *
  * RASM, changed 16-04-2026:
  * added PIN_TX3 and PIN_RX3 for use with external SPI bus
- *
  */ 
-
-
 #ifndef DEVICEIOLIB_H_
 #define DEVICEIOLIB_H_
+
+//RAPH ADDED
+#include <stdbool.h>
+#include <stdint.h>
+#include <ioport.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // defines

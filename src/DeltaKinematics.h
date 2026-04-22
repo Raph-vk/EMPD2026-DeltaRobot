@@ -33,6 +33,7 @@
 // Functions
 float PID_Controller(float error);
 float FeedForward(float alphaRad);
-bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorAnglesRad[3]);
+Bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorAnglesRad[3]);
+
 
 #endif /* DELTAKINEMATICS_H_ */

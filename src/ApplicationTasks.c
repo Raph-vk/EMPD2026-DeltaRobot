@@ -32,7 +32,7 @@ Deze file is de centrale opstart van de applicatie.
 
 static TaskHandle_t handle_ButtonHandlerTask = NULL;
 static TaskHandle_t handle_VisualisationTask = NULL;
-
+static TaskHandle_t handle_IMUTask = NULL;
 
 ///////////////////////////////////////////////////////////////////////////////
 // global handles & objects
@@ -53,27 +53,28 @@ void StartApplicationTasks(void)
 {
 	BaseType_t result = pdFAIL;
 	UBaseType_t StateQueueSize = 1;
+	static const IMU_TASK_CONFIG imuTaskConfig = { I2C_CHANNEL_0, 0x68 };
 
 	// Aanmaken van "SystemState queue"
 	// Geeft de actuele status waarin de machine zich bevindt door.
 	handle_StateQueue = xQueueCreate(StateQueueSize, sizeof(SystemState_t));
 	if (handle_StateQueue == NULL)
 	{
-		//Foutafhandeling is leeggelaten
+		vPrintString("handle_StateQueue create failed.\n");
 	}
 	
 	// EmergencySmephore aanmaken
 	handle_EmergencySemaphore = xSemaphoreCreateBinary();
 	if (handle_EmergencySemaphore == NULL)
 	{
-		// Foutafhandeling is leeggelaten
+		vPrintString("handle_EmergencySemaphore create failed.\n");
 	}
 	
 	// Event group aanmaken voor knoppen, communicatie tussen ButtonHandlerTask -> ControlTask.
 	handle_ThreadEventGroup = xEventGroupCreate();
 	if (handle_ThreadEventGroup == NULL)
 	{
-		// Foutafhandeling is leeggelaten
+		vPrintString("handle_ThreadEventGroup create failed.\n");
 	}
 	
 	
@@ -84,7 +85,7 @@ void StartApplicationTasks(void)
 	handle_ButtonEventGroup = xEventGroupCreate();
 	if (handle_ButtonEventGroup == NULL)
 	{
-		// Foutafhandeling is leeggelaten
+		vPrintString("handle_ButtonEventGroup create failed.\n");
 	}
 	
 
@@ -97,16 +98,26 @@ void StartApplicationTasks(void)
 	result = xTaskCreate(ButtonHandlerTask, "tsk_Button", (configMINIMAL_STACK_SIZE), NULL, 0, &handle_ButtonHandlerTask);
 	if (result == pdPASS )
 	{
+		vPrintString("ButtonHandlerTask task create failed.\n");
 	}
 	result = xTaskCreate(ControlTask, "tsk_Control", (configMINIMAL_STACK_SIZE), NULL, 2, &handle_ControlTask);
 	if (result == pdPASS )
 	{
+		vPrintString("ControlTask task create failed.\n");
 	}
 	result = xTaskCreate(VisualisationTask, "tsk_Visualisation", (configMINIMAL_STACK_SIZE), NULL, 1, &handle_VisualisationTask);
 	if (result == pdPASS )
 	{
+		vPrintString("VisualisationTask task create failed.\n");
+
 	}
 
+	// IMU initialisatie gebeurt in de task zelf, nadat de FreeRTOS scheduler draait.
+	result = xTaskCreate(imu_Task,"task_UMI", (configMINIMAL_STACK_SIZE),(void *)&imuTaskConfig,1, &handle_IMUTask);
+	if (result != pdPASS)
+	{
+		vPrintString("IMU task create failed.\n");
+	}
 	/**************************************************** Taken aanmaken ****************************************************/
 }
 

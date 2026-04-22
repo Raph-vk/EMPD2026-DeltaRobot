@@ -72,7 +72,6 @@ void VisualisationTask(void *pvParameters)
 {
     SystemState_t status = STATE_INIT;
 	SystemState_t previousStatus = (SystemState_t)-1;
-	uint32_t blinkDelay = 200;			// knipperperiode in ms
 	uint32_t i = 0;
 
 	vPrintString("> starting VisualisationTask\n");

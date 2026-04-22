@@ -11,6 +11,7 @@
 #include <asf.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -41,6 +42,12 @@ void vPrintString(const char *format, ...)
 	taskENTER_CRITICAL();
 
 	p = pvPortMalloc(MAX_PRINT_STRING_LENGTH);
+	if (p == NULL)
+	{
+		taskEXIT_CRITICAL();
+		return;
+	}
+
 	p[0] = '\0';
 	
 	// Add this line to show Taskname before printed text on console
@@ -50,7 +57,7 @@ void vPrintString(const char *format, ...)
 	text_length = strlen(p);
 	
 	va_start(ap, format);
-	vsprintf(p + text_length, format, ap);
+	vsnprintf(p + text_length, MAX_PRINT_STRING_LENGTH - text_length, format, ap);
 	va_end(ap);
 
 #if 1
@@ -58,10 +65,14 @@ void vPrintString(const char *format, ...)
 	{
 		// queue the POINTER to the text buffer if room available, 
 		// free the buffer after printing in PrintfTask()
-		if(xQueueSend(printfQueue, &p, 0) == errQUEUE_FULL)
+		if(xQueueSend(printfQueue, &p, 0) != pdPASS)
 		{
 			vPortFree(p);	// no room in queue, free text buffer
 		}
+	}
+	else
+	{
+		vPortFree(p);
 	}
 #else
 	portTickType max_block_time_ticks = 200UL / portTICK_RATE_MS;

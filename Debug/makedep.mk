@@ -14,6 +14,8 @@ src\DeltaKinematics.c
 
 src\MotorControl.c
 
+src\IMUTask.c
+
 src\VisualisationTask.c
 
 src\MotionEngine.c

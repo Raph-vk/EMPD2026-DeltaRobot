@@ -8,8 +8,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // globals
-static const float degToRad = 0.01745329251994329576923690768489f; //PI / 180.0f; // conversiefactor van graden naar radialen
-static const float RadToDeg = 57.295779513082320876798154814105f; // 180.0f / PI; // conversiefactor van radialen naar graden
+//static const float degToRad = 0.01745329251994329576923690768489f; //PI / 180.0f; // conversiefactor van graden naar radialen
+//static const float RadToDeg = 57.295779513082320876798154814105f; // 180.0f / PI; // conversiefactor van radialen naar graden
 
 static float motorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
 static uint8_t motorIndex;
@@ -72,14 +72,13 @@ void motor_DisplayStatus(void)
 ///////////////////////////////////////////////////////////////////////////////
 // bool motor_IsHomeLimitActive(uint8_t motorIndex)
 
-Bool motor_IsHomeLimitActive(uint8_t motorIndex)
+Bool motor_IsHomeLimitActive(uint8_t index)
 {
-	if (motorIndex >= N_MOTORS)
+	if (index >= N_MOTORS)
 	{
 		return true;    // safe default
 	}
-
-	return port_IsBitSet(MotorHomeLimitBit[motorIndex]);
+	return port_IsBitSet(MotorHomeLimitBit[index]);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -118,9 +117,6 @@ static Bool readyPos[N_MOTORS] = { false, false, false };
 static Bool allReady = false;
 static Bool motorHomed[N_MOTORS] = { false, false, false };
 static Bool allHomed = false;
-
-static uint32_t i = 0;
-
  
 Bool homeAllMotors(void)
 {
@@ -199,7 +195,7 @@ Bool homeAllMotors(void)
 					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
 					qc_ClearCountRegister(MotorQcChannel[motorIndex]);
 
-					vPrintString("Motor: %u is at limit.\n", (unsigned int)motorIndex);
+					vPrintString("Motor: %u is at limit.\n", (unsigned)motorIndex);
 
 					readyPos[motorIndex] = true;
 				}

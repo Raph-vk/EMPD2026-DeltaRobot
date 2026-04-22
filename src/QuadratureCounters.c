@@ -67,7 +67,7 @@ void QCEncodersShowCount(const char *idString)
 	for (qcChannel = 0; qcChannel <= QC_MAX_CHANNEL; qcChannel++)
 	{
 		qcCountRegister = qc_ReadCountRegister(qcChannel);
-		vPrintString("%s channel %d: CNT = %8d\n", idString, qcChannel, qcCountRegister);
+		vPrintString("%s channel %d: CNT = %8ld\n", idString, qcChannel, (long)qcCountRegister);
 	}
 }
 

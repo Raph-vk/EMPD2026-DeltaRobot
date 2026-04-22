@@ -19,6 +19,7 @@
 // application includes
 #include "DeltaKinematics.h"
 #include "MachinePins.h"
+#include "QuadratureCounters.h"
 
 #include "vPrintString.h" 
 #include "Map.h" // voor constrain() and fmap()
@@ -65,9 +66,9 @@ typedef struct
 // Function prototypes
 Bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS]);
 void InitSequence(void);
-static void CaptureCurrentPositionAsHoldTarget(void);
+void CaptureCurrentPositionAsHoldTarget(void);
 Bool HoldCurrentPosition(float Twait);
-static Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait);
+Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait);
 Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tmax);
 Bool RunSequence(void);
 

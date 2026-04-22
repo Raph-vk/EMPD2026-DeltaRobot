@@ -18,7 +18,7 @@ static float holdTargetPos[N_MOTORS] = {0.0f, 0.0f, 0.0f};
 ///////////////////////////////////////////////////////////////////////////////
 // general settings
 static uint8_t mI = 0; //Motor index
-static const float EncoderCountsPerRevolution = 2048.0f; // 2048 counts per revolution of the motor shaft
+//static const float EncoderCountsPerRevolution = 2048.0f; // 2048 counts per revolution of the motor shaft
 
 ///////////////////////////////////////////////////////////////////////////////
 // position control variables
@@ -135,7 +135,20 @@ Bool HoldCurrentPosition(float Twait)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Standstill
-static Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait)
+void CaptureCurrentPositionAsHoldTarget(void)
+{
+	ReadMotorPositions(motorPos_Rad);
+
+	for (mI = 0; mI < N_MOTORS; mI++)
+	{
+		holdTargetPos[mI] = (motorPos_Rad[mI] / i_twk) * RadToDeg;
+	}
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Standstill
+Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait)
 {
 	//eerste keer
 	if (!gripperSetupDone)
@@ -167,16 +180,16 @@ static Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait)
 // Called once per 1 ms tick. Evaluates the move profile and controls the motors.
 static float motorTargetRad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Berekende motor-eindpositie [rad]
 
-static const float  xMax = 0.0; // [m] eind positie
-static const float  vMax = 1.0; // [m/s] maximale snelheid
-static const float  aMax = 1.0; // [m/s2] maximale acceleratie
-static const float  rMax = 0.0; // [m/s3] maximale RUK
+//static const float  xMax = 0.0; // [m] eind positie
+//static const float  vMax = 1.0; // [m/s] maximale snelheid
+//static const float  aMax = 1.0; // [m/s2] maximale acceleratie
+//static const float  rMax = 0.0; // [m/s3] maximale RUK
 
 static float thetaStart[N_MOTORS];		// Motorpositie aan het begin van de beweging [rad]
 static float thetaMax_inc[N_MOTORS];	// Totale incrementele motorverplaatsing [rad]
 static float rPiek[N_MOTORS];			// Piek-ruk in motorruimte [rad/s^3]
 static float alphaMax[N_MOTORS];		// Piek-hoekacceleratie in motorruimte [rad/s^2]
-static float alpha0[N_MOTORS], alpha1[N_MOTORS], alpha2[N_MOTORS], alpha3[N_MOTORS];
+//static float alpha0[N_MOTORS], alpha1[N_MOTORS], alpha2[N_MOTORS], alpha3[N_MOTORS];
 
 static float thetaRef[N_MOTORS];		// Incrementele motorpositie referentie [rad]
 static float omegaRef[N_MOTORS];		// Motor-snelheidsreferentie [rad/s]

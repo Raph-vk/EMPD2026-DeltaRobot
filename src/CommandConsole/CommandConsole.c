@@ -128,8 +128,14 @@ void PrintfTask(void *pvParameters)
 	while(true)
 	{
 		xQueueReceive(printfQueue, &p, portMAX_DELAY);
+
+		while (the_command_uart == NULL)
+		{
+			vTaskDelay(1);
+		}
+
 		text_length = strlen(p);
-		freertos_uart_write_packet(the_command_uart, p,	text_length, max_block_time_ticks);
+		freertos_uart_write_packet(the_command_uart, (const uint8_t *)p, text_length, max_block_time_ticks);
 		vPortFree(p);
 	}
 	

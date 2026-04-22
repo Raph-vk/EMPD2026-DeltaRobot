@@ -16,6 +16,8 @@
 //////////////////////////////////////////////////////////////////////////////
 // function prototypes
 
+void port_AllLampsOff(void);
+void port_SetLamp(uint8_t lampNumber);
 void VisualisationTask(void *pvParameters);
 
 

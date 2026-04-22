@@ -63,8 +63,8 @@ static const uint8_t MotorHomeLimitBit[N_MOTORS] = {M1_LIMIT, M2_LIMIT, M3_LIMIT
 //void motor_DisableESCONController(void);
 
 void motor_DisplayStatus(void);
-
 Bool motor_IsHomeLimitActive(uint8_t motorIndex);
+Bool anyHomeSwitchActive(void);
 Bool homeAllMotors(void);     // homing-step voor alle 3 motoren
 
 #endif /* MOTORCONTROL_H_ */

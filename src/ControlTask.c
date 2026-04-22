@@ -29,10 +29,10 @@ void ToState(SystemState_t newState)
 // bool IsFaultInputActive(void)
 //
 // Returns true if one of the fault inputs is still active.
-// Assumes active-high fault inputs.
+// PIN_NOOD is fail-safe active-low: high level = OK, low level = emergency.
 Bool IsFaultInputActive(void)
 {
-	return port_IsBitSet(BIT_NOOD);
+	return !port_IsBitSet(BIT_NOOD);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -109,7 +109,7 @@ void ControlTask(void *pvParameters)
 	flags = PIO_IT_RISE_EDGE; // PIO_IT_FALL_EDGE
 	interrupt_AttachHandler(ClockInterruptHandler, PIN_CLOCK, flags);
 	
-	// Bij wegnemend signaal in PINs, run EmergencyInterruptHandler.
+	// Bij wegvallen van het noodsignaal, run EmergencyInterruptHandler.
 	flags = PIO_IT_LOW_LEVEL;
 	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOOD, flags);
 
@@ -118,7 +118,7 @@ void ControlTask(void *pvParameters)
 	threadBits = xEventGroupWaitBits(handle_ThreadEventGroup, BIT_0 | BIT_1, stayAllbits, waitForAllbits, ticksToWait);
 	
 	// Helper taken zijn ready
-	vPrintString("> helper tasks running, ControlTask started, event group = 0x%04x\n", threadBits);
+	vPrintString("> helper tasks running, ControlTask started, event group = 0x%04lx\n", (unsigned long)threadBits);
 	ToState(STATE_WAIT);
 	
 	///////////////////////////////////////////////////////////////////////////
@@ -167,7 +167,7 @@ void ControlTask(void *pvParameters)
 				
 				if (homingAllMotorsDone)
 				{
-					HoldCurrentPosition();
+					HoldCurrentPosition(0.0f);
 					
 					vPrintString("> HOMING complete -> READY\n");
 					ToState(STATE_READY);
