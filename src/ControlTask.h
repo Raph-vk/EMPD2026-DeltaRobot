@@ -29,7 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
 #include "MotorControl.h"
-#include "ButtonHandlerTask.h"
+#include "InputHandlerTask.h"
 #include "MotionEngine.h"
 #include "ApplicationTasks.h"
 #include "MachinePins.h"

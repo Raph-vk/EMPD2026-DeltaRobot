@@ -22,7 +22,7 @@ Deze file is de centrale opstart van de applicatie.
 #include "TaskSleep.h"
 
 #include "ApplicationTasks.h"
-#include "ButtonHandlerTask.h"
+#include "InputHandlerTask.h"
 #include "VisualisationTask.h"
 #include "ControlTask.h"
 
@@ -30,7 +30,7 @@ Deze file is de centrale opstart van de applicatie.
 ///////////////////////////////////////////////////////////////////////////////
 // application tasks handler declarations
 
-static TaskHandle_t handle_ButtonHandlerTask = NULL;
+static TaskHandle_t handle_InputHandlerTask = NULL;
 static TaskHandle_t handle_VisualisationTask = NULL;
 TaskHandle_t		handle_ControlTask = NULL;
 //static TaskHandle_t handle_IMUTask = NULL;
@@ -56,7 +56,7 @@ void StartApplicationTasks(void)
 	BaseType_t result = pdFAIL;
 	UBaseType_t QueueSize = 1;
 
-	// Event group aanmaken voor knoppen, communicatie tussen ButtonHandlerTask -> ControlTask.
+	// Event group aanmaken voor knoppen, communicatie tussen InputHandlerTask -> ControlTask.
 	handle_ThreadEventGroup = xEventGroupCreate();
 	if (handle_ThreadEventGroup == NULL)
 	{
@@ -109,10 +109,10 @@ void StartApplicationTasks(void)
 	/**************************************************** Taken aanmaken ****************************************************/
 	// De taken worden aangemaakt en in de ready list geplaatst.
 	// Prioriteit 0 is laagste 4 is hoogste!!
-	result = xTaskCreate(ButtonHandlerTask, "tsk_Button", (configMINIMAL_STACK_SIZE), NULL, 0, &handle_ButtonHandlerTask);
+	result = xTaskCreate(InputHandlerTask, "tsk_Input", (configMINIMAL_STACK_SIZE), NULL, 0, &handle_InputHandlerTask);
 	if (result == pdPASS )
 	{
-		vPrintString("ButtonHandlerTask task create failed.\n");
+		vPrintString("InputHandlerTask task create failed.\n");
 	}
 	result = xTaskCreate(ControlTask, "tsk_Control", (configMINIMAL_STACK_SIZE), NULL, 2, &handle_ControlTask);
 	if (result == pdPASS )

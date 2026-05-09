@@ -8,7 +8,7 @@ src\ControlTask.c
 
 src\ASF\common\services\spi\sam_spi\spi_master.c
 
-src\ButtonHandlerTask.c
+src\InputHandlerTask.c
 
 src\DeltaKinematics.c
 

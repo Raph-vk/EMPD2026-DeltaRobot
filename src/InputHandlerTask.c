@@ -1,5 +1,5 @@
 /*
- * ButtonHandlerTask.c
+ * InputHandlerTask.c
  *
  * Created: 10/04/2023
  *  Author: Raph van Koeveringe
@@ -23,7 +23,7 @@
 // other includes
 
 #include "SwitchLib.h"
-#include "ButtonHandlerTask.h"
+#include "InputHandlerTask.h"
 #include "bits.h"
 
 #include "MachinePins.h"
@@ -161,16 +161,16 @@ static void ProcessCurrentSensorData(uint32_t stroomData)
 
 
 ///////////////////////////////////////////////////////////////////////////////
-/* void ButtonHandlerTask(void *pvParameters)
+/* void InputHandlerTask(void *pvParameters)
  *
  * Bewaakt de knoppen Start, Stop en Reset en zet eventbits voor de ControlTask.
  *
  */
 uint8_t stroomChannel = 3;
 uint8_t potChannel = 4;
-void ButtonHandlerTask(void *pvParameters)
+void InputHandlerTask(void *pvParameters)
 {
-	vPrintString("> starting ButtonHandlerTask\n");
+	vPrintString("> starting InputHandlerTask\n");
 
 	adc_EnableChannel(stroomChannel);
 	adc_EnableChannel(potChannel);
@@ -178,7 +178,7 @@ void ButtonHandlerTask(void *pvParameters)
 	uint8_t i = 0;
 	
 	// Apart aangeven dat deze task actief is
-	vPrintString("> running ButtonHandlerTask\n");
+	vPrintString("> running InputHandlerTask\n");
 	xEventGroupSetBits(handle_ThreadEventGroup, BIT_0);
 	
 	while (true)

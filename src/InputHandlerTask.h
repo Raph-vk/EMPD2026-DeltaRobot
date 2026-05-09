@@ -1,13 +1,13 @@
 /*
- * ButtonHandlerTask.c
+ * InputHandlerTask.h
  *
  * Created: 10/04/2023
  *  Author: Raph van Koeveringe
  */ 
 
 
-#ifndef BUTTONHANDLERTASK_H_
-#define BUTTONHANDLERTASK_H_
+#ifndef INPUTHANDLERTASK_H_
+#define INPUTHANDLERTASK_H_
 
 ///////////////////////////////////////////////////////////////////////////////
 // library includes
@@ -30,6 +30,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes
 
-void ButtonHandlerTask(void *pvParameters);
+void InputHandlerTask(void *pvParameters);
 
-#endif /* BUTTONHANDLERTASK_H_ */
+#endif /* INPUTHANDLERTASK_H_ */

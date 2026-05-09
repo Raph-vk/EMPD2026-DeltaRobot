@@ -709,10 +709,10 @@
     <Compile Include="src\ASF\common\services\spi\sam_spi\spi_master.c">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\ButtonHandlerTask.c">
+    <Compile Include="src\InputHandlerTask.c">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\ButtonHandlerTask.h">
+    <Compile Include="src\InputHandlerTask.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\ControlTask.h">
