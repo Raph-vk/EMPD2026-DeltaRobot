@@ -25,78 +25,211 @@
 #include "SwitchLib.h"
 #include "ButtonHandlerTask.h"
 #include "bits.h"
-//#include "PortIOLib.h"
+
 #include "MachinePins.h"
 
 #include "ApplicationTasks.h"
 
+#define ADC_REFERENCE_VOLTAGE         3.3f
+#define CURRENT_SENSOR_VOLTS_PER_AMP  0.1f
+
+
+///////////////////////////////////////////////////////////////////////////////
+/* Bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit))
+Helperfunctie die teruggeeft of een van de knoppen is ingedrukt 
+*/
+static Bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit)
+{
+	return switch_IsPressed(pcbSwitch) || !port_IsBitSet(inputBit);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/* Bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit))
+ * 
+ * Helperfunctie die debounce verwerkt en teruggeeft of een van de knoppen is ingedrukt en weer losgelaten.
+ *  
+ */
+static Bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit)
+{
+	//Als knop niet ingedrukt is
+	if (!IsButtonPressed(pcbSwitch, inputBit))
+	{
+		return false;
+	}
+
+	//debounce
+	taskSleep(20);
+
+	//Als niet meer ingedrukt is
+	if (!IsButtonPressed(pcbSwitch, inputBit))
+	{
+		return false;
+	}
+
+	//Wacht tot knop niet meer ingedrukt wordt.
+	while (IsButtonPressed(pcbSwitch, inputBit))
+	{
+		taskSleep(1);
+	}
+
+	return true;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/* static void ProcessPotmeterData(uint32_t potData)
+
+Zorgt voor het uitlezen van de potmeter en het plaatsen van de procentuele stap-waarde in de Queue
+indien deze is veranderd. De waarde wordt afgerond naar dichtstbijzijnde stap van 5%.
+Met garantie op 0 en 100%.
+*/
+#define PERCENT_STEP_SIZE       5u
+static uint32_t lastProcent = UINT32_MAX;
+
+static void ProcessPotmeterData(uint32_t potData)
+{
+    uint32_t procent;
+    uint32_t adcPercentScale = potData * 100u;
+
+    if (adcPercentScale < (ADC_MAX_VALUE * PERCENT_STEP_SIZE))
+    {
+        procent = 0u;
+    }
+    else if (adcPercentScale > (ADC_MAX_VALUE * (100u - PERCENT_STEP_SIZE) ))
+    {
+        procent = 100u;
+    }
+    else
+    {
+        uint32_t step = ((potData * 20) + (ADC_MAX_VALUE / 2u)) / ADC_MAX_VALUE;
+        procent = step * PERCENT_STEP_SIZE;
+    }
+
+    if (procent != lastProcent)
+    {
+        xQueueOverwrite(handle_potQueue, &procent);
+        vPrintString("> Operation Percentage is set to %lu%%\n", (unsigned long)procent);
+        lastProcent = procent;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/* static void ProcessCurrentSensorData(uint32_t stroomData)
+Leest een stroomsensor uit die 100mV/A als analoge uitgang geeft.
+De berekende stroom in ampere wordt in de stroom queue geplaatst.
+*/
+static Bool hasCurrentSample = false;
+static uint32_t vorigeStroomData = 0;
+static float zeroCurrentVoltage = 2.5f;        // Better: measure this during startup
+
+static void ProcessCurrentSensorData(uint32_t stroomData)
+{
+	uint32_t verschil;
+
+	if (!hasCurrentSample)
+	{
+		vorigeStroomData = stroomData;
+		hasCurrentSample = true;
+	}
+	else
+	{
+		if (stroomData >= vorigeStroomData)
+		{
+			verschil = stroomData - vorigeStroomData;
+		}
+		else
+		{
+			verschil = vorigeStroomData - stroomData;
+		}
+
+		if (verschil < 100u)
+		{
+			return;
+		}
+
+		vorigeStroomData = stroomData;
+	}
+
+	float spanning = ((float)stroomData * ADC_REFERENCE_VOLTAGE) / (float)ADC_MAX_VALUE;
+
+	// ACS712: uitgang is rond VCC/2 bij 0A
+	float stroom = (spanning - zeroCurrentVoltage) * 10.0f; // *10.0f is gelijk aan delen door 100mV/A
+
+	xQueueOverwrite(handle_stroomQueue, &stroom);
+}
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
 /* void ButtonHandlerTask(void *pvParameters)
-
-Bewaakt de knoppen Start, Stop en Reset en zet eventbits voor de ControlTask.
-
-*/
+ *
+ * Bewaakt de knoppen Start, Stop en Reset en zet eventbits voor de ControlTask.
+ *
+ */
+uint8_t stroomChannel = 3;
+uint8_t potChannel = 4;
 void ButtonHandlerTask(void *pvParameters)
 {
-	uint8_t startButton = PCB_SWITCH_START;   // SW1
-	uint8_t stopButton  = PCB_SWITCH_STOP;   // SW2
-	uint8_t resetButton = PCB_SWITCH_RESET;   // SW3
-
 	vPrintString("> starting ButtonHandlerTask\n");
 
+	adc_EnableChannel(stroomChannel);
+	adc_EnableChannel(potChannel);
+
+	uint8_t i = 0;
+	
 	// Apart aangeven dat deze task actief is
+	vPrintString("> running ButtonHandlerTask\n");
 	xEventGroupSetBits(handle_ThreadEventGroup, BIT_0);
-
+	
 	while (true)
-	{
+	{		
 		// START
-		if (switch_IsPressed(startButton))
+		if ( ButtonWasPressed(PCB_SWITCH_START, BIT_START) )
 		{
-			taskSleep(20); // debounce
-			if (switch_IsPressed(startButton))
-			{
-				while (switch_IsPressed(startButton))
-				{
-					taskSleep(1);
-				}
-
-				vPrintString("> START button SW%d pressed!\n", startButton + 1);
-				xEventGroupSetBits(handle_ButtonEventGroup, EVT_START_BUTTON);
-			}
+			vPrintString("> START button is pressed!\n");
+			xEventGroupSetBits(handle_ButtonEventGroup, EVT_START_BUTTON);
 		}
-
 		// STOP
-		if (switch_IsPressed(stopButton))
+		if ( ButtonWasPressed(PCB_SWITCH_STOP, BIT_STOP) )
 		{
-			taskSleep(20); // debounce
-			if (switch_IsPressed(stopButton))
-			{
-				while (switch_IsPressed(stopButton))
-				{
-					taskSleep(1);
-				}
-
-				vPrintString("> STOP button SW%d pressed!\n", stopButton + 1);
-				xEventGroupSetBits(handle_ButtonEventGroup, EVT_STOP_BUTTON);
-			}
+			vPrintString("> STOP button is pressed!\n");
+			xEventGroupSetBits(handle_ButtonEventGroup, EVT_STOP_BUTTON);
 		}
-
 		// RESET
-		if (switch_IsPressed(resetButton))
+		if ( ButtonWasPressed(PCB_SWITCH_RESET, BIT_RESET) )
 		{
-			taskSleep(20); // debounce
-			if (switch_IsPressed(resetButton))
-			{
-				while (switch_IsPressed(resetButton))
-				{
-					taskSleep(1);
-				}
-
-				vPrintString("> RESET button SW%d pressed!\n", resetButton + 1);
-				xEventGroupSetBits(handle_ButtonEventGroup, EVT_RESET_BUTTON);
-			}
+			vPrintString("> RESET button is pressed!\n");
+			xEventGroupSetBits(handle_ButtonEventGroup, EVT_RESET_BUTTON);
 		}
+		
+		/*
+		// Nood (READ-OUT ONLY)
+		if (!ButtonWasPressed(PCB_SWITCH_EMER, BIT_NOOD) )
+		{
+			vPrintString("> NOOD button is pressed!\n");
+		}
+		*/
+		
+		if (i >= 50)
+		{
+			i = 0;
+			
+			//Starts conversie van alle kanalen en wacht tot klaar zijn.
+			adc_StartConversion();
+			while ((adc_IsConversionReady(potChannel) == false) ||
+				(adc_IsConversionReady(stroomChannel) == false))
+			{
+				taskSleep(0);
+			}
 
+			ProcessCurrentSensorData( adc_ReadData(stroomChannel));
+			ProcessPotmeterData( adc_ReadData(potChannel));
+		}
+		else
+		{
+			i++;
+		}
 		taskSleep(10);
 	}
+/*Should never get Here*/
 }

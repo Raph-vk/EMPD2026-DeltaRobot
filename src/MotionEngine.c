@@ -84,6 +84,7 @@ Bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
 
 		// Zorg dat waarde niet groter is dan maximale DAC-waarde, en output.
 		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // min/max ongeveer +/-10V.
+
 		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
 	}
 
@@ -109,12 +110,14 @@ Bool HoldCurrentPosition(float Twait)
 {
 	if (!holdSetupDone)
 	{
+		//capture currect position
 		ReadMotorPositions(motorPos_Rad);
 		for (mI = 0; mI < N_MOTORS; mI++)
 		{
 			holdTargetPos[mI] = (motorPos_Rad[mI] / i_twk) * RadToDeg;
 		}
 
+		//check time
 		t0 = g_time;
 		holdSetupDone = true;
 	}
@@ -135,19 +138,6 @@ Bool HoldCurrentPosition(float Twait)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Standstill
-void CaptureCurrentPositionAsHoldTarget(void)
-{
-	ReadMotorPositions(motorPos_Rad);
-
-	for (mI = 0; mI < N_MOTORS; mI++)
-	{
-		holdTargetPos[mI] = (motorPos_Rad[mI] / i_twk) * RadToDeg;
-	}
-}
-
-
-///////////////////////////////////////////////////////////////////////////////
-// Standstill
 Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait)
 {
 	//eerste keer
@@ -155,10 +145,18 @@ Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait)
 	{
 		port_SetBit(GRIPPER, Grab);
 
-		CaptureCurrentPositionAsHoldTarget();
+		//capture currect position
+		ReadMotorPositions(motorPos_Rad);
+		for (mI = 0; mI < N_MOTORS; mI++)
+		{
+			holdTargetPos[mI] = (motorPos_Rad[mI] / i_twk) * RadToDeg;
+		}
+		
+		//check time
 		t0 = g_time;
 		gripperSetupDone = true;
 	}
+	
 	// Als tijd voorbij is
 	else if (g_time - t0 >= Twait)
 	{
@@ -167,6 +165,7 @@ Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait)
 		return true; // Hold positie voldaan
 	}
 
+	
 	HoldPosition(holdTargetPos);
 
 	//Tijd bijhouden
@@ -338,12 +337,12 @@ Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 ///////////////////////////////////////////////////////////////////////////////
 static const SequenceStep pickPlaceSeq[] =
 {
-    MOVE(100.0f, 100.0f, -300.0f, 1.1f),
+    MOVE(100.0f, 100.0f, 300.0f, 1.1f),
     GRIP(true, 0.5f),
-    MOVE(200.0f,   0.0f, -300.0f, 1.1f),
+    MOVE(200.0f,   0.0f, 300.0f, 1.1f),
     HOLD(0.1f),
     GRIP(false, 0.5f),
-    MOVE(100.0f, 100.0f, -300.0f, 1.1f),
+    MOVE(100.0f, 100.0f, 300.0f, 1.1f),
     END_SEQ()
 };
 

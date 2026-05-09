@@ -6,10 +6,31 @@
  */
 ///////////////////////////////////////////////////////////////////////////////
 #include "ControlTask.h"
+#include "temp.h"
+
 ///////////////////////////////////////////////////////////////////////////////
 
 // file globals
 static SystemState_t state = STATE_INIT;
+
+///////////////////////////////////////////////////////////////////////////////
+// const char *StateToString(SystemState_t state)
+//
+// Returns a readable name for the current system state.
+static const char *StateToString(SystemState_t systemState)
+{
+	switch (systemState)
+	{
+		case STATE_INIT:    return "INIT";
+		case STATE_WAIT:    return "WAIT";
+		case STATE_HOMING:  return "HOMING";
+		case STATE_READY:   return "READY";
+		case STATE_PAUSE:   return "PAUSE";
+		case STATE_RUNNING: return "RUNNING";
+		case STATE_FAULT:   return "FAULT";
+		default:            return "UNKNOWN";
+	}
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // void ToState(newState)
@@ -21,54 +42,46 @@ void ToState(SystemState_t newState)
 	{
 		state = newState;
 		xQueueOverwrite(handle_StateQueue, &state);
+		vPrintString("> Switch to state = %s\n", StateToString(state));
 	}
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////
-// bool IsFaultInputActive(void)
+// bool InNoodsituatie(void)
 //
 // Returns true if one of the fault inputs is still active.
-// PIN_NOOD is fail-safe active-low: high level = OK, low level = emergency.
-Bool IsFaultInputActive(void)
+// PIN_NOOD is fail-safe active-low: set = OK, not set = Nood.
+Bool InNoodsituatie(void)
 {
-	return !port_IsBitSet(BIT_NOOD);
+	return port_IsBitSet(BIT_NOOD);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // void ClockInterruptHandler(uint32_t id, uint32_t mask)
 //
 // invoked on every clock tick (1 ms) of the external hardware clock
-
 void ClockInterruptHandler(uint32_t id, uint32_t mask)
 {
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
+	// Als ControlTask bestaat, geef een task notification.
 	if (handle_ControlTask != NULL)
 	{
-		vTaskNotifyGiveFromISR(handle_ControlTask, &xHigherPriorityTaskWoken);
+		vTaskNotifyGiveFromISR(handle_ControlTask, NULL);
 	}
-
-	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// void EmergencyInterruptHandler(uint32_t id, uint32_t mask)
+// void NoodInterruptHandler(uint32_t id, uint32_t mask)
 //
-// emergency input interrupt
-void EmergencyInterruptHandler(uint32_t id, uint32_t mask)
+// Nood input interrupt
+void NoodInterruptHandler(uint32_t id, uint32_t mask)
 {
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	
-	// Direct veilig maken
-	//motor_DisableESCONController();
 
-	if (handle_EmergencySemaphore != NULL)
+	// NoodSemaphore vrijgeven
+	if (handle_NoodSemaphore != NULL)
 	{
-		xSemaphoreGiveFromISR(handle_EmergencySemaphore, &xHigherPriorityTaskWoken);
+		xSemaphoreGiveFromISR(handle_NoodSemaphore, 0);
 	}
-
-	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -86,40 +99,56 @@ void ControlTask(void *pvParameters)
 	const BaseType_t clearAllbits  = pdTRUE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
 	const BaseType_t waitForAnyBit= pdFALSE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
 
-	EventBits_t threadBits = 0;
+	//EventBits_t threadBits = 0;
 	const BaseType_t stayAllbits  = pdFALSE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
 	const BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
 	
 	const TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
-	const float RustPostitie[N_MOTORS] = {20.0f,20.0f,20.0f};
-		
+	// const float RustPostitie[N_MOTORS] = {20.0f,20.0f,20.0f};
+	
 	Bool homingAllMotorsDone = false;
 	Bool sequenceDone  = false;
 
-	uint32_t flags = 0;
+	float gemetenStroom = 0.0f;
+	BaseType_t hasCurrentSample = pdFALSE;
+	
+	float rustPositie[N_MOTORS] = {20.0f,20.0f,20.0f};
 	
 	vPrintString("> starting ControlTask.\n");
 
 	ToState(STATE_INIT);
 	
-	// schakeld direct de motoren uit.
-	//motor_DisableESCONController();
+	RunningLoopTimer_Init();
+
 	
 	// Bij opkomend signaal in PIN, run ClockInterruptHandler.
-	flags = PIO_IT_RISE_EDGE; // PIO_IT_FALL_EDGE
-	interrupt_AttachHandler(ClockInterruptHandler, PIN_CLOCK, flags);
+	interrupt_AttachHandler(ClockInterruptHandler, PIN_CLOCK, PIO_IT_RISE_EDGE);
+	interrupt_Disable(PIN_CLOCK);
+	interrupt_Enable(PIN_CLOCK);
+
 	
-	// Bij wegvallen van het noodsignaal, run EmergencyInterruptHandler.
-	flags = PIO_IT_LOW_LEVEL;
-	interrupt_AttachHandler(EmergencyInterruptHandler, PIN_NOOD, flags);
+	// PIN_NOOD is fail-safe, pinSet = systemOK, not set = Nood
+	interrupt_AttachHandler(NoodInterruptHandler, PIN_NOOD, PIO_IT_FALL_EDGE);
+	interrupt_Disable(PIN_NOOD);
+	interrupt_Enable(PIN_NOOD);
+
 
 	// wait for all tasks to get up and running:
-	vPrintString("> ControlTask waiting for helper tasks...\n");
-	threadBits = xEventGroupWaitBits(handle_ThreadEventGroup, BIT_0 | BIT_1, stayAllbits, waitForAllbits, ticksToWait);
+	vPrintString("> ControlTask wachtende op helper taken...\n");
+	xEventGroupWaitBits(handle_ThreadEventGroup, BIT_0 | BIT_1, stayAllbits, waitForAllbits, ticksToWait);
 	
 	// Helper taken zijn ready
-	vPrintString("> helper tasks running, ControlTask started, event group = 0x%04lx\n", (unsigned long)threadBits);
-	ToState(STATE_WAIT);
+	vPrintString("> helper taken draaien, ControlTask wordt nu ook gestart.\n");
+	
+	// Controleer al in nood is.
+	if( InNoodsituatie() )
+	{
+		ToState(STATE_FAULT);
+	}
+	else
+	{
+		ToState(STATE_WAIT);
+	}
 	
 	///////////////////////////////////////////////////////////////////////////
 	// oneindige loop
@@ -133,12 +162,24 @@ void ControlTask(void *pvParameters)
 			0				// niet blokkeren
 		);
 
-
-		// Emergency check via Semaphore
-		if (xSemaphoreTake(handle_EmergencySemaphore, 0) == pdTRUE)
+		// Nood check via Semaphore, of als fout actief is, of als stroom te hoog oploopt.
+		hasCurrentSample = xQueuePeek(handle_stroomQueue, &gemetenStroom, 0);
+		
+		if ( xSemaphoreTake(handle_NoodSemaphore, 0) == pdTRUE || (hasCurrentSample == true && gemetenStroom >= (maxStroom-1.0) ) ) //
 		{
-			vPrintString("> EMERGENCY INTERRUPT RECIEVED\n");
-			ToState(STATE_FAULT);
+			if (state != STATE_FAULT)
+			{
+				ToState(STATE_FAULT);
+
+				if(InNoodsituatie())
+				{
+					vPrintString("> Noodinput actief!\n");
+				}
+				else if (gemetenStroom >= maxStroom)
+				{
+					vPrintString("> NOOD: Gemeten stroom te hoog, %.2f!\n", gemetenStroom);
+				}
+			}
 		}
 
 		switch (state)
@@ -162,8 +203,11 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_HOMING:
 			{
-				taskSleep(1);
-				homingAllMotorsDone = homeAllMotors(); //<- MotorControl.c
+				// 1kHz take
+				ulTaskNotifyTake(pdTRUE, ticksToWait);
+
+				//homingAllMotorsDone = homeAllMotors(); //<- MotorControl.c
+				homingAllMotorsDone = true;
 				
 				if (homingAllMotorsDone)
 				{
@@ -181,11 +225,13 @@ void ControlTask(void *pvParameters)
 				// Op vaste positie regelen op iedere control tick
 				ulTaskNotifyTake(pdTRUE, ticksToWait);
 				
-				HoldPosition(RustPostitie);
+				HoldPosition(rustPositie);
 
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
 				{
+					RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check		
+
 					InitSequence();
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
 					ToState(STATE_RUNNING);
@@ -193,28 +239,57 @@ void ControlTask(void *pvParameters)
 
 				break;
 			}
+			/////////////////////////////////////////////////////////////////////
+			case  STATE_PAUSE:
+			{
+				// Op vaste positie regelen op iedere control tick
+				ulTaskNotifyTake(pdTRUE, ticksToWait);
+				
+				HoldPosition(rustPositie); //Change to current/last position
+
+				// Startknop -> runnen
+				if (buttonBits & EVT_START_BUTTON)
+				{
+					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
+					ToState(STATE_RUNNING);
+					RunningLoopTimer_ResetWindow();
+				}
+				// Resetknop -> READY
+				if (buttonBits & EVT_RESET_BUTTON)
+				{
+					vPrintString("> RESET -> READY (Startknop ontvangen.)\n");
+					ToState(STATE_READY);
+				}
+
+				break;
+			}
+
 
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_RUNNING:
 			{
+				RunningLoopTimer_End(); //ONLY for 1kHz loop check
+				
 				// Sequence draaien op control tick
 				ulTaskNotifyTake(pdTRUE, ticksToWait);
 				
+				RunningLoopTimer_Begin();
+
 				// Uitvoeren van bepaalde stappen.
 				sequenceDone = RunSequence();
 
 				// Stopknop -> terug naar READY
 				if (buttonBits & EVT_STOP_BUTTON)
 				{
-					HoldCurrentPosition(0);
+					//HoldCurrentPosition(0);
 					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
-					ToState(STATE_READY);
+					ToState(STATE_PAUSE);
 				}
 				// Cyclus klaar -> terug naar READY
 				else if (sequenceDone)
 				{
-					HoldCurrentPosition(0);
-					vPrintString("> RUNNING -> READY (cyclus voldaan)\n");
+					//HoldCurrentPosition(0);
+					vPrintString("> RUNNING -> READY (cyclus voldaan).\n");
 					ToState(STATE_READY);
 				}
 				break;
@@ -229,21 +304,22 @@ void ControlTask(void *pvParameters)
 					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
 				}
 
-				taskSleep(100);
-
 				// Alleen uit fault als reset is gedrukt EN foutsignaal weg is
 				if (buttonBits & EVT_RESET_BUTTON)
 				{
-					if (!IsFaultInputActive())
+					if (!InNoodsituatie())
 					{
-						vPrintString("> FAULT cleared -> WAIT (reset ontvangen, foutsignaal weg)\n");
+						vPrintString("> FAULT cleared -> WAIT (reset ontvangen, signaal ook actief)\n");
 						ToState(STATE_WAIT);
 					}
 					else
 					{
-						vPrintString("> RESET ontvangen, maar fault input is nog actief\n");
+						vPrintString("> RESET ontvangen, maar PIN_NOOD heeft nog steeds geen signaal!\n");
 					}
 				}
+				
+				taskSleep(1);
+				
 				break;
 			}
 

@@ -66,7 +66,6 @@ typedef struct
 // Function prototypes
 Bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS]);
 void InitSequence(void);
-void CaptureCurrentPositionAsHoldTarget(void);
 Bool HoldCurrentPosition(float Twait);
 Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait);
 Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tmax);

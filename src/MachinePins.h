@@ -2,7 +2,7 @@
  * MachinePins.h
  *
  * Created: 12/04/2026 11:35:37
- *  Author: raphv
+ * Author: raphv
  */ 
 
 #ifndef MACHINEPINS_H_
@@ -47,9 +47,14 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // I2C ports
-// ch1 - Scherm1
-// ch2 - Optical Flow Sensor 1 & 2
+// ch0 - Scherm1
+// ch1 - Optical Flow Sensor 1 & 2
 
+///////////////////////////////////////////////////////////////////////////////
+// analoge inputs
+// ch3 - currentsensor
+#define maxStroom 12.0f
+// ch4 - potmeter
 
 ///////////////////////////////////////////////////////////////////////////////
 // motor configuratie DAC en QC
@@ -63,7 +68,7 @@ static const uint8_t MotorQcChannel[N_MOTORS] = {0, 1, 2};
 #define PCB_SWITCH_START        0 // PIN_A9 
 #define PCB_SWITCH_STOP         1 // PIN_A8
 #define PCB_SWITCH_RESET        2 // PIN_A7
-//#define PCB_SWITCH_			3 // PIN_A6 // Wellicht potmeter toevoegen? of op andere Apin
+#define PCB_SWITCH_EMER			3 // PIN_A6
 
 
 #endif /* MACHINEPINS_H_ */

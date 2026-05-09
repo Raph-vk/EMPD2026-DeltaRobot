@@ -32,7 +32,8 @@ Deze file is de centrale opstart van de applicatie.
 
 static TaskHandle_t handle_ButtonHandlerTask = NULL;
 static TaskHandle_t handle_VisualisationTask = NULL;
-static TaskHandle_t handle_IMUTask = NULL;
+TaskHandle_t		handle_ControlTask = NULL;
+//static TaskHandle_t handle_IMUTask = NULL;
 
 ///////////////////////////////////////////////////////////////////////////////
 // global handles & objects
@@ -40,10 +41,11 @@ static TaskHandle_t handle_IMUTask = NULL;
 EventGroupHandle_t handle_ThreadEventGroup = NULL;
 EventGroupHandle_t handle_ButtonEventGroup = NULL;
 
-SemaphoreHandle_t  handle_EmergencySemaphore = NULL;
+SemaphoreHandle_t	handle_NoodSemaphore = NULL;
 
-QueueHandle_t      handle_StateQueue = NULL;
-TaskHandle_t       handle_ControlTask = NULL;
+QueueHandle_t		handle_StateQueue = NULL;
+QueueHandle_t		handle_potQueue = NULL;
+QueueHandle_t		handle_stroomQueue = NULL;
 
 
 
@@ -52,24 +54,8 @@ TaskHandle_t       handle_ControlTask = NULL;
 void StartApplicationTasks(void)
 {
 	BaseType_t result = pdFAIL;
-	UBaseType_t StateQueueSize = 1;
-	static const IMU_TASK_CONFIG imuTaskConfig = { I2C_CHANNEL_0, 0x68 };
+	UBaseType_t QueueSize = 1;
 
-	// Aanmaken van "SystemState queue"
-	// Geeft de actuele status waarin de machine zich bevindt door.
-	handle_StateQueue = xQueueCreate(StateQueueSize, sizeof(SystemState_t));
-	if (handle_StateQueue == NULL)
-	{
-		vPrintString("handle_StateQueue create failed.\n");
-	}
-	
-	// EmergencySmephore aanmaken
-	handle_EmergencySemaphore = xSemaphoreCreateBinary();
-	if (handle_EmergencySemaphore == NULL)
-	{
-		vPrintString("handle_EmergencySemaphore create failed.\n");
-	}
-	
 	// Event group aanmaken voor knoppen, communicatie tussen ButtonHandlerTask -> ControlTask.
 	handle_ThreadEventGroup = xEventGroupCreate();
 	if (handle_ThreadEventGroup == NULL)
@@ -88,8 +74,36 @@ void StartApplicationTasks(void)
 		vPrintString("handle_ButtonEventGroup create failed.\n");
 	}
 	
+	// NoodSmephore aanmaken
+	handle_NoodSemaphore = xSemaphoreCreateBinary();
+	if (handle_NoodSemaphore == NULL)
+	{
+		vPrintString("handle_NoodSemaphore create failed.\n");
+	}
 
+	// Aanmaken van "SystemState queue"
+	// Geeft de actuele status waarin de machine zich bevindt door.
+	handle_StateQueue = xQueueCreate(QueueSize, sizeof(SystemState_t));
+	if (handle_StateQueue == NULL)
+	{
+		vPrintString("handle_StateQueue create failed.\n");
+	}
 	
+	// Aanmaken van "potQueue"
+	// Geeft de actuele procentuele stap-waarde van de potmeter door.
+	handle_potQueue = xQueueCreate(QueueSize, sizeof(uint32_t));
+	if (handle_potQueue == NULL)
+	{
+		vPrintString("handle_potQueue create failed.\n");
+	}
+
+	// Aanmaken van "stroom queue"
+	// Geeft de actuele stroomwaarde door.
+	handle_stroomQueue = xQueueCreate(QueueSize, sizeof(float));
+	if (handle_stroomQueue == NULL)
+	{
+		vPrintString("handle_stroomQueue create failed.\n");
+	}
 
 	
 	/**************************************************** Taken aanmaken ****************************************************/
@@ -112,12 +126,16 @@ void StartApplicationTasks(void)
 
 	}
 
+	/*
+	static const IMU_TASK_CONFIG imuTaskConfig = { I2C_CHANNEL_0, 0x68 };
+
 	// IMU initialisatie gebeurt in de task zelf, nadat de FreeRTOS scheduler draait.
 	result = xTaskCreate(imu_Task,"task_UMI", (configMINIMAL_STACK_SIZE),(void *)&imuTaskConfig,1, &handle_IMUTask);
 	if (result != pdPASS)
 	{
 		vPrintString("IMU task create failed.\n");
 	}
+	*/
 	/**************************************************** Taken aanmaken ****************************************************/
 }
 

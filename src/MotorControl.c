@@ -163,7 +163,7 @@ Bool homeAllMotors(void)
 
 	///////////////////////////////////////////////
 	// extra Check of systeem in fout staat
-	if (IsFaultInputActive())
+	if (InNoodsituatie())
 	{
 		vPrintString("> Er is een fout input actief!!\n");
 
