@@ -47,15 +47,7 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////
-// #defines
-//Inputs
-#define M1_LIMIT		BIT_M1_HOME
-#define M2_LIMIT		BIT_M2_HOME
-#define M3_LIMIT		BIT_M3_HOME
-#define ESCON_OVERLOAD	BIT_NOOD
-
-// 
-static const uint8_t MotorHomeLimitBit[N_MOTORS] = {M1_LIMIT, M2_LIMIT, M3_LIMIT};
+static const uint8_t MotorHomeLimitBit[N_MOTORS] = {BIT_M1_HOME, BIT_M2_HOME, BIT_M3_HOME};
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes
 

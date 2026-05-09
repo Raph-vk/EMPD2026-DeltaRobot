@@ -337,12 +337,12 @@ Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 ///////////////////////////////////////////////////////////////////////////////
 static const SequenceStep pickPlaceSeq[] =
 {
-    MOVE(100.0f, 100.0f, 300.0f, 1.1f),
+    MOVE(0.0f, 0.0f, 300.0f, 1.1f),
     GRIP(true, 0.5f),
-    MOVE(200.0f,   0.0f, 300.0f, 1.1f),
+    MOVE(0.0f, 0.0f, 350.0f, 1.1f),
     HOLD(0.1f),
-    GRIP(false, 0.5f),
-    MOVE(100.0f, 100.0f, 300.0f, 1.1f),
+    GRIP(false, 5.0f),
+    MOVE(50.0f, 50.0f, 400.0f, 1.1f),
     END_SEQ()
 };
 

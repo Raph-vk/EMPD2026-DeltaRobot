@@ -50,15 +50,15 @@ void motor_DisplayStatus(void)
 
 	vPrintString("digital input = 0x%02x\n", portInValue);
 	
-	isSet = port_IsBitSet(M1_LIMIT);
+	isSet = port_IsBitSet(BIT_M1_HOME);
 	bitVal = isSet? 1 : 0;
 	vPrintString("Limit M1:    %d\n", bitVal);
 
-	isSet = port_IsBitSet(M2_LIMIT);
+	isSet = port_IsBitSet(BIT_M2_HOME);
 	bitVal = isSet? 1 : 0;
 	vPrintString("Limit M2:    %d\n", bitVal);
 
-	isSet = port_IsBitSet(M3_LIMIT);
+	isSet = port_IsBitSet(BIT_M3_HOME);
 	bitVal = isSet? 1 : 0;
 	vPrintString("Limit M3:     %d\n", bitVal);
 
