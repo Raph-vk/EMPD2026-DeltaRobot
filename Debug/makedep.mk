@@ -16,6 +16,44 @@ src\MotorControl.c
 
 src\IMUTask.c
 
+src\temp.c
+
+src\u8g2\csrc\u8g2_font_5x7_tr.c
+
+src\u8g2\csrc\u8g2_buffer.c
+
+src\u8g2\csrc\u8g2_d_memory.c
+
+src\u8g2\csrc\u8g2_ssd1309_i2c_128x64_noname0_1.c
+
+src\u8g2\csrc\u8g2_font.c
+
+src\u8g2\csrc\u8g2_font_6x10_tf.c
+
+src\u8g2\csrc\u8g2_hvline.c
+
+src\u8g2\csrc\u8g2_intersection.c
+
+src\u8g2\csrc\u8g2_kerning.c
+
+src\u8g2\csrc\u8g2_ll_hvline.c
+
+src\u8g2\csrc\u8g2_setup.c
+
+src\u8g2\csrc\u8x8_8x8.c
+
+src\u8g2\csrc\u8x8_byte.c
+
+src\u8g2\csrc\u8x8_cad.c
+
+src\u8g2\csrc\u8x8_display.c
+
+src\u8g2\csrc\u8x8_d_ssd1309.c
+
+src\u8g2\csrc\u8x8_gpio.c
+
+src\u8g2\csrc\u8x8_setup.c
+
 src\VisualisationTask.c
 
 src\MotionEngine.c
