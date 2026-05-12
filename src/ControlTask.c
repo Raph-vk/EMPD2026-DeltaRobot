@@ -190,7 +190,6 @@ void ControlTask(void *pvParameters)
 				// Wachten op start-of resetknop
 				if ((buttonBits & EVT_START_BUTTON) || (buttonBits & EVT_RESET_BUTTON))
 				{
-
 					// Naar HomingState schakelen.
 					vPrintString("> WAIT -> HOMING ( Start-of Resetknop is ontvangen).\n");
 					homingAllMotorsDone = false;
@@ -299,10 +298,12 @@ void ControlTask(void *pvParameters)
 			case  STATE_FAULT:
 			{
 				//Iedere motor geen kracht forceren.
+				port_SetBit(BIT_GRIPPER, false);
 				for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 				{
 					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
 				}
+
 
 				// Alleen uit fault als reset is gedrukt EN foutsignaal weg is
 				if (buttonBits & EVT_RESET_BUTTON)

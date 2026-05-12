@@ -154,7 +154,6 @@ static void ProcessCurrentSensorData(uint32_t stroomData)
 
 	// ACS712: uitgang is rond VCC/2 bij 0A
 	float stroom = (spanning - zeroCurrentVoltage) * 10.0f; // *10.0f is gelijk aan delen door 100mV/A
-
 	xQueueOverwrite(handle_stroomQueue, &stroom);
 }
 
@@ -201,14 +200,6 @@ void InputHandlerTask(void *pvParameters)
 			vPrintString("> RESET button is pressed!\n");
 			xEventGroupSetBits(handle_ButtonEventGroup, EVT_RESET_BUTTON);
 		}
-		
-		/*
-		// Nood (READ-OUT ONLY)
-		if (!ButtonWasPressed(PCB_SWITCH_EMER, BIT_NOOD) )
-		{
-			vPrintString("> NOOD button is pressed!\n");
-		}
-		*/
 		
 		if (i >= 50)
 		{

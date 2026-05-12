@@ -257,7 +257,7 @@ void VisualisationTask(void *pvParameters)
 		{
 			uint32_t procent;
 			float stroom;
-			
+						
 			// Potmeterwaarde niet-destructief uit de queue lezen
 			if (xQueuePeek(handle_potQueue, &procent, 0) == pdTRUE)
 			{
@@ -267,16 +267,17 @@ void VisualisationTask(void *pvParameters)
 			{
 				snprintf(potLine, sizeof(potLine), "vMax:---");
 			}	
-
+			
 			// Stroomwaarde niet-destructief uit de queue lezen
 			if (xQueuePeek(handle_stroomQueue, &stroom, 0) == pdTRUE)
 			{
 				snprintf(stroomLine, sizeof(stroomLine), "Stroom:%.1fA", stroom); //1decimaal
+				vPrintString("Gemeten stroom: %.1fA\n", stroom);
 			}
 			else
 			{
 				snprintf(stroomLine, sizeof(stroomLine), "Stroom:---A");
-			}	
+			}
 			
 			//Infolijn TOEVOEGEN.
 			snprintf(stateLine, sizeof(stateLine), "Status: %s", stateString);
