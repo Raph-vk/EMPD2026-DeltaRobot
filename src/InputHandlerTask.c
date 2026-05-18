@@ -201,7 +201,7 @@ void InputHandlerTask(void *pvParameters)
 			xEventGroupSetBits(handle_ButtonEventGroup, EVT_RESET_BUTTON);
 		}
 		
-		if (i >= 50)
+		if (i >= 10)
 		{
 			i = 0;
 			

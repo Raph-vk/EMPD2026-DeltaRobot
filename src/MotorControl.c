@@ -38,17 +38,17 @@ void motor_DisableESCONController(void)
 // void motor_DisplayStatus(void)
 void motor_DisplayStatus(void)
 {
-	uint8_t portInValue = 0;
+	//uint8_t portInValue = 0;
 	uint8_t bitVal		= 0;
 	Bool isSet			= false;
 	
 	// non-inverting input port, pull-up resistors
 	
-	portInValue = port_GetInput();
+	//portInValue = port_GetInput();
 	
-	led_DisplayValue(portInValue >> 1);	// using bits 1..4
+	//led_DisplayValue(portInValue >> 1);	// using bits 1..4
 
-	vPrintString("digital input = 0x%02x\n", portInValue);
+	//vPrintString("digital input = 0x%02x\n", portInValue);
 	
 	isSet = port_IsBitSet(BIT_M1_HOME);
 	bitVal = isSet? 1 : 0;
@@ -122,7 +122,7 @@ Bool homeAllMotors(void)
 {
 	motorIndex = 0;
 	 
-	motor_DisplayStatus();
+	//motor_DisplayStatus();
 
 	// Eerste keer: initialiseren / starten
 	if (HomingStarted == false)

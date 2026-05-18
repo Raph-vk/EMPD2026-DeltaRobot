@@ -248,16 +248,19 @@ void VisualisationTask(void *pvParameters)
 				break;				
 			}
 		}
-	
-		//Loop teller voor blink, praktisch; 7, 8, 9, 0, 1, 2 ....
-		i = (i + 1) % 10;
 		
 		// NAAR OLED SCHERM SCHRIJVEN
-		if (updateDisplay || (i == 0))
+		if (!updateDisplay || (i < 10))
+		{
+			//Loop teller voor blink, praktisch; 7, 8, 9, 0, 1, 2 ....
+			i++;
+			taskSleep(100);
+		}
+		else
 		{
 			uint32_t procent;
 			float stroom;
-						
+			
 			// Potmeterwaarde niet-destructief uit de queue lezen
 			if (xQueuePeek(handle_potQueue, &procent, 0) == pdTRUE)
 			{
@@ -266,7 +269,7 @@ void VisualisationTask(void *pvParameters)
 			else
 			{
 				snprintf(potLine, sizeof(potLine), "vMax:---");
-			}	
+			}
 			
 			// Stroomwaarde niet-destructief uit de queue lezen
 			if (xQueuePeek(handle_stroomQueue, &stroom, 0) == pdTRUE)
@@ -292,7 +295,6 @@ void VisualisationTask(void *pvParameters)
 				updateDisplay = true;
 			}
 		}
-		taskSleep(100);
 	}
 	/* Should never get here */
 }

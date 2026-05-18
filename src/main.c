@@ -126,6 +126,8 @@ void HartbeatTask(void *pvParameters)
 		// toggle led pin
 		stled_Toggle();
 		taskSleep(500);
+		
+		//led_DisplayValue(0x07);
 	}
 	
 	/* Should never go here */
