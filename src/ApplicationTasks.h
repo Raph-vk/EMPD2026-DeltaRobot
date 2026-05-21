@@ -9,6 +9,12 @@
 #ifndef APPLICATIONTASKS_H_
 #define APPLICATIONTASKS_H_
 
+#include "FreeRTOS.h"
+#include "event_groups.h"
+#include "queue.h"
+#include "semphr.h"
+#include "task.h"
+
 ///////////////////////////////////////////////////////////////////////////////
 // objects made available for external use
 extern EventGroupHandle_t	handle_ThreadEventGroup;

@@ -6,17 +6,18 @@
  
 Deze file is de centrale opstart van de applicatie.
  
- */ 
-#include "ControlTask.h"
+ */
+#include "ApplicationTasks.h"
+
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 #include <asf.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
-#include "CommandConsole.h"
+#include "vPrintString.h"
 
-#include "ApplicationTasks.h"
+#include "ControlTask.h"
 #include "InputHandlerTask.h"
 #include "VisualisationTask.h"
 

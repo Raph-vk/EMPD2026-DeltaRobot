@@ -4,33 +4,32 @@
  * Created: 21/05/2026 20:01:24
  *  Author: raphv
  */
+#include "Regelaar.h"
+
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 
 #include <asf.h>
-#include <string.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // FreeRTOS includes
 
-#include "CommandConsole.h"
 #include "vPrintString.h"
-#include "TaskSleep.h"
 
 ///////////////////////////////////////////////////////////////////////////////
-#include "Regelaar.h"
 #include "MachinePins.h" //for N_MOTORS
 
 ///////////////////////////////////////////////////////////////////////////////
 static const float Tsample = 0.001f;
 
 // Regelaarconstanten
-static const float Tau_i = 1.0f;
-static const float Tau_f = 1.0f;
-static const float Tau_d = 1.0f;
-static const float Kp    = 8.5577f;
+static const float Kp    = 9.4821f;
+static const float Tau_d = 0.0375f;
+static const float Tau_f = 0.00125f;
+static const float Tau_i = 0.1250f;
 
-// Regelaarcoëfficiënten uit de Tustinmethode
+
+// RegelaarcoÃ«fficiÃ«nten uit de Tustinmethode
 static float a0;
 static float a1;
 static float a2;
@@ -134,6 +133,6 @@ float PIDregelaar(uint8_t motorIndex, float error)
 float FeedForward(float alpha)
 {
 	const float Je_totaal = 0.000020378; //2.0378e-05// kgm^2, totale traagheidsmoment op de motoras
-	const float KaKt = 0.01524; // Nm/V (Ka [A/V] * Kt [Nm/A])
+	const float KaKt = 0.01016; // Nm/V (Ka [A/V] * Kt [Nm/A])
 	return (Je_totaal * alpha) / KaKt;
 }

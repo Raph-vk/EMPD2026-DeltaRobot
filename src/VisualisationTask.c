@@ -4,24 +4,29 @@
  * Created: 10-04-2026
  *  Author: Raph van Koeveringe
  */ 
+#include "VisualisationTask.h"
+
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 #include <asf.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <string.h> //needed for memset
 
 ///////////////////////////////////////////////////////////////////////////////
 // library & HAL includes
-#include "CommandConsole.h"
+#include "vPrintString.h"
 #include "TaskSleep.h"
 
 #include "I2CLib.h"  //voor scherm intergratie
 #include "bits.h" //voor lampen
 #include "u8g2.h" //Voor scherm intergratie
 #include "LEDLib.h"
+#include "PortIOLib.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
-#include "VisualisationTask.h"
 #include "ApplicationTasks.h"
 #include "ControlTask.h"
 #include "MachinePins.h"
@@ -50,7 +55,7 @@ static uint32_t g_oledTransferErrorCount = 0;
 ///////////////////////////////////////////////////////////////////////////////
 // void port_AllLampsOff(void)
 
-void port_AllLampsOff(void)
+static void port_AllLampsOff(void)
 {
 	//Alle lampen uit.
 	port_SetBit(BIT_LAMP_GREEN, false);
@@ -59,10 +64,6 @@ void port_AllLampsOff(void)
 	led_DisplayValue(0x00); 
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// void port_SetLamp(uint8_t lampNumber)
-// Zet een lamp aan
-//
 static void port_SetLamps(bool green, bool orange, bool red)
 {
 	port_SetBit(BIT_LAMP_GREEN,  green);
@@ -135,9 +136,9 @@ void VisualisationTask(void *pvParameters)
 		{
 			case STATE_INIT:
 			{			
-				port_SetLamps(false, blink, false);
+				port_SetLamps(false, true, false);
 				
-				stateString = "INITIALISEREN";
+				stateString = "INITIALISEREN...";
 				operatorLine1 = "Wacht A.U.B.";
 				break;
 			}
@@ -146,7 +147,7 @@ void VisualisationTask(void *pvParameters)
 			case STATE_WAIT:
 			{
 				//Rode lamp aan
-				port_SetLamps(false, true, false);
+				port_SetLamps(false, blink, false);
 				
 				stateString = "WACHTEN";
 				operatorLine1 = "Druk <START> om armen";
@@ -158,9 +159,9 @@ void VisualisationTask(void *pvParameters)
 			case STATE_HOMING:
 			{
 				//Orange lamp knipperen
-				port_SetLamps(false, blink, false);
+				port_SetLamps(false, true, false);
 
-				stateString = "REFEREREN";
+				stateString = "HOMING...";
 				operatorLine1 = "Wacht A.U.B.";
 
 				break;
@@ -168,9 +169,9 @@ void VisualisationTask(void *pvParameters)
 
 			case STATE_READY:
 			{			
-				port_SetLamps(true, false, false);
+				port_SetLamps(blink, false, false);
 				
-				stateString = "Gereed";
+				stateString = "GEREED";
 				operatorLine1 = "Druk <START> om te";
 				operatorLine2 = "beginnen.";
 				break;
@@ -178,7 +179,7 @@ void VisualisationTask(void *pvParameters)
 
 			case STATE_PAUSE:
 			{
-				port_SetLamps(true, true, false);
+				port_SetLamps(blink, blink, false);
 				
 				stateString = "PAUZE";
 				operatorLine1 = "<START> om te hervatten,";
@@ -190,7 +191,7 @@ void VisualisationTask(void *pvParameters)
 			case STATE_RUNNING:
 			{
 				// Groene lamp knipperen
-				port_SetLamps(blink, false, false);
+				port_SetLamps(true, false, false);
 					
 				stateString = "ACTIEF";
 				operatorLine1 = "Druk <STOP> om cyclus";

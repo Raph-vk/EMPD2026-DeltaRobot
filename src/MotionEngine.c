@@ -6,10 +6,13 @@
  *  Created: 10/04/2026
  *  Authors: Raph van Koeveringe
  */
+#include "MotionEngine.h"
+
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 #include <asf.h>
 #include <math.h>
+#include <stdint.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // HAL includes for RTSW board
@@ -17,14 +20,14 @@
 #include "QC7366Lib.h"
 #include "vPrintString.h"
 #include "Map.h" // voor constrain() and fmap()
+#include "PortIOLib.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
 #include "DeltaKinematics.h"
-#include "MachinePins.h"
 #include "QuadratureCounters.h"
-#include "MotionEngine.h"
 #include "Regelaar.h"
+#include "ControlTask.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -60,23 +63,105 @@ static float tau = 0.0f; // [s] tijd sinds start van beweging
 static float k = 0.0f;
 static float dt = 0.0f;
 
-static const float degToRad = 0.01745329251994329576923690768489f; //PI / 180.0f; // conversiefactor van graden naar radialen
-static const float RadToDeg = 57.295779513082320876798154814105f; // 180.0f / PI; // conversiefactor van radialen naar graden
+//static const float degToRad = 0.01745329251994329576923690768489f; //PI / 180.0f; // conversiefactor van graden naar radialen
+//static const float RadToDeg = 57.295779513082320876798154814105f; // 180.0f / PI; // conversiefactor van radialen naar graden
+
 
 
 ///////////////////////////////////////////////////////////////////////////////
-// helperfunctie; void HoldPosition(array HoekBoven)
-// 
-// Wordt na iedere 1 ms tick opgeroepen.
-// Behoudt alle motorassen op gewenste motorhoeken.
+// Beginnen en nullen van alle variabelen
+void SequenceRESET(void)
+{
+	g_time = 0.0f;
+	currentStep = 0;
+	setupMotionProfileDone = false;
+	verplaatsingKlaar = false;
+	holdSetupDone = false;
+	gripperSetupDone = false;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+// bool RunSequence(void)
+//
+// Called once per 1 ms tick.
+// Executes one step at a time.
+// Returns true when the complete sequence is finished.
+bool RunSequence(void)
+{
+	bool stepDone = false;
+
+	switch (currentStep)
+	{
+		case 0:
+		// Move to pick position
+		stepDone = Move_ToSetpoint(0.0f, 0.0f, 300.0f, 5.0f);
+		break;
+
+		case 1:
+		// Close gripper and wait
+		stepDone = GripperAtCurrentPosition(true, 0.5f);
+		break;
+
+		case 2:
+		// Move upward
+		stepDone = Move_ToSetpoint(0.0f, 0.0f, 350.0f, 5.0f);
+		break;
+
+		case 3:
+		// Hold position shortly
+		stepDone = HoldCurrentPosition(0.1f);
+		break;
+
+		case 4:
+		// Open gripper and wait
+		stepDone = GripperAtCurrentPosition(false, 5.0f);
+		break;
+
+		case 5:
+		// Move to next position
+		stepDone = Move_ToSetpoint(50.0f, 50.0f, 400.0f, 1.0f);
+		break;
+
+		case 6:
+		// Sequence finished
+		currentStep = 0;
+		return true;
+
+		default:
+		// Safety fallback
+		currentStep = 0;
+		return true;
+	}
+
+	if (stepDone)
+	{
+		currentStep++;
+	}
+
+	return false;
+}
+
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+// bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
+/*
+ * Wordt na iedere 1 ms tick opgeroepen.
+ * Behoudt alle motorassen op gewenste motorhoeken.
+ *
+ * Input is bovenarm positie in radialen
+ */
 static const float largeErrorThreshold		= 0.1f;	// Wanneer fout groter is dan 0.1 motor-rad
 static const float slowApproachVoltage		= 0.75f;	// [V] Gewenste voltage voor langzame verplaatsing
 static float holdMotorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
 
-bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
+bool HoldPosition(const float holdArmPos_RAD[N_MOTORS])
 {
 	bool nearReference = true;
-	mI = 0;
 	
 	// Lees motorposities uit.
 	ReadMotorPositions(motorPos_Rad);
@@ -85,7 +170,7 @@ bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
 	for (mI = 0; mI < N_MOTORS; mI++)
 	{
  		// Gewenste armpositie omzetten naar radialen en rekening houden met reducties		
-		holdMotorPos_Rad[mI] = i_twk * (holdArmPos_DegInput[mI] * degToRad);
+		holdMotorPos_Rad[mI] = i_twk * holdArmPos_RAD[mI];
 
 		// Fout bepalen
 		Fout_motorRad[mI] = holdMotorPos_Rad[mI] - motorPos_Rad[mI];
@@ -112,30 +197,18 @@ bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
 	return nearReference;
 }//End HoldPosition();
 
-
-///////////////////////////////////////////////////////////////////////////////
-// Beginnen en nullen van alle variabelen
-void InitSequence(void)
-{
-	g_time = 0.0f;
-	currentStep = 0;
-	setupMotionProfileDone = false;
-	verplaatsingKlaar = false;
-	holdSetupDone = false;
-	gripperSetupDone = false;
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // Standstill
-bool HoldCurrentPosition(float Twait)
+bool HoldCurrentPosition(float waitTime_s)
 {
+	// Als setup nog niet gedaan is,
 	if (!holdSetupDone)
 	{
-		//capture currect position
+		//Bepaal huidige positie
 		ReadMotorPositions(motorPos_Rad);
 		for (mI = 0; mI < N_MOTORS; mI++)
 		{
-			holdTargetPos[mI] = (motorPos_Rad[mI] / i_twk) * RadToDeg;
+			holdTargetPos[mI] = (motorPos_Rad[mI] / i_twk);
 		}
 
 		//check time
@@ -145,7 +218,7 @@ bool HoldCurrentPosition(float Twait)
 
 	HoldPosition(holdTargetPos);
 
-	if (g_time - t0 >= Twait)
+	if (g_time - t0 >= waitTime_s)
 	{
 		holdSetupDone = false;
 		g_time += Ts;
@@ -159,18 +232,18 @@ bool HoldCurrentPosition(float Twait)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Standstill
-bool GripperAtCurrentPosition(const bool Grab ,const float Twait)
+bool GripperAtCurrentPosition(bool grab, float waitTime_s)
 {
 	//eerste keer
 	if (!gripperSetupDone)
 	{
-		port_SetBit(BIT_GRIPPER, Grab);
+		port_SetBit(BIT_GRIPPER, grab);
 
 		//capture currect position
 		ReadMotorPositions(motorPos_Rad);
 		for (mI = 0; mI < N_MOTORS; mI++)
 		{
-			holdTargetPos[mI] = (motorPos_Rad[mI] / i_twk) * RadToDeg;
+			holdTargetPos[mI] = (motorPos_Rad[mI] / i_twk);
 		}
 		
 		//check time
@@ -179,7 +252,7 @@ bool GripperAtCurrentPosition(const bool Grab ,const float Twait)
 	}
 	
 	// Als tijd voorbij is
-	else if (g_time - t0 >= Twait)
+	else if (g_time - t0 >= waitTime_s)
 	{
 		gripperSetupDone = false;
 		g_time += Ts;
@@ -215,12 +288,12 @@ static float thetaRef[N_MOTORS];		// Incrementele motorpositie referentie [rad]
 static float omegaRef[N_MOTORS];		// Motor-snelheidsreferentie [rad/s]
 static float alphaRef[N_MOTORS];		// Motor-acceleratiereferentie [rad/s^2]
 
-bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tmax)
+bool Move_ToSetpoint(float x_mm, float y_mm, float z_mm, float maxTime_s)
 {
 	mI = 0;
 
 	// Validatie van input parameters
-	if (Tmax <= 0.0f)
+	if (maxTime_s <= 0.0f)
 	{
 		return false;
 	}
@@ -234,16 +307,18 @@ bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 		t0 = g_time; // starttijd van de beweging
 
 		//float eindPos_M0, eindPos_M1, eindPos_M2 = NULL;
-		float tcpTarget[3] = { x_eindPos, y_eindPos, z_eindPos };
+		float tcpTarget[3] = { x_mm, y_mm, z_mm };
 	
 		// Bepalen van de gewenste motor-eindpositie in motor-radialen.
 		if (!DeltaKinematics_Inverse(tcpTarget, motorTargetRad)) // inverse kinematica
 		{
 			//Indien positie buitenbereik is;
-			verplaatsingKlaar = true;
+			verplaatsingKlaar = false;
 			vPrintString("FOUT: ongeldige eindpositie voor inverse kinematica.\n");
 			setupMotionProfileDone = false;
-			return true;
+			
+			ToState(STATE_PAUSE);
+			return false;
 		}
 		
 		// Bepalen van totaal incrementeel te verplaatsen motorhoek per motor
@@ -254,13 +329,13 @@ bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 			
 			thetaMax_inc[mI] = motorTargetRad[mI] - motorPos_Rad[mI];
 			
-			// Bepalen van maximale RUK per motor, zodat binnen Tmax blijft.
-			rPiek[mI] = thetaMax_inc[mI] * 32.0/(Tmax*Tmax*Tmax);	// maximale ruk [m/s3]
-			alphaMax[mI]	= rPiek[mI]*Tmax/4.0;
+			// Bepalen van maximale RUK per motor, zodat binnen maxTime_s blijft.
+			rPiek[mI] = thetaMax_inc[mI] * 32.0f / (maxTime_s * maxTime_s * maxTime_s);	// maximale ruk [m/s3]
+			alphaMax[mI] = rPiek[mI] * maxTime_s / 4.0f;
 		}
 		
-		t1 = 0.25f * Tmax; // Tmax / 4.0;
-		t2 = 0.75f * Tmax; // 3.0 * Tmax / 4.0;
+		t1 = 0.25f * maxTime_s; // maxTime_s / 4.0;
+		t2 = 0.75f * maxTime_s; // 3.0 * maxTime_s / 4.0;
 
 		setupMotionProfileDone = true;
 	}
@@ -272,7 +347,7 @@ bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 	for (mI = 0; mI < N_MOTORS; mI++)
 	{
 		// eenmalig bepalen
-		k = alphaMax[mI]/Tmax;
+		k = alphaMax[mI] / maxTime_s;
 
 		// opstellen van een referentiebewegingsprofiel voor de regeling
 		// 1; Zolang de huidige tijd nog voor het startmoment ligt:
@@ -299,32 +374,32 @@ bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 			alphaRef[mI]	=	alphaMax[mI] - 4.0f*k*(tau);
 
 			omegaRef[mI]	=	alphaMax[mI] * (tau) -2.0f * k * ((tau)*(tau)) 
-							+ (1.0f/8.0f)*alphaMax[mI]*Tmax;
+							+ (1.0f/8.0f) * alphaMax[mI] * maxTime_s;
 			
 			thetaRef[mI]	=	0.5 * alphaMax[mI] * ((tau)*(tau)) 
 							- (2.0f/3.0f) * (k) * ((tau)*(tau)*(tau))
-							+ (1.0f/8.0f)*alphaMax[mI]*Tmax*(tau)
-							+ (2.0f/(3.0f*64.0f))*alphaMax[mI]*(Tmax*Tmax);
+							+ (1.0f/8.0f) * alphaMax[mI] * maxTime_s * (tau)
+							+ (2.0f/(3.0f*64.0f)) * alphaMax[mI] * (maxTime_s * maxTime_s);
 			
 			verplaatsingKlaar = false;
 		}
 		// 4; van vertraging terug naar stilstand, actief remmen tot steeds minder remmen.
-		else if ( tau <= Tmax )
+		else if ( tau <= maxTime_s )
 		{
 			alphaRef[mI]	=	-alphaMax[mI] + 4.0*(k) * (dt);
 
 			omegaRef[mI]	=	-alphaMax[mI] * (dt)
 							+ 2.0f*(k) * ((dt)*(dt))
-							+ (0.125f)*alphaMax[mI]*Tmax;
+							+ (0.125f) * alphaMax[mI] * maxTime_s;
 
 			thetaRef[mI]	=	-(alphaMax[mI]/2.0f) * ((dt)*(dt))
 							+ (2.0f/3.0f) * (k) * ((dt)*(dt)*(dt))
-							+ (0.125f) * alphaMax[mI]*Tmax*(dt)
-							+ (22.0f/(192.0f))*alphaMax[mI]*(Tmax*Tmax);
+							+ (0.125f) * alphaMax[mI] * maxTime_s * (dt)
+							+ (22.0f/(192.0f)) * alphaMax[mI] * (maxTime_s * maxTime_s);
 
 			verplaatsingKlaar = false;
 		}
-		//	5; op eindpunt en Tmax verstreken.
+		//	5; op eindpunt en maxTime_s verstreken.
 		else
 		{
 			alphaRef[mI]	=	0.0f;
@@ -354,58 +429,3 @@ bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 	return verplaatsingKlaar;
 
 }//END-function
-
-///////////////////////////////////////////////////////////////////////////////
-static const SequenceStep pickPlaceSeq[] =
-{
-    MOVE(0.0f, 0.0f, 300.0f, 1.1f),
-    GRIP(true, 0.5f),
-    MOVE(0.0f, 0.0f, 350.0f, 1.1f),
-    HOLD(0.1f),
-    GRIP(false, 5.0f),
-    MOVE(50.0f, 50.0f, 400.0f, 1.1f),
-    END_SEQ()
-};
-
-
-///////////////////////////////////////////////////////////////////////////////
-// bool RunSequence(void)
-//
-// Called once per 1 ms tick.
-// Beslist welke stap er uitgevoerd moeten worden.
-bool RunSequence(void)
-{
-    const SequenceStep *s = &pickPlaceSeq[currentStep];
-    bool done = false;
-
-    switch (s->type)
-    {
-    case STEP_MOVE:
-        done = Move_ToSetpoint(s->x, s->y, s->z, s->Tmax);
-        break;
-
-    case STEP_HOLD:
-        done = HoldCurrentPosition(s->Twait);
-        break;
-
-    case STEP_GRIPPER:
-        done = GripperAtCurrentPosition(s->grab, s->Twait);
-        break;
-
-    case STEP_END:
-        currentStep = 0;
-        return true;
-
-    default:
-        currentStep = 0;
-        return true;
-    }
-
-    if (done)
-    {
-        currentStep++;
-    }
-
-    return false;
-}
-//end runSequence();

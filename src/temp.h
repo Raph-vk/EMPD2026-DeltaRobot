@@ -9,7 +9,7 @@
 #define TEMP_H_
 
 ///////////////////////////////////////////////////////////////////////////////
-// functions declerations
+// function declarations
 void RunningLoopTimer_Init(void);
 void RunningLoopTimer_ResetWindow(void);
 void RunningLoopTimer_Begin(void);

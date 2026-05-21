@@ -7,6 +7,9 @@
 #ifndef CONTROLTASK_H_
 #define CONTROLTASK_H_
 
+#include <stdbool.h>
+#include <stdint.h>
+
 ///////////////////////////////////////////////////////////////////////////////
 // local type definitions STATEMACHINE
 typedef enum
@@ -22,12 +25,8 @@ typedef enum
 
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes
-void ToState(SystemState_t newState);
 bool InNoodsituatie(void);
-
-void ClockInterruptHandler(uint32_t id, uint32_t mask);
-void NoodInterruptHandler(uint32_t id, uint32_t mask);
-
+void ToState(SystemState_t newState);
 void ControlTask(void *pvParameters);
 
 

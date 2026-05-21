@@ -8,9 +8,9 @@
 #ifndef MACHINEPINS_H_
 #define MACHINEPINS_H_
 
+#include <stdint.h>
+
 #include "DeviceIOLib.h"
-#include "PortIOLib.h"
-#include "SwitchLib.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Hoeveelheid motoren
@@ -58,8 +58,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // motor configuratie DAC en QC
-extern const uint8_t MotorDacChannel[N_MOTORS] = {0, 1, 2};
-extern const uint8_t MotorQcChannel[N_MOTORS] = {0, 1, 2};
+extern const uint8_t MotorDacChannel[N_MOTORS];
+extern const uint8_t MotorQcChannel[N_MOTORS];
 
 
 ///////////////////////////////////////////////////////////////////////////////

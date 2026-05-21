@@ -9,6 +9,8 @@
 #ifndef INPUTHANDLERTASK_H_
 #define INPUTHANDLERTASK_H_
 
+#include "bits.h"
+
 // Event bits for handle_ButtonEventGroup
 #define EVT_START_BUTTON    BIT_10
 #define EVT_STOP_BUTTON     BIT_11

@@ -8,15 +8,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 #include <asf.h>
-#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
 
 ///////////////////////////////////////////////////////////////////////////////
-// application includes
-#include "CommandConsole.h"
+// FreeRTOS includes
 #include "vPrintString.h"
-#include "TaskSleep.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // HAL includes for RTSW board
@@ -104,7 +101,7 @@ bool anyHomeSwitchActive(void)
 //      * motor in hold zetten
 // - return true als alle 3 klaar zijn
 // VOLTAGE negative is moving UP, positive is moving down
-static const float readyArmAngle = -0.5235988f; //30graden hoek in rad, gewenste armpositie voordat homing benadering begint
+static const float readyArmAngleRAD = -0.5235988f; //30graden hoek in rad, gewenste armpositie voordat homing benadering begint
 static const float Home_uDac = -1.0f;	// Homing-spanning per motor (omhoog gaande kopper).
 static const float slowHome_uDac = 0.5f;	// Homing-spanning per motor (omhoog gaande kopper).
 static const float Hold_uDac = 2.0f;
@@ -120,11 +117,11 @@ bool homeAllMotors(void)
 {
 	motorIndex = 0;
 	 
-	//motor_DisplayStatus();
-
 	// Eerste keer: initialiseren / starten
 	if (HomingStarted == false)
 	{
+		vPrintString("> Homing wordt gestart!\n");
+		
 		// DAC-spanning eerst op 0 forceren en alles false zetten
 		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 		{
@@ -148,7 +145,10 @@ bool homeAllMotors(void)
 				//Zet op nul en houdt op positie.
 				dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
 				vPrintString("> Bij starten van Homing is er al een home-switch actief!\n");
+				
 				//fault trigger?
+				ToState(STATE_FAULT);
+				
 				HomingStarted = false;
 				return false;
 			}
@@ -163,14 +163,16 @@ bool homeAllMotors(void)
 	// extra Check of systeem in fout staat
 	if (InNoodsituatie())
 	{
-		vPrintString("> Er is een fout input actief!!\n");
-
 		//Iedere motor spanning afnemen.
 		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 		{
 			dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
 		}
+		
+		vPrintString("> Er is een fout input actief!!\n");
 		HomingStarted = false;
+		
+		ToState(STATE_FAULT);
 		return false;
 	}
 
@@ -208,7 +210,7 @@ bool homeAllMotors(void)
 			else
 			{
 				// Op positie behouden met PID
-				float error = motorPos_Rad[motorIndex] - readyArmAngle;
+				float error = motorPos_Rad[motorIndex] - readyArmAngleRAD;
 				motorControlOutput = Hold_uDac + PIDregelaar(motorIndex, error); //motorspanning bepalen met PID-regelaar
 				motorControlOutput = constrain(motorControlOutput, DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // ongeveer +/-10V begrenzen.
 				dac_SetOutputVoltage(MotorDacChannel[motorIndex], motorControlOutput);
@@ -218,8 +220,8 @@ bool homeAllMotors(void)
 		//Als alles Ready is, naar Backoff Positie gaan tot die positie bereikt is.
 		if(allReady)
 		{
-			float HoldPos[N_MOTORS] = {readyArmAngle, readyArmAngle, readyArmAngle};
-			allReady = HoldPosition(HoldPos);
+			float BackOffPos[N_MOTORS] = {readyArmAngleRAD, readyArmAngleRAD, readyArmAngleRAD};
+			allReady = HoldPosition(BackOffPos);
 		}
 	}// einde AllReady statement
 	///////////////////////////////////////////////////////////////////////////////

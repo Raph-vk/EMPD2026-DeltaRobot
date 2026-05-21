@@ -8,8 +8,10 @@
 #ifndef REGELAAR_H_
 #define REGELAAR_H_
 
+#include <stdint.h>
+
 ///////////////////////////////////////////////////////////////////////////////
-// functions declerations
+// function declarations
 void Regelaar_INIT(void);
 float PIDregelaar(uint8_t motorIndex, float error);
 float FeedForward(float alpha);

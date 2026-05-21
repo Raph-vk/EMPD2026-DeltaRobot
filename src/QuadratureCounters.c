@@ -5,25 +5,21 @@
  *  Author: rasmsmee
  */ 
 
+#include "QuadratureCounters.h"
+
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
-
 #include <asf.h>
-#include <string.h>
+#include <stdint.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // FreeRTOS includes
-#include "CommandConsole.h"
-#include "TaskSleep.h"
+#include "vPrintString.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // HAL includes for RTSW board
 // LS7366R encoder counter
 #include "QC7366Lib.h"
-
-///////////////////////////////////////////////////////////////////////////////
-// application includes
-#include "QuadratureCounters.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // void QCEncodersSetup(void)
@@ -34,7 +30,7 @@ void QCEncodersSetup(void)
 	uint8_t	qcDefaultMode = 0;
 	mode_register_t qcModeRegister = QC_MODE_REGISTER_0;
 	
-	// bitmask, meerdere configuratiebits gecombineerd worden tot ��n configuratiewaarde.
+	// bitmask, meerdere configuratiebits gecombineerd tot een configuratiewaarde.
 	// MODE_QC_4 = vier signalen, stijgende en vallende edges van A en B channel. Dus maximale resolutie.
 	// MODE_FREERUNNING = teller blijft doorlopen.
 	// INDEX_DISABLE = Z-kanaal wordt niet gebruikt.

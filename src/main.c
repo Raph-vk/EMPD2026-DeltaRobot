@@ -9,7 +9,7 @@
 // system includes
 
 #include <asf.h>
-#include <string.h>
+#include <stdint.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
@@ -18,6 +18,7 @@
 #include "vPrintString.h"
 #include "TaskSleep.h"
 #include "ApplicationTasks.h"
+#include "MachinePins.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // HAL includes for RTSW board
@@ -38,11 +39,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 // Function prototypes
 
-void HartbeatTask(void *pvParameters);
-void StartHartbeatTask(void);
+static void HartbeatTask(void *pvParameters);
+static void StartHartbeatTask(void);
 
 void vApplicationIdleHook( void );
 void vApplicationMallocFailedHook(void);
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName);
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -50,10 +52,13 @@ void vApplicationMallocFailedHook(void);
 
 static TaskHandle_t handle_HartbeatTask = NULL;
 
+const uint8_t MotorDacChannel[N_MOTORS] = {0U, 1U, 2U};
+const uint8_t MotorQcChannel[N_MOTORS] = {0U, 1U, 2U};
+
 ///////////////////////////////////////////////////////////////////////////////
 // void StartHartbeatTask(void)
 // Maakt de heartbeat-task aan. Deze task knippert alleen een LED, zodat je ziet dat het systeem leeft.
-void StartHartbeatTask(void)
+static void StartHartbeatTask(void)
 {
 	BaseType_t result = pdFAIL;
 	
@@ -115,8 +120,8 @@ void vApplicationMallocFailedHook(void)
 
 ///////////////////////////////////////////////////////////////////////////////
 // void HartbeatTask(void *pvParameters)
-// Oneindige taak die met de onboard LED puur een “alive”-indicatie geeft.
-void HartbeatTask(void *pvParameters)
+// Oneindige taak die met de onboard LED puur een â€œaliveâ€-indicatie geeft.
+static void HartbeatTask(void *pvParameters)
 {
 	vPrintString("> Hartbeat should be running, flashing onboard LED...\n");
 	

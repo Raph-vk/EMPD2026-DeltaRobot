@@ -11,7 +11,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // FreeRTOS includes
-#include "CommandConsole.h"
+#include "vPrintString.h"
 #include "TaskSleep.h"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -20,6 +20,7 @@
 #include "InterruptLib.h"
 #include "bits.h"
 #include "DAC4921Lib.h" //voor setDACoutput
+#include "PortIOLib.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
@@ -29,6 +30,7 @@
 #include "ApplicationTasks.h"
 #include "MachinePins.h"
 #include "temp.h"
+#include "Regelaar.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
@@ -55,8 +57,9 @@ static const char *StateToString(SystemState_t systemState)
 
 ///////////////////////////////////////////////////////////////////////////////
 // void ToState(newState)
-//
-// Makes correctly the new state and communicates that.
+/*
+ * Wisseld correct naar een nieuwe state en communiceert dat.
+*/
 void ToState(SystemState_t newState)
 {
 	if (state != newState)
@@ -70,9 +73,10 @@ void ToState(SystemState_t newState)
 
 ///////////////////////////////////////////////////////////////////////////////
 // bool InNoodsituatie(void)
-//
-// Returns true if one of the fault inputs is still active.
-// PIN_NOOD is fail-safe active-low: set = OK, not set = Nood.
+/*
+ * Returns true if one of the fault inputs is still active.
+ * PIN_NOOD is fail-safe active-low: set = OK, not set = Nood.
+*/
 bool InNoodsituatie(void)
 {
 	return port_IsBitSet(BIT_NOOD);
@@ -80,9 +84,10 @@ bool InNoodsituatie(void)
 
 ///////////////////////////////////////////////////////////////////////////////
 // void ClockInterruptHandler(uint32_t id, uint32_t mask)
-//
-// invoked on every clock tick (1 ms) of the external hardware clock
-void ClockInterruptHandler(uint32_t id, uint32_t mask)
+/*
+ * wordt bij iedere clock puls geactiveerd (1 ms) door externe hardware clock
+*/ 
+static void ClockInterruptHandler(uint32_t id, uint32_t mask)
 {
 	// Als ControlTask bestaat, geef een task notification.
 	if (handle_ControlTask != NULL)
@@ -93,12 +98,9 @@ void ClockInterruptHandler(uint32_t id, uint32_t mask)
 
 ///////////////////////////////////////////////////////////////////////////////
 // void NoodInterruptHandler(uint32_t id, uint32_t mask)
-//
-// Nood input interrupt
-void NoodInterruptHandler(uint32_t id, uint32_t mask)
+static void NoodInterruptHandler(uint32_t id, uint32_t mask)
 {
-
-	// NoodSemaphore vrijgeven
+	// NoodSemaphore vrijgeven bij trigger
 	if (handle_NoodSemaphore != NULL)
 	{
 		xSemaphoreGiveFromISR(handle_NoodSemaphore, 0);
@@ -107,15 +109,17 @@ void NoodInterruptHandler(uint32_t id, uint32_t mask)
 
 ///////////////////////////////////////////////////////////////////////////////
 /* void ControlTask(void *pvParameters)
-
-State machine volgens ontwerp:
-WAIT -> HOMING -> READY -> RUNNING -> READY
-Bij fout/noodinput altijd naar FAULT.
-Vanuit FAULT met reset + geen foutsignaal terug naar WAIT.
-
+ *
+ * State machine volgens ontwerp:
+ * WAIT -> HOMING -> READY -> RUNNING -> READY
+ * Bij fout/noodinput altijd naar FAULT.
+ * Vanuit FAULT met reset + geen foutsignaal terug naar WAIT.
+ *
 */
 void ControlTask(void *pvParameters)
 {
+	///////////////////////////////////////////////////////////////////////////////
+	//Taak declaraties
 	EventBits_t buttonBits = 0;
 	const BaseType_t clearAllbits  = pdTRUE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
 	const BaseType_t waitForAnyBit= pdFALSE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
@@ -134,12 +138,12 @@ void ControlTask(void *pvParameters)
 	BaseType_t hasCurrentSample = pdFALSE;
 	
 	float rustPositie[N_MOTORS] = {20.0f,20.0f,20.0f};
-	
+	///////////////////////////////////////////////////////////////////////////////
 	vPrintString("> starting ControlTask.\n");
 
 	ToState(STATE_INIT);
-	
-	RunningLoopTimer_Init();
+	///////////////////////////////////////////////////////////////////////////////
+	//opstart instellingen
 	
 	//ALLES UITSCHAKELEN.
 	port_SetBit(BIT_GRIPPER, false);
@@ -148,6 +152,8 @@ void ControlTask(void *pvParameters)
 		dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
 	}
 
+	RunningLoopTimer_Init();
+	Regelaar_INIT();
 	
 	// Bij opkomend signaal in PIN, run ClockInterruptHandler.
 	interrupt_AttachHandler(ClockInterruptHandler, PIN_CLOCK, PIO_IT_RISE_EDGE);
@@ -267,7 +273,7 @@ void ControlTask(void *pvParameters)
 				{
 					RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check		
 
-					InitSequence();
+					SequenceRESET();
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
 					ToState(STATE_RUNNING);
 				}

@@ -5,32 +5,18 @@
  * Only this file knows the robot geometry, so geometry changes stay local.
  *
  * Created on: 10/04/2026
- * Author: Raph van Koeveringe / Robbe
+ * Author: Raph van Koeveringe
  */
 #include "DeltaKinematics.h"
 //////////////////////////////////////////////////////////////////////////////
 // system includes
 #include <asf.h>
 #include <math.h>
+#include <stdint.h>
 
 //////////////////////////////////////////////////////////////////////////////
 // application includes
 #include "MachinePins.h"
-
-
-
-
-//////////////////////////////////////////////////////////////////////////////
-// #define's
-#define EPSILON_F			(1.0e-6f) // bijna nul
-#define PI				(3.14159265358979323846f) // PI_floating
-//////////////////////////////////////////////////////////////////////////////
-//Basic math values
-#define DELTA_SIN120		(0.8660254037844386468f)
-#define DELTA_COS120		(-0.5f)
-#define DELTA_TAN60			(1.7320508075688772935f)
-#define DELTA_SIN30			(0.5f)
-
 
 //////////////////////////////////////////////////////////////////////////////
 //file globals

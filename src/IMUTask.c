@@ -12,26 +12,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
-#include "I2CLib.h"
 #include "vPrintString.h"
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// type definitions
-typedef struct
-{
-	TickType_t tick;
-	float ax_mps2;
-	float ay_mps2;
-	float gz_rps;
-} IMU_DATA;
-
-typedef struct
-{
-	I2C_CHANNEL channel;
-	uint8_t i2cAddress;
-} IMU_TASK_CONFIG;
 
 ///////////////////////////////////////////////////////////////////////////////
 // MPU-9250 / MPU-6500 / MPU-9255 register map (gedeeld deel)
