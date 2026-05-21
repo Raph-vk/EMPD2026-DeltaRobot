@@ -119,6 +119,13 @@ void ControlTask(void *pvParameters)
 	ToState(STATE_INIT);
 	
 	RunningLoopTimer_Init();
+	
+	//ALLES UITSCHAKELEN.
+	port_SetBit(BIT_GRIPPER, false);
+	for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+	{
+		dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
+	}
 
 	
 	// Bij opkomend signaal in PIN, run ClockInterruptHandler.
@@ -195,6 +202,14 @@ void ControlTask(void *pvParameters)
 					homingAllMotorsDone = false;
 					ToState(STATE_HOMING);
 				}
+
+				//ALLES UITFORCEREN.
+				port_SetBit(BIT_GRIPPER, false);
+				for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+				{
+					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
+				}
+
 				taskSleep(10);
 				break;
 			}
@@ -205,8 +220,8 @@ void ControlTask(void *pvParameters)
 				// 1kHz take
 				ulTaskNotifyTake(pdTRUE, ticksToWait);
 
-				//homingAllMotorsDone = homeAllMotors(); //<- MotorControl.c
-				homingAllMotorsDone = true;
+				homingAllMotorsDone = homeAllMotors(); //<- MotorControl.c
+				//homingAllMotorsDone = true;
 				
 				if (homingAllMotorsDone)
 				{

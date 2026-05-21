@@ -16,6 +16,8 @@ src\MotorControl.c
 
 src\IMUTask.c
 
+src\Regelaar.c
+
 src\temp.c
 
 src\u8g2\csrc\u8g2_font_5x7_tr.c

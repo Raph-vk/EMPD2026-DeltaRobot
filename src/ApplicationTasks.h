@@ -11,9 +11,6 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // objects made available for external use
-#include <asf.h>
-// #include "IMUTask.h"
-
 extern EventGroupHandle_t	handle_ThreadEventGroup;
 extern EventGroupHandle_t	handle_ButtonEventGroup;
 extern SemaphoreHandle_t	handle_NoodSemaphore;

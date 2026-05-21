@@ -10,7 +10,6 @@ Deze file is de centrale opstart van de applicatie.
 
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
-
 #include <asf.h>
 #include <string.h>
 

@@ -258,6 +258,8 @@ void VisualisationTask(void *pvParameters)
 		}
 		else
 		{
+			//scherm schrijven
+			i = 0;
 			uint32_t procent;
 			float stroom;
 			

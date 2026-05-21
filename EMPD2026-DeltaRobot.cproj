@@ -739,6 +739,12 @@
     <Compile Include="src\IMUTask.c">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\Regelaar.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\Regelaar.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\temp.c">
       <SubType>compile</SubType>
     </Compile>
