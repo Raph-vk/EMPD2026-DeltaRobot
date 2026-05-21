@@ -16,19 +16,20 @@
 #include <math.h>
 
 ///////////////////////////////////////////////////////////////////////////////
+// HAL includes for RTSW board
+#include "DAC4921Lib.h"
+#include "QC7366Lib.h"
+#include "vPrintString.h"
+#include "Map.h" // voor constrain() and fmap()
+
+///////////////////////////////////////////////////////////////////////////////
 // application includes
 #include "DeltaKinematics.h"
 #include "MachinePins.h"
 #include "QuadratureCounters.h"
 
-#include "vPrintString.h" 
-#include "Map.h" // voor constrain() and fmap()
 
-///////////////////////////////////////////////////////////////////////////////
-// HAL includes for RTSW board
 
-#include "DAC4921Lib.h"
-#include "QC7366Lib.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // define's

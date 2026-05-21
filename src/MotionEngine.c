@@ -8,6 +8,8 @@
  */
 ///////////////////////////////////////////////////////////////////////////////
 #include "MotionEngine.h"
+#include "Regelaar.h"
+
 ///////////////////////////////////////////////////////////////////////////////
 // globals
 static const float Ts = 0.001f;      // sample time, must match external clock
@@ -79,7 +81,7 @@ Bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
 		else
 		{
 			// Voltage berekenen mbv PID_Controller
-			motorControlOutput[mI] = PID_Controller( Fout_motorRad[mI] );
+			motorControlOutput[mI] = PIDregelaar(mI, Fout_motorRad[mI] );
 		}
 
 		// Zorg dat waarde niet groter is dan maximale DAC-waarde, en output.
@@ -316,7 +318,7 @@ Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tm
 
 		// Bepalen van output voltage mbv Fout, PID_Controller + FeedForward
 		Fout_motorRad[mI] = (thetaRef[mI] + thetaStart[mI]) - motorPos_Rad[mI];
-		motorControlOutput[mI] = PID_Controller(Fout_motorRad[mI]) + FeedForward(alphaRef[mI]);
+		motorControlOutput[mI] = PIDregelaar(mI, Fout_motorRad[mI]) + FeedForward(alphaRef[mI]);
 		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE);
 	}
 	

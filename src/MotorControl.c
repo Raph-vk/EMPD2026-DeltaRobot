@@ -5,6 +5,7 @@
  *  Author: Raph van Koeveringe
  */ 
 #include "MotorControl.h"
+#include "Regelaar.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // globals
@@ -33,41 +34,6 @@ void motor_DisableESCONController(void)
 	port_SetBit(ESCON_ENABLE, false);
 }
 */
-
-///////////////////////////////////////////////////////////////////////////////
-// void motor_DisplayStatus(void)
-void motor_DisplayStatus(void)
-{
-	//uint8_t portInValue = 0;
-	uint8_t bitVal		= 0;
-	Bool isSet			= false;
-	
-	// non-inverting input port, pull-up resistors
-	
-	//portInValue = port_GetInput();
-	
-	//led_DisplayValue(portInValue >> 1);	// using bits 1..4
-
-	//vPrintString("digital input = 0x%02x\n", portInValue);
-	
-	isSet = port_IsBitSet(BIT_M1_HOME);
-	bitVal = isSet? 1 : 0;
-	vPrintString("Limit M1:    %d\n", bitVal);
-
-	isSet = port_IsBitSet(BIT_M2_HOME);
-	bitVal = isSet? 1 : 0;
-	vPrintString("Limit M2:    %d\n", bitVal);
-
-	isSet = port_IsBitSet(BIT_M3_HOME);
-	bitVal = isSet? 1 : 0;
-	vPrintString("Limit M3:     %d\n", bitVal);
-
-	isSet = port_IsBitSet(BIT_NOOD);
-	bitVal = isSet? 1 : 0;
-	vPrintString("NOODSTOP / ESCON Overload: %d\n", bitVal);
-	
-	vPrintString("\n");
-}
 		
 ///////////////////////////////////////////////////////////////////////////////
 // bool motor_IsHomeLimitActive(uint8_t motorIndex)
@@ -76,9 +42,10 @@ Bool motor_IsHomeLimitActive(uint8_t index)
 {
 	if (index >= N_MOTORS)
 	{
+		vPrintString(">INDEX MOTOR OUT OF RANGE!!");
 		return true;    // safe default
 	}
-	return port_IsBitSet(MotorHomeLimitBit[index]);
+	return !port_IsBitSet(MotorHomeLimitBit[index]);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -105,11 +72,11 @@ Bool anyHomeSwitchActive(void)
 //      * encoder van die motor op nul
 //      * motor in hold zetten
 // - return true als alle 3 klaar zijn
-
-static const float readyArmAngle[N_MOTORS] = {-10.0f, -10.0f, -10.0f}; //degrees, gewenste armpositie voordat homing benadering begint
-static const float Home_uDac[N_MOTORS] = {4.0f, 4.0f, 4.0f};	// Homing-spanning per motor (omhoog gaande kopper).
-static const float slowHome_uDac[N_MOTORS] = {1.0f, 1.0f, 1.0f};	// Homing-spanning per motor (omhoog gaande kopper).
-static const float Hold_uDac = 0.5f;
+// VOLTAGE negative is moving UP, positive is moving down
+static const float readyArmAngle = -0.5235988f; //30graden hoek in rad, gewenste armpositie voordat homing benadering begint
+static const float Home_uDac = -1.0f;	// Homing-spanning per motor (omhoog gaande kopper).
+static const float slowHome_uDac = 0.5f;	// Homing-spanning per motor (omhoog gaande kopper).
+static const float Hold_uDac = 2.0f;
 
 static float motorControlOutput = 0.0f;
 static Bool HomingStarted = false;
@@ -156,7 +123,7 @@ Bool homeAllMotors(void)
 			}
 			else
 			{
-				dac_SetOutputVoltage(MotorDacChannel[motorIndex], Home_uDac[motorIndex]);
+				dac_SetOutputVoltage(MotorDacChannel[motorIndex], Home_uDac);
 			}
 		}
 	}
@@ -202,7 +169,7 @@ Bool homeAllMotors(void)
 				else
 				{
 					// Blijf homing-spanning uitsturen
-					dac_SetOutputVoltage(MotorDacChannel[motorIndex], Home_uDac[motorIndex]);
+					dac_SetOutputVoltage(MotorDacChannel[motorIndex], Home_uDac);
 					allReady = false;
 				}
 			}
@@ -210,7 +177,8 @@ Bool homeAllMotors(void)
 			else
 			{
 				// Op positie behouden met PID
-				motorControlOutput = Hold_uDac + PID_Controller(motorPos_Rad[motorIndex]);
+				float error = motorPos_Rad[motorIndex] - readyArmAngle;
+				motorControlOutput = Hold_uDac + PIDregelaar(motorIndex, error); //motorspanning bepalen met PID-regelaar
 				motorControlOutput = constrain(motorControlOutput, DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // ongeveer +/-10V begrenzen.
 				dac_SetOutputVoltage(MotorDacChannel[motorIndex], motorControlOutput);
 			}
@@ -219,7 +187,8 @@ Bool homeAllMotors(void)
 		//Als alles Ready is, naar Backoff Positie gaan tot die positie bereikt is.
 		if(allReady)
 		{
-			allReady = HoldPosition(readyArmAngle);
+			float HoldPos[N_MOTORS] = {readyArmAngle, readyArmAngle, readyArmAngle};
+			allReady = HoldPosition(HoldPos);
 		}
 	}// einde AllReady statement
 	///////////////////////////////////////////////////////////////////////////////
@@ -249,7 +218,7 @@ Bool homeAllMotors(void)
 				}
 				else // Blijf langzaam naar home positie bewegen
 				{
-					dac_SetOutputVoltage(MotorDacChannel[motorIndex], slowHome_uDac[motorIndex]);
+					dac_SetOutputVoltage(MotorDacChannel[motorIndex], slowHome_uDac);
 					allHomed = false;
 				}
 			}

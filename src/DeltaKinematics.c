@@ -18,58 +18,16 @@
 #define DELTA_TAN60			(1.7320508075688772935f)
 #define DELTA_SIN30			(0.5f)
 
+
 //////////////////////////////////////////////////////////////////////////////
-// system defines
-#define Tsample			(0.001f)
-
-
+//file globals
 static float rBase = 200.0f;	// basisradius,schouderpunt [mm]
 static float rPols = 40.0f;	// polsRadius [mm]				// platformradius [mm]
 static float LengteBovenarm = 210.0f;	// bovenarm lengte [mm]
 static float LengteOnderarm = 550.0f; // onderarm [mm]
+static const float Bovenarm_thetaMax = 0.6981317008f; // 40deg * (PI/180)
+static const float Bovenarm_thetaMin = -1.3962634035f; // -80deg * (PI/180)
 static uint8_t motorIndex = 0; // Motor index voor iteraties, 0,1,2 voor M1,M2,M3
-
-//////////////////////////////////////////////////////////////////////////////
-/* PID controller waarden 
- * error input -> returnwaarde = gewenste spanning 
- */
-// Regelaarconstanten
-static const float Kp = 8.5577f;
-static const float Ki = 68.462f;
-static const float Kd = 0.32091f;
-static float integral = 0.0f;
-static float prevError = 0.0f;
-
-float PID_Controller(float error)
-{
-	float derivative;
-	float voltage;
-	
-	// I-actie
-	integral += error * Tsample;
-	// D-actie
-	derivative = (error - prevError) / Tsample;
-	// PID uitgang
-	voltage = (Kp * error) + (Ki * integral) + (Kd * derivative);
-
-	// Vorige error opslaan
-	prevError = error;
-	return voltage;
-}
-
-//////////////////////////////////////////////////////////////////////////////
-/* FeedForward waarden bepalen 
- * gewenste hoekacceleratie (bovenarm) input -> returnwaarde = gewenste spanning 
- */
-//intern geheugen
-//////////////////////////////////
-float FeedForward(float alpha)
-{
-	const float Je_totaal = 0.000020378; //2.0378e-05// kgm^2, totale traagheidsmoment op de motoras
-	const float KaKt = 0.01524; // Nm/V (Ka [A/V] * Kt [Nm/A])
-	return (Je_totaal * alpha) / KaKt;
-}
-
 
 //////////////////////////////////////////////////////////////////////////////
 /* bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float jointAnglesRad[3])
@@ -80,10 +38,8 @@ float FeedForward(float alpha)
  */
 // constantes
 //Mechanische hoeklimieten van de bovenarm.
-static const float Bovenarm_thetaMax = 0.6981317008f; // 40deg * (PI/180)
-static const float Bovenarm_thetaMin = -1.3962634035f; // -80deg * (PI/180)
-static const float phi[N_MOTORS] = {0.0f, 2.0943951024f, 4.1887902048f}; // 0deg, 120deg, 240deg in radialen
-//static float jointPosRad[N_MOTORS]; // bovenarmhoeken in radialen (M1,M2,M3)
+
+static const float phi[N_MOTORS] = {0.0f, 2.0943951024f, 4.1887902048f}; // 0deg, 120deg, 240deg in radialen voor rotatiematrix
 
 Bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOTORS]) // 
 {
@@ -106,7 +62,7 @@ Bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 			{ cosf(phi[motorIndex]),  sinf(phi[motorIndex]), 0.0f },
 			{-sinf(phi[motorIndex]),  cosf(phi[motorIndex]), 0.0f },
 			{ 0.0f,       			0.0f,  1.0f }
-		};*/ // Toegepast in onderstaande berekeningen
+		};*/ // efficienter toegepast in onderstaande berekeningen
 		
 		// Lokale TCP-positie gezien vanuit motor.
 		//Enkel essenciële berekening uitvoeren voor de rotatie, zonder volledige matrixvermenigvuldiging:
