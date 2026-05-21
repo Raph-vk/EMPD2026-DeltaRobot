@@ -5,18 +5,40 @@
  *  Author: Raph van Koeveringe
  */ 
 ///////////////////////////////////////////////////////////////////////////////
-#include "VisualisationTask.h"
+// system includes
+#include <asf.h>
+#include <string.h> //needed for memset
 
+///////////////////////////////////////////////////////////////////////////////
+// library & HAL includes
+#include "CommandConsole.h"
+#include "TaskSleep.h"
+
+#include "I2CLib.h"  //voor scherm intergratie
+#include "bits.h" //voor lampen
+#include "u8g2.h" //Voor scherm intergratie
+#include "LEDLib.h"
+
+///////////////////////////////////////////////////////////////////////////////
+// application includes
+#include "VisualisationTask.h"
+#include "ApplicationTasks.h"
+#include "ControlTask.h"
+#include "MachinePins.h"
+
+///////////////////////////////////////////////////////////////////////////////
+// function declarations to these functions are below.
+static bool OLED_INIT(void);
+static bool OLED_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2, const char *stroomTxt, const char *potTxt);
+static bool OLED_Recover(void);
 static uint8_t u8x8_byte_due_i2c(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr);
 static uint8_t u8x8_gpio_and_delay_due(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr);
-static Bool OLED_Recover(void);
-
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
 static u8g2_t g_u8g2;
 static I2C_HANDLE *g_oledI2c = NULL;
-static Bool g_oledReady = false;
-static Bool g_oledTransferError = false;
+static bool g_oledReady = false;
+static bool g_oledTransferError = false;
 static status_code_t g_oledLastTransferStatus = STATUS_OK;
 static uint32_t g_oledRecoverCount = 0;
 static uint32_t g_oledTransferErrorCount = 0;
@@ -31,9 +53,9 @@ static uint32_t g_oledTransferErrorCount = 0;
 void port_AllLampsOff(void)
 {
 	//Alle lampen uit.
-	port_SetBit(LAMP_GREEN, false);
-	port_SetBit(LAMP_ORANGE, false);
-	port_SetBit(LAMP_RED, false);
+	port_SetBit(BIT_LAMP_GREEN, false);
+	port_SetBit(BIT_LAMP_ORANGE, false);
+	port_SetBit(BIT_LAMP_RED, false);
 	led_DisplayValue(0x00); 
 }
 
@@ -41,11 +63,11 @@ void port_AllLampsOff(void)
 // void port_SetLamp(uint8_t lampNumber)
 // Zet een lamp aan
 //
-static void port_SetLamps(Bool green, Bool orange, Bool red)
+static void port_SetLamps(bool green, bool orange, bool red)
 {
-	port_SetBit(LAMP_GREEN,  green);
-	port_SetBit(LAMP_ORANGE, orange);
-	port_SetBit(LAMP_RED,    red);
+	port_SetBit(BIT_LAMP_GREEN,  green);
+	port_SetBit(BIT_LAMP_ORANGE, orange);
+	port_SetBit(BIT_LAMP_RED,    red);
 
 	uint8_t ledValue = 0x00;
 
@@ -55,67 +77,6 @@ static void port_SetLamps(Bool green, Bool orange, Bool red)
 
 	led_DisplayValue(ledValue);
 }
-
-///////////////////////////////////////////////////////////////////////////////
-// OLED_Init(void)
-//
-Bool OLED_Init(void)
-{
-	u8g2_Setup_ssd1309_i2c_128x64_noname0_1(&g_u8g2, U8G2_R0, u8x8_byte_due_i2c, u8x8_gpio_and_delay_due);
-	u8g2_SetI2CAddress(&g_u8g2, OLED_I2C_ADDRESS);
-
-	g_oledTransferError = false;
-	g_oledLastTransferStatus = STATUS_OK;
-	g_oledRecoverCount = 0;
-	g_oledTransferErrorCount = 0;
-
-	g_oledReady = OLED_Recover();
-	return g_oledReady;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Bool OLED_DrawStatus()
-//
-// strings naar de juiste positie op scherm schrijven.
-//
-Bool OLED_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2, const char *stroomTxt, const char *potTxt)
-{
-	if (g_oledReady == false)
-	{
-		return false;
-	}
-
-	g_oledTransferError = false;
-	g_oledLastTransferStatus = STATUS_OK;
-
-	u8g2_FirstPage(&g_u8g2);
-	do
-	{
-		// Bovenste STATUS regel
-		u8g2_SetFont(&g_u8g2, u8g2_font_6x10_tf);
-		u8g2_DrawStr(&g_u8g2, 0, 10, stateTxt);
-
-		// operator compact
-		u8g2_SetFont(&g_u8g2, u8g2_font_5x7_tr);
-		u8g2_DrawStr(&g_u8g2, 0, 21, opTxt1);
-		u8g2_DrawStr(&g_u8g2, 0, 31, opTxt2);
-
-		// Onderste data regel
-		u8g2_SetFont(&g_u8g2, u8g2_font_5x7_tr);
-		u8g2_DrawStr(&g_u8g2, 0, 62,  stroomTxt);
-		u8g2_DrawStr(&g_u8g2, 80, 62, potTxt);
-	} while (u8g2_NextPage(&g_u8g2));
-
-	if (g_oledTransferError)
-	{
-		g_oledReady = false;
-		g_oledTransferErrorCount++;
-		return false;
-	}
-
-	return true;
-}
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // void VisualisationTask(void *pvParameters)
@@ -135,10 +96,10 @@ void VisualisationTask(void *pvParameters)
 	const char *stateString = ""; //Moeten const en pointer zijn!
 	const char *operatorLine1 = "";
 	const char *operatorLine2 = "";
-	Bool updateDisplay = false;
+	bool updateDisplay = false;
 	
 	//screen setup
-	if (OLED_Init() == false)
+	if (OLED_INIT() == false)
 	{
 		vPrintString("> OLED init failed, display recovery will retry in task loop.\n");
 	}
@@ -167,7 +128,7 @@ void VisualisationTask(void *pvParameters)
 		stateString = "";
 		operatorLine1 = "";
 		operatorLine2 = "";
-		Bool blink = (i < 5);
+		bool blink = (i < 5);
 			
 		// Uitvoer actie bij bepaalde state.
 		switch (status)
@@ -303,13 +264,72 @@ void VisualisationTask(void *pvParameters)
 
 
 
-
-
-
 ///////////////////////////////////////////////////////////////////////////////
 // SCREEN FUNCTIONS
+///////////////////////////////////////////////////////////////////////////////
+// OLED_INIT(void)
+/*
+ * Setting to correct screen.
+ */
+static bool OLED_INIT(void)
+{
+	u8g2_Setup_ssd1309_i2c_128x64_noname0_1(&g_u8g2, U8G2_R0, u8x8_byte_due_i2c, u8x8_gpio_and_delay_due);
+	u8g2_SetI2CAddress(&g_u8g2, OLED_I2C_ADDRESS);
+
+	g_oledTransferError = false;
+	g_oledLastTransferStatus = STATUS_OK;
+	g_oledRecoverCount = 0;
+	g_oledTransferErrorCount = 0;
+
+	g_oledReady = OLED_Recover();
+	return g_oledReady;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// bool OLED_DrawStatus()
 //
-static Bool OLED_Recover(void)
+// strings naar de juiste positie op scherm schrijven.
+//
+static bool OLED_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2, const char *stroomTxt, const char *potTxt)
+{
+	if (g_oledReady == false)
+	{
+		return false;
+	}
+
+	g_oledTransferError = false;
+	g_oledLastTransferStatus = STATUS_OK;
+
+	u8g2_FirstPage(&g_u8g2);
+	do
+	{
+		// Bovenste STATUS regel
+		u8g2_SetFont(&g_u8g2, u8g2_font_6x10_tf);
+		u8g2_DrawStr(&g_u8g2, 0, 10, stateTxt);
+
+		// operator compact
+		u8g2_SetFont(&g_u8g2, u8g2_font_5x7_tr);
+		u8g2_DrawStr(&g_u8g2, 0, 21, opTxt1);
+		u8g2_DrawStr(&g_u8g2, 0, 31, opTxt2);
+
+		// Onderste data regel
+		u8g2_SetFont(&g_u8g2, u8g2_font_5x7_tr);
+		u8g2_DrawStr(&g_u8g2, 0, 62,  stroomTxt);
+		u8g2_DrawStr(&g_u8g2, 80, 62, potTxt);
+	} while (u8g2_NextPage(&g_u8g2));
+
+	if (g_oledTransferError)
+	{
+		g_oledReady = false;
+		g_oledTransferErrorCount++;
+		return false;
+	}
+
+	return true;
+}
+
+
+static bool OLED_Recover(void)
 {
 	uint8_t clearResult;
 

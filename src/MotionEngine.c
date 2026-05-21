@@ -4,11 +4,30 @@
  *  MotionEngine for controlling the delta robot's motors to follow a desired trajectory.
  *
  *  Created: 10/04/2026
- *  Authors: Raph van Koeveringe (/ Robbe)
+ *  Authors: Raph van Koeveringe
  */
 ///////////////////////////////////////////////////////////////////////////////
+// system includes
+#include <asf.h>
+#include <math.h>
+
+///////////////////////////////////////////////////////////////////////////////
+// HAL includes for RTSW board
+#include "DAC4921Lib.h"
+#include "QC7366Lib.h"
+#include "vPrintString.h"
+#include "Map.h" // voor constrain() and fmap()
+
+///////////////////////////////////////////////////////////////////////////////
+// application includes
+#include "DeltaKinematics.h"
+#include "MachinePins.h"
+#include "QuadratureCounters.h"
 #include "MotionEngine.h"
 #include "Regelaar.h"
+
+///////////////////////////////////////////////////////////////////////////////
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // globals
@@ -29,10 +48,10 @@ static float uDac[N_MOTORS]				= {0.0, 0.0, 0.0};	// Gelimiteerde uDac output [V
 	
 static float Fout_motorRad[N_MOTORS]			= {0.0f, 0.0f, 0.0f};	// Berekende fout in motor-rad
 static float motorPos_Rad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Gemeten motor-as positie [rad]
-static Bool setupMotionProfileDone = false;
-static Bool verplaatsingKlaar = false;
-static Bool holdSetupDone = false;
-static Bool gripperSetupDone = false;
+static bool setupMotionProfileDone = false;
+static bool verplaatsingKlaar = false;
+static bool holdSetupDone = false;
+static bool gripperSetupDone = false;
 static uint16_t currentStep = 0;
 static float t0 = 0.0f;
 static float t1 = 0.0f;
@@ -54,9 +73,9 @@ static const float largeErrorThreshold		= 0.1f;	// Wanneer fout groter is dan 0.
 static const float slowApproachVoltage		= 0.75f;	// [V] Gewenste voltage voor langzame verplaatsing
 static float holdMotorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
 
-Bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
+bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
 {
-	Bool nearReference = true;
+	bool nearReference = true;
 	mI = 0;
 	
 	// Lees motorposities uit.
@@ -108,7 +127,7 @@ void InitSequence(void)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Standstill
-Bool HoldCurrentPosition(float Twait)
+bool HoldCurrentPosition(float Twait)
 {
 	if (!holdSetupDone)
 	{
@@ -140,12 +159,12 @@ Bool HoldCurrentPosition(float Twait)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Standstill
-Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait)
+bool GripperAtCurrentPosition(const bool Grab ,const float Twait)
 {
 	//eerste keer
 	if (!gripperSetupDone)
 	{
-		port_SetBit(GRIPPER, Grab);
+		port_SetBit(BIT_GRIPPER, Grab);
 
 		//capture currect position
 		ReadMotorPositions(motorPos_Rad);
@@ -196,7 +215,7 @@ static float thetaRef[N_MOTORS];		// Incrementele motorpositie referentie [rad]
 static float omegaRef[N_MOTORS];		// Motor-snelheidsreferentie [rad/s]
 static float alphaRef[N_MOTORS];		// Motor-acceleratiereferentie [rad/s^2]
 
-Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tmax)
+bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tmax)
 {
 	mI = 0;
 
@@ -354,10 +373,10 @@ static const SequenceStep pickPlaceSeq[] =
 //
 // Called once per 1 ms tick.
 // Beslist welke stap er uitgevoerd moeten worden.
-Bool RunSequence(void)
+bool RunSequence(void)
 {
     const SequenceStep *s = &pickPlaceSeq[currentStep];
-    Bool done = false;
+    bool done = false;
 
     switch (s->type)
     {

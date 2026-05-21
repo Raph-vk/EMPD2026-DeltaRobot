@@ -14,7 +14,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // Hoeveelheid motoren
-#define N_MOTORS		1
+#define N_MOTORS		3
 #define i_twk			(47.0f) // 47:1 reductie tandwielkast
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -58,11 +58,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // motor configuratie DAC en QC
-//static const uint8_t MotorDacChannel[N_MOTORS] = {0, 1, 2};
-//static const uint8_t MotorQcChannel[N_MOTORS] = {0, 1, 2};
-
-static const uint8_t MotorDacChannel[N_MOTORS] = {0};
-static const uint8_t MotorQcChannel[N_MOTORS] = {2};
+extern const uint8_t MotorDacChannel[N_MOTORS] = {0, 1, 2};
+extern const uint8_t MotorQcChannel[N_MOTORS] = {0, 1, 2};
 
 
 ///////////////////////////////////////////////////////////////////////////////

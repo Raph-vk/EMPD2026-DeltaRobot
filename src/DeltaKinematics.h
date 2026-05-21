@@ -14,24 +14,17 @@
  * Author: Raph van Koeveringe
  */
 
+
+//////////////////////////////////////////////////////////////////////////////
+#include <stdbool.h>
+
+
 #ifndef DELTAKINEMATICS_H_
 #define DELTAKINEMATICS_H_
 
 //////////////////////////////////////////////////////////////////////////////
-// system includes
-#include <asf.h>
-#include <math.h>
-#include <stdbool.h>
-#include "MachinePins.h"
-
-//////////////////////////////////////////////////////////////////////////////
-// #define's
-#define EPSILON_F			(1.0e-6f) // bijna nul
-#define PI				(3.14159265358979323846f) // PI_floating
-
-//////////////////////////////////////////////////////////////////////////////
 // Functions
-Bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorAnglesRad[3]);
+bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorAnglesRad[3]);
 
 
 #endif /* DELTAKINEMATICS_H_ */

@@ -7,34 +7,7 @@
 #ifndef MOTIONENGINE_H_
 #define MOTIONENGINE_H_
 
-///////////////////////////////////////////////////////////////////////////////
-// system includes
-#include <asf.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <string.h>
-#include <math.h>
-
-///////////////////////////////////////////////////////////////////////////////
-// HAL includes for RTSW board
-#include "DAC4921Lib.h"
-#include "QC7366Lib.h"
-#include "vPrintString.h"
-#include "Map.h" // voor constrain() and fmap()
-
-///////////////////////////////////////////////////////////////////////////////
-// application includes
-#include "DeltaKinematics.h"
-#include "MachinePins.h"
-#include "QuadratureCounters.h"
-
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// define's
-#define GRIPPER BIT_GRIPPER
-
+#include "MachinePins.h" //voor N_MOTORS
 ///////////////////////////////////////////////////////////////////////////////
 // local type definitions SEQUENCE
 typedef enum
@@ -55,7 +28,7 @@ typedef struct
     float Tmax;
 
     float Twait;
-    Bool grab;
+    bool grab;
 } SequenceStep;
 
 #define MOVE(x_, y_, z_, t_)   { STEP_MOVE,    x_, y_, z_, t_, 0.0f, false }
@@ -65,12 +38,12 @@ typedef struct
 
 ///////////////////////////////////////////////////////////////////////////
 // Function prototypes
-Bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS]);
+bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS]);
 void InitSequence(void);
-Bool HoldCurrentPosition(float Twait);
-Bool GripperAtCurrentPosition(const Bool Grab ,const float Twait);
-Bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tmax);
-Bool RunSequence(void);
+bool HoldCurrentPosition(float Twait);
+bool GripperAtCurrentPosition(const bool Grab ,const float Twait);
+bool Move_ToSetpoint(float x_eindPos, float y_eindPos, float z_eindPos, float Tmax);
+bool RunSequence(void);
 
 
 #endif /* MOTIONENGINE_H_ */

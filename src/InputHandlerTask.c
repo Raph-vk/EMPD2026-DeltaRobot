@@ -4,52 +4,51 @@
  * Created: 10/04/2023
  *  Author: Raph van Koeveringe
  */ 
-
+#include "InputHandlerTask.h"
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
-
 #include <asf.h>
-#include <string.h>
+
+///////////////////////////////////////////////////////////////////////////////
+// HAL includes for RTSW board
+#include "bits.h"
+#include "ADCLib.h"
+#include "SwitchLib.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // FreeRTOS includes
-
 #include "CommandConsole.h"
 #include "vPrintString.h"
 #include "TaskSleep.h"
 
 
 ///////////////////////////////////////////////////////////////////////////////
-// other includes
-
-#include "SwitchLib.h"
-#include "InputHandlerTask.h"
-#include "bits.h"
-
+// application includes
 #include "MachinePins.h"
-
 #include "ApplicationTasks.h"
 
+///////////////////////////////////////////////////////////////////////////////
+// defines
 #define ADC_REFERENCE_VOLTAGE         3.3f
 #define CURRENT_SENSOR_VOLTS_PER_AMP  0.1f
 
 
 ///////////////////////////////////////////////////////////////////////////////
-/* Bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit))
+/* bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit))
 Helperfunctie die teruggeeft of een van de knoppen is ingedrukt 
 */
-static Bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit)
+static bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit)
 {
 	return switch_IsPressed(pcbSwitch) || !port_IsBitSet(inputBit);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/* Bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit))
+/* bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit))
  * 
  * Helperfunctie die debounce verwerkt en teruggeeft of een van de knoppen is ingedrukt en weer losgelaten.
  *  
  */
-static Bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit)
+static bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit)
 {
 	//Als knop niet ingedrukt is
 	if (!IsButtonPressed(pcbSwitch, inputBit))
@@ -118,7 +117,7 @@ static void ProcessPotmeterData(uint32_t potData)
 Leest een stroomsensor uit die 100mV/A als analoge uitgang geeft.
 De berekende stroom in ampere wordt in de stroom queue geplaatst.
 */
-static Bool hasCurrentSample = false;
+static bool hasCurrentSample = false;
 static uint32_t vorigeStroomData = 0;
 static float zeroCurrentVoltage = 2.5f;        // Better: measure this during startup
 

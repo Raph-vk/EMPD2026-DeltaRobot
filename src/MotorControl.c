@@ -5,7 +5,38 @@
  *  Author: Raph van Koeveringe
  */ 
 #include "MotorControl.h"
+///////////////////////////////////////////////////////////////////////////////
+// system includes
+#include <asf.h>
+#include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+///////////////////////////////////////////////////////////////////////////////
+// application includes
+#include "CommandConsole.h"
+#include "vPrintString.h"
+#include "TaskSleep.h"
+
+///////////////////////////////////////////////////////////////////////////////
+// HAL includes for RTSW board
+#include "LEDLib.h"
+#include "PortIOLib.h"
+#include "DAC4921Lib.h"
+#include "QC7366Lib.h" // LS7366R encoder counter
+#include "Map.h" //For constraint();
+
+///////////////////////////////////////////////////////////////////////////////
+// application includes
+#include "QuadratureCounters.h"
+#include "ControlTask.h"
+#include "MachinePins.h"
 #include "Regelaar.h"
+#include "MotionEngine.h"
+
+///////////////////////////////////////////////////////////////////////////////
+static const uint8_t MotorHomeLimitBit[N_MOTORS] = {BIT_M1_HOME, BIT_M2_HOME, BIT_M3_HOME};
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // globals
@@ -38,7 +69,7 @@ void motor_DisableESCONController(void)
 ///////////////////////////////////////////////////////////////////////////////
 // bool motor_IsHomeLimitActive(uint8_t motorIndex)
 
-Bool motor_IsHomeLimitActive(uint8_t index)
+bool motor_IsHomeLimitActive(uint8_t index)
 {
 	if (index >= N_MOTORS)
 	{
@@ -50,7 +81,7 @@ Bool motor_IsHomeLimitActive(uint8_t index)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Check of er nog een homeswitch actief is. 
-Bool anyHomeSwitchActive(void)
+bool anyHomeSwitchActive(void)
 {	
 	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 	{
@@ -79,13 +110,13 @@ static const float slowHome_uDac = 0.5f;	// Homing-spanning per motor (omhoog ga
 static const float Hold_uDac = 2.0f;
 
 static float motorControlOutput = 0.0f;
-static Bool HomingStarted = false;
-static Bool readyPos[N_MOTORS] = { false, false, false };
-static Bool allReady = false;
-static Bool motorHomed[N_MOTORS] = { false, false, false };
-static Bool allHomed = false;
+static bool HomingStarted = false;
+static bool readyPos[N_MOTORS] = { false, false, false };
+static bool allReady = false;
+static bool motorHomed[N_MOTORS] = { false, false, false };
+static bool allHomed = false;
  
-Bool homeAllMotors(void)
+bool homeAllMotors(void)
 {
 	motorIndex = 0;
 	 

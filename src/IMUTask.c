@@ -5,18 +5,33 @@
  * Created: 22/04/2026 08:38:01
  *  Author: raphv
  */ 
+#include "IMUTask.h"
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
-
 #include <asf.h>
-#include <stdbool.h>
-#include <stdint.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
-
-#include "IMUTask.h"
+#include "I2CLib.h"
 #include "vPrintString.h"
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+// type definitions
+typedef struct
+{
+	TickType_t tick;
+	float ax_mps2;
+	float ay_mps2;
+	float gz_rps;
+} IMU_DATA;
+
+typedef struct
+{
+	I2C_CHANNEL channel;
+	uint8_t i2cAddress;
+} IMU_TASK_CONFIG;
 
 ///////////////////////////////////////////////////////////////////////////////
 // MPU-9250 / MPU-6500 / MPU-9255 register map (gedeeld deel)

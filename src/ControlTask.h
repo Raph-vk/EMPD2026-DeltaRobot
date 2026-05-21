@@ -6,33 +6,6 @@
  */ 
 #ifndef CONTROLTASK_H_
 #define CONTROLTASK_H_
-///////////////////////////////////////////////////////////////////////////////
-// system includes
-#include <asf.h>
-#include <string.h>
-#include <stdbool.h>
-
-///////////////////////////////////////////////////////////////////////////////
-// FreeRTOS includes
-#include "CommandConsole.h"
-#include "vPrintString.h"
-#include "TaskSleep.h"
-
-///////////////////////////////////////////////////////////////////////////////
-// HAL includes for RTSW board
-
-#include "DeviceIOLib.h"
-#include "InterruptLib.h"
-#include "bits.h"
-
-///////////////////////////////////////////////////////////////////////////////
-// application includes
-#include "MotorControl.h"
-#include "InputHandlerTask.h"
-#include "MotionEngine.h"
-#include "ApplicationTasks.h"
-#include "MachinePins.h"
-#include "MotionEngine.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // local type definitions STATEMACHINE
@@ -50,7 +23,7 @@ typedef enum
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes
 void ToState(SystemState_t newState);
-Bool InNoodsituatie(void);
+bool InNoodsituatie(void);
 
 void ClockInterruptHandler(uint32_t id, uint32_t mask);
 void NoodInterruptHandler(uint32_t id, uint32_t mask);

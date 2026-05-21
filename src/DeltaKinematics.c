@@ -7,10 +7,23 @@
  * Created on: 10/04/2026
  * Author: Raph van Koeveringe / Robbe
  */
-//////////////////////////////////////////////////////////////////////////////
 #include "DeltaKinematics.h"
+//////////////////////////////////////////////////////////////////////////////
+// system includes
+#include <asf.h>
 #include <math.h>
 
+//////////////////////////////////////////////////////////////////////////////
+// application includes
+#include "MachinePins.h"
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+// #define's
+#define EPSILON_F			(1.0e-6f) // bijna nul
+#define PI				(3.14159265358979323846f) // PI_floating
 //////////////////////////////////////////////////////////////////////////////
 //Basic math values
 #define DELTA_SIN120		(0.8660254037844386468f)
@@ -41,7 +54,7 @@ static uint8_t motorIndex = 0; // Motor index voor iteraties, 0,1,2 voor M1,M2,M
 
 static const float phi[N_MOTORS] = {0.0f, 2.0943951024f, 4.1887902048f}; // 0deg, 120deg, 240deg in radialen voor rotatiematrix
 
-Bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOTORS]) // 
+bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOTORS]) // 
 {
 	//////////////////////////////////////////////////////////////////////////
 	// functie declaraties

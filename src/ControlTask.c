@@ -4,12 +4,33 @@
  * Created: 10/04/2026
  * Author: Raph van Koeveringe
  */
-///////////////////////////////////////////////////////////////////////////////
 #include "ControlTask.h"
+///////////////////////////////////////////////////////////////////////////////
+// system includes
+#include <asf.h>
+
+///////////////////////////////////////////////////////////////////////////////
+// FreeRTOS includes
+#include "CommandConsole.h"
+#include "TaskSleep.h"
+
+///////////////////////////////////////////////////////////////////////////////
+// HAL includes for RTSW board
+#include "DeviceIOLib.h"
+#include "InterruptLib.h"
+#include "bits.h"
+#include "DAC4921Lib.h" //voor setDACoutput
+
+///////////////////////////////////////////////////////////////////////////////
+// application includes
+#include "MotorControl.h"
+#include "InputHandlerTask.h"
+#include "MotionEngine.h"
+#include "ApplicationTasks.h"
+#include "MachinePins.h"
 #include "temp.h"
 
 ///////////////////////////////////////////////////////////////////////////////
-
 // file globals
 static SystemState_t state = STATE_INIT;
 
@@ -52,7 +73,7 @@ void ToState(SystemState_t newState)
 //
 // Returns true if one of the fault inputs is still active.
 // PIN_NOOD is fail-safe active-low: set = OK, not set = Nood.
-Bool InNoodsituatie(void)
+bool InNoodsituatie(void)
 {
 	return port_IsBitSet(BIT_NOOD);
 }
@@ -106,8 +127,8 @@ void ControlTask(void *pvParameters)
 	const TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
 	// const float RustPostitie[N_MOTORS] = {20.0f,20.0f,20.0f};
 	
-	Bool homingAllMotorsDone = false;
-	Bool sequenceDone  = false;
+	bool homingAllMotorsDone = false;
+	bool sequenceDone  = false;
 
 	float gemetenStroom = 0.0f;
 	BaseType_t hasCurrentSample = pdFALSE;

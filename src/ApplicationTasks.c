@@ -2,28 +2,23 @@
  * ApplicationTasks.c
  *
  * Created: 27-11-2023 14:57:44
- *  Author: rasmsmee
+ *  Author: raphv
  
 Deze file is de centrale opstart van de applicatie.
  
  */ 
-
+#include "ControlTask.h"
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 #include <asf.h>
-#include <string.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
-
 #include "CommandConsole.h"
-#include "vPrintString.h"
-#include "TaskSleep.h"
 
 #include "ApplicationTasks.h"
 #include "InputHandlerTask.h"
 #include "VisualisationTask.h"
-#include "ControlTask.h"
 
 
 ///////////////////////////////////////////////////////////////////////////////
