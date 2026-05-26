@@ -28,7 +28,6 @@ Deze file is de centrale opstart van de applicatie.
 static TaskHandle_t handle_InputHandlerTask = NULL;
 static TaskHandle_t handle_VisualisationTask = NULL;
 TaskHandle_t		handle_ControlTask = NULL;
-//static TaskHandle_t handle_IMUTask = NULL;
 
 ///////////////////////////////////////////////////////////////////////////////
 // global handles & objects
@@ -46,6 +45,12 @@ QueueHandle_t		handle_stroomQueue = NULL;
 
 ///////////////////////////////////////////////////////////////////////////////
 // void StartApplicationTasks(void)
+/*
+ * Initialiseert de FreeRTOS eventgroups, semaphores en queues.
+ * Maakt daarna de applicatietaken aan en bewaart de task-handles.
+ * Invoer: geen.
+ * Uitvoer: geen returnwaarde; de globale handles worden gevuld.
+ */
 void StartApplicationTasks(void)
 {
 	BaseType_t result = pdFAIL;
@@ -84,6 +89,7 @@ void StartApplicationTasks(void)
 		vPrintString("handle_StateQueue create failed.\n");
 	}
 	
+
 	// Aanmaken van "potQueue"
 	// Geeft de actuele procentuele stap-waarde van de potmeter door.
 	handle_potQueue = xQueueCreate(QueueSize, sizeof(uint32_t));
@@ -105,32 +111,21 @@ void StartApplicationTasks(void)
 	// De taken worden aangemaakt en in de ready list geplaatst.
 	// Prioriteit 0 is laagste 4 is hoogste!!
 	result = xTaskCreate(InputHandlerTask, "tsk_Input", (configMINIMAL_STACK_SIZE), NULL, 0, &handle_InputHandlerTask);
-	if (result == pdPASS )
+	if (result != pdPASS )
 	{
 		vPrintString("InputHandlerTask task create failed.\n");
 	}
 	result = xTaskCreate(ControlTask, "tsk_Control", (configMINIMAL_STACK_SIZE), NULL, 2, &handle_ControlTask);
-	if (result == pdPASS )
+	if (result != pdPASS )
 	{
 		vPrintString("ControlTask task create failed.\n");
 	}
 	result = xTaskCreate(VisualisationTask, "tsk_Visualisation", (configMINIMAL_STACK_SIZE), NULL, 1, &handle_VisualisationTask);
-	if (result == pdPASS )
+	if (result != pdPASS )
 	{
 		vPrintString("VisualisationTask task create failed.\n");
 
 	}
-
-	/*
-	static const IMU_TASK_CONFIG imuTaskConfig = { I2C_CHANNEL_0, 0x68 };
-
-	// IMU initialisatie gebeurt in de task zelf, nadat de FreeRTOS scheduler draait.
-	result = xTaskCreate(imu_Task,"task_UMI", (configMINIMAL_STACK_SIZE),(void *)&imuTaskConfig,1, &handle_IMUTask);
-	if (result != pdPASS)
-	{
-		vPrintString("IMU task create failed.\n");
-	}
-	*/
 	/**************************************************** Taken aanmaken ****************************************************/
 }
 

@@ -709,6 +709,12 @@
     <Compile Include="src\ASF\common\services\spi\sam_spi\spi_master.c">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\Homing.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\Homing.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\InputHandlerTask.c">
       <SubType>compile</SubType>
     </Compile>
@@ -724,9 +730,6 @@
     <Compile Include="src\DeltaKinematics.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\IMUTask.h">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="src\MachinePins.h">
       <SubType>compile</SubType>
     </Compile>
@@ -736,13 +739,10 @@
     <Compile Include="src\MotorControl.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\IMUTask.c">
+    <Compile Include="src\Screen.c">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\Regelaar.c">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\Regelaar.h">
+    <Compile Include="src\Screen.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\temp.c">

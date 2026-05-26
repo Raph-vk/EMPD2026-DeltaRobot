@@ -26,7 +26,7 @@
 // application includes
 #include "DeltaKinematics.h"
 #include "QuadratureCounters.h"
-#include "Regelaar.h"
+#include "MotorControl.h"
 #include "ControlTask.h"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -40,14 +40,9 @@ static float g_time = 0.0f;          // totale tijd sinds opstarten van de robot
 static float holdTargetPos[N_MOTORS] = {0.0f, 0.0f, 0.0f};
 
 ///////////////////////////////////////////////////////////////////////////////
-// general settings
-static uint8_t mI = 0; //Motor index
-//static const float EncoderCountsPerRevolution = 2048.0f; // 2048 counts per revolution of the motor shaft
-
-///////////////////////////////////////////////////////////////////////////////
 // position control variables
-static float motorControlOutput[N_MOTORS]	= {0.0, 0.0, 0.0};	// Berekende output
-static float uDac[N_MOTORS]				= {0.0, 0.0, 0.0};	// Gelimiteerde uDac output [V] met uDac = Constraint(g,min,max)
+static float motorControlOutput[N_MOTORS];	// Berekende output
+static float uDac[N_MOTORS];	// Gelimiteerde uDac output [V] met uDac = Constraint(g,min,max)
 	
 static float Fout_motorRad[N_MOTORS]			= {0.0f, 0.0f, 0.0f};	// Berekende fout in motor-rad
 static float motorPos_Rad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Gemeten motor-as positie [rad]
@@ -69,7 +64,12 @@ static float dt = 0.0f;
 
 
 ///////////////////////////////////////////////////////////////////////////////
-// Beginnen en nullen van alle variabelen
+// void SequenceRESET(void)
+/*
+ * Zet de bewegingssequentie terug naar de eerste stap.
+ * Invoer: geen.
+ * Uitvoer: geen returnwaarde; interne sequentie- en setupvlaggen worden gereset.
+ */
 void SequenceRESET(void)
 {
 	g_time = 0.0f;
@@ -80,13 +80,13 @@ void SequenceRESET(void)
 	gripperSetupDone = false;
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////
 // bool RunSequence(void)
-//
-// Called once per 1 ms tick.
-// Executes one step at a time.
-// Returns true when the complete sequence is finished.
+/*
+ * Voert de ingestelde bewegingssequentie stap voor stap uit.
+ * Invoer: geen directe parameters; wordt eenmaal per 1 ms control-tick aangeroepen.
+ * Uitvoer: true wanneer de volledige sequentie klaar is, anders false.
+ */
 bool RunSequence(void)
 {
 	bool stepDone = false;
@@ -145,29 +145,51 @@ bool RunSequence(void)
 
 
 
+static uint32_t analogPrintCounter = 0;
+
+///////////////////////////////////////////////////////////////////////////////
+// static void printAnalogVoltage(float analogvoltage)
+/*
+ * Print periodiek de gevraagde analoge motorspanning voor debugdoeleinden.
+ * Invoer: analogvoltage is de laatst berekende motorspanning in volt.
+ * Uitvoer: geen returnwaarde; schrijft alleen naar de debugconsole.
+ */
+static void printAnalogVoltage(float analogvoltage)
+{
+	analogPrintCounter++;
+
+	if (analogPrintCounter >= 1000)
+	{
+		for (uint8_t i = 0; i < N_MOTORS; i++)
+		{
+			vPrintString("Motor %u voltage is: %.3f V\n",(unsigned int)i, analogvoltage);
+		}
+		analogPrintCounter = 0;
+	}
+}
 
 
 ///////////////////////////////////////////////////////////////////////////////
-// bool HoldPosition(const float holdArmPos_DegInput[N_MOTORS])
-/*
- * Wordt na iedere 1 ms tick opgeroepen.
- * Behoudt alle motorassen op gewenste motorhoeken.
- *
- * Input is bovenarm positie in radialen
- */
 static const float largeErrorThreshold		= 0.1f;	// Wanneer fout groter is dan 0.1 motor-rad
 static const float slowApproachVoltage		= 0.75f;	// [V] Gewenste voltage voor langzame verplaatsing
 static float holdMotorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
 
+///////////////////////////////////////////////////////////////////////////////
+// bool HoldPosition(const float holdArmPos_RAD[N_MOTORS])
+/*
+ * Regelt alle motorassen naar een vaste armpositie.
+ * Invoer: holdArmPos_RAD bevat per arm de gewenste positie in radialen.
+ * Uitvoer: true wanneer alle motoren dicht bij de referentie zitten, anders false.
+ */
 bool HoldPosition(const float holdArmPos_RAD[N_MOTORS])
 {
 	bool nearReference = true;
 	
 	// Lees motorposities uit.
-	ReadMotorPositions(motorPos_Rad);
+	LeesMotorPositiesRad(motorPos_Rad);
 
 	// Voor iedere motor
-	for (mI = 0; mI < N_MOTORS; mI++)
+	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
 	{
  		// Gewenste armpositie omzetten naar radialen en rekening houden met reducties		
 		holdMotorPos_Rad[mI] = i_twk * holdArmPos_RAD[mI];
@@ -187,10 +209,11 @@ bool HoldPosition(const float holdArmPos_RAD[N_MOTORS])
 			// Voltage berekenen mbv PID_Controller
 			motorControlOutput[mI] = PIDregelaar(mI, Fout_motorRad[mI] );
 		}
+		
+		printAnalogVoltage(motorControlOutput[mI]); //TEMP
 
 		// Zorg dat waarde niet groter is dan maximale DAC-waarde, en output.
 		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // min/max ongeveer +/-10V.
-
 		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
 	}
 
@@ -198,19 +221,20 @@ bool HoldPosition(const float holdArmPos_RAD[N_MOTORS])
 }//End HoldPosition();
 
 ///////////////////////////////////////////////////////////////////////////////
-// Standstill
+// bool HoldCurrentPosition(float waitTime_s)
+/*
+ * Houdt de actuele armpositie vast voor een opgegeven wachttijd.
+ * Invoer: waitTime_s is de minimale vasthoudtijd in seconden.
+ * Uitvoer: true wanneer de wachttijd verstreken is, anders false.
+ */
 bool HoldCurrentPosition(float waitTime_s)
 {
 	// Als setup nog niet gedaan is,
 	if (!holdSetupDone)
 	{
 		//Bepaal huidige positie
-		ReadMotorPositions(motorPos_Rad);
-		for (mI = 0; mI < N_MOTORS; mI++)
-		{
-			holdTargetPos[mI] = (motorPos_Rad[mI] / i_twk);
-		}
-
+		LeesArmPositiesRad(holdTargetPos);
+		
 		//check time
 		t0 = g_time;
 		holdSetupDone = true;
@@ -231,7 +255,12 @@ bool HoldCurrentPosition(float waitTime_s)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Standstill
+// bool GripperAtCurrentPosition(bool grab, float waitTime_s)
+/*
+ * Zet de gripper en houdt de huidige armpositie vast tijdens de wachttijd.
+ * Invoer: grab bepaalt sluiten/openen, waitTime_s is de wachttijd in seconden.
+ * Uitvoer: true wanneer de wachttijd verstreken is, anders false.
+ */
 bool GripperAtCurrentPosition(bool grab, float waitTime_s)
 {
 	//eerste keer
@@ -240,11 +269,7 @@ bool GripperAtCurrentPosition(bool grab, float waitTime_s)
 		port_SetBit(BIT_GRIPPER, grab);
 
 		//capture currect position
-		ReadMotorPositions(motorPos_Rad);
-		for (mI = 0; mI < N_MOTORS; mI++)
-		{
-			holdTargetPos[mI] = (motorPos_Rad[mI] / i_twk);
-		}
+		LeesArmPositiesRad(holdTargetPos);
 		
 		//check time
 		t0 = g_time;
@@ -268,9 +293,7 @@ bool GripperAtCurrentPosition(bool grab, float waitTime_s)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// bool Move_ToSetpoint(void)
-//
-// Called once per 1 ms tick. Evaluates the move profile and controls the motors.
+// status bewegingsprofiel
 static float motorTargetRad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Berekende motor-eindpositie [rad]
 
 //static const float  xMax = 0.0; // [m] eind positie
@@ -288,10 +311,15 @@ static float thetaRef[N_MOTORS];		// Incrementele motorpositie referentie [rad]
 static float omegaRef[N_MOTORS];		// Motor-snelheidsreferentie [rad/s]
 static float alphaRef[N_MOTORS];		// Motor-acceleratiereferentie [rad/s^2]
 
+///////////////////////////////////////////////////////////////////////////////
+// bool Move_ToSetpoint(float x_mm, float y_mm, float z_mm, float maxTime_s)
+/*
+ * Beweegt de TCP naar een gewenste positie met een rukbegrensd bewegingsprofiel.
+ * Invoer: x_mm, y_mm en z_mm zijn de doelpositie; maxTime_s is de bewegingstijd.
+ * Uitvoer: true wanneer de beweging klaar is, anders false.
+ */
 bool Move_ToSetpoint(float x_mm, float y_mm, float z_mm, float maxTime_s)
 {
-	mI = 0;
-
 	// Validatie van input parameters
 	if (maxTime_s <= 0.0f)
 	{
@@ -299,7 +327,7 @@ bool Move_ToSetpoint(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	}
 
 	// Uitlezen van actuele positie
-	ReadMotorPositions(motorPos_Rad);
+	LeesMotorPositiesRad(motorPos_Rad);
 
 	// Eenmalig nieuw bewegingsprofiel berekenen.
 	if(!setupMotionProfileDone)
@@ -322,7 +350,7 @@ bool Move_ToSetpoint(float x_mm, float y_mm, float z_mm, float maxTime_s)
 		}
 		
 		// Bepalen van totaal incrementeel te verplaatsen motorhoek per motor
-		for (mI = 0; mI < N_MOTORS; mI++)
+		for (uint8_t mI = 0; mI < N_MOTORS; mI++)
 		{
 			// Totaal te verplaatsen motorhoek bepalen.
 			thetaStart[mI] = motorPos_Rad[mI];
@@ -344,7 +372,7 @@ bool Move_ToSetpoint(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	// output voltage voor iedere motor bepalen t.o.v. incrementele referentiebewegingsprofiel
 	tau = g_time - t0;
 	dt = tau - t2;
-	for (mI = 0; mI < N_MOTORS; mI++)
+	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
 	{
 		// eenmalig bepalen
 		k = alphaMax[mI] / maxTime_s;
@@ -417,7 +445,7 @@ bool Move_ToSetpoint(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	}
 	
 	// Daadwerkelijk iedere motor outputvoltage zetten.
-	for (mI = 0; mI < N_MOTORS; mI++)
+	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
 	{
 		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
 	}

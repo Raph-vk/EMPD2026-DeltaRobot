@@ -11,8 +11,8 @@
 
 #include "MachinePins.h" // for N_MOTORS
 
-///////////////////////////////////////////////////////////////////////////
-// Function prototypes
+///////////////////////////////////////////////////////////////////////////////
+// function prototypes
 void SequenceRESET(void);
 bool RunSequence(void);
 
@@ -21,6 +21,5 @@ bool HoldPosition(const float holdArmPos_RAD[N_MOTORS]);
 bool HoldCurrentPosition(float waitTime_s);
 bool GripperAtCurrentPosition(bool grab, float waitTime_s);
 bool Move_ToSetpoint(float x_mm, float y_mm, float z_mm, float maxTime_s);
-
 
 #endif /* MOTIONENGINE_H_ */

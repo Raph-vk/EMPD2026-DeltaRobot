@@ -26,20 +26,20 @@ static float LengteBovenarm = 210.0f;	// bovenarm lengte [mm]
 static float LengteOnderarm = 550.0f; // onderarm [mm]
 static const float Bovenarm_thetaMax = 0.6981317008f; // 40deg * (PI/180)
 static const float Bovenarm_thetaMin = -1.3962634035f; // -80deg * (PI/180)
-static uint8_t motorIndex = 0; // Motor index voor iteraties, 0,1,2 voor M1,M2,M3
 
-//////////////////////////////////////////////////////////////////////////////
-/* bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float jointAnglesRad[3])
- * Inverse kinematica: bereken per motor de benodigde bovenarmhoek
- * voor dezelfde TCP-positie. Door de TCP telkens naar het lokale
- * motorvlak te roteren kan dezelfde 2D-berekening voor M1, M2 en M3
- * gebruikt worden.
- */
 // constantes
 //Mechanische hoeklimieten van de bovenarm.
 
 static const float phi[N_MOTORS] = {0.0f, 2.0943951024f, 4.1887902048f}; // 0deg, 120deg, 240deg in radialen voor rotatiematrix
 
+//////////////////////////////////////////////////////////////////////////////
+// bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOTORS])
+/*
+ * Berekent de inverse kinematica voor de delta robot.
+ * Invoer: tcpPosition_mm bevat de gewenste TCP-positie in millimeters.
+ * Uitvoer: motorRad wordt gevuld met de benodigde motorhoeken in radialen.
+ * Returnwaarde: true als alle motorhoeken geldig zijn, anders false.
+ */
 bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOTORS]) // 
 {
 	//////////////////////////////////////////////////////////////////////////
@@ -52,7 +52,7 @@ bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 	//float tcpPosition_mm[N_MOTORS] = {x, y, z};
 		
 	//Per motor
-	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++){
+	for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++){
 	
 		// Rotatiematrix rond de z-as. Hiermee wordt de globale TCP-positie
 		// omgerekend naar het lokale coordinatenstelsel van motor k.

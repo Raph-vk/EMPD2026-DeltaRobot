@@ -41,7 +41,7 @@
 #define BIT_LAMP_ORANGE		2   // PIN_40
 #define	BIT_LAMP_RED		3   // PIN_41
 #define	BIT_GRIPPER         4   // PIN_42
-//#define   5 // PIN_43
+#define BIT_VOEDING			5	// PIN_43
 //#define   6 // PIN_44
 //#define   7 // PIN_45
 
@@ -58,8 +58,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // motor configuratie DAC en QC
-extern const uint8_t MotorDacChannel[N_MOTORS];
-extern const uint8_t MotorQcChannel[N_MOTORS];
+extern const uint8_t MotorDacChannel[N_MOTORS]; //0,1,2
+extern const uint8_t MotorQcChannel[N_MOTORS]; // 0,1,2
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -69,7 +69,5 @@ extern const uint8_t MotorQcChannel[N_MOTORS];
 #define PCB_SWITCH_START        0 // PIN_A9 
 #define PCB_SWITCH_STOP         1 // PIN_A8
 #define PCB_SWITCH_RESET        2 // PIN_A7
-#define PCB_SWITCH_EMER			3 // PIN_A6
-
 
 #endif /* MACHINEPINS_H_ */

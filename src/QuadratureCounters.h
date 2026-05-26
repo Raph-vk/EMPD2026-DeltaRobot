@@ -3,6 +3,7 @@
  *
  * Created: 23-11-2023 11:56:06
  *  Author: rasmsmee
+ * Aangepast: Raph van Koeveringe
  */ 
 
 
@@ -15,9 +16,11 @@
 
 void QCEncodersSetup(void);
 void QCEncodersShowCount(const char *idString);
-void QCEncodersClearCount(void);
+void EncodersClearCount(void);
+void EncoderClearCount(uint8_t qcChannel);
 
-void ReadMotorPositions(float motorPos_Rad[N_MOTORS]);
-
+void LeesMotorPositiesRad(float motorPos_Rad[N_MOTORS]);
+void LeesArmPositiesRad(float armPos_Rad[N_MOTORS]);
+void LeesArmPositieRad(uint8_t motorIndex, float armPos_Rad[N_MOTORS]);
 
 #endif /* QUADRATURECOUNTERS_H_ */

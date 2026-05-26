@@ -7,13 +7,11 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
-
 #include <asf.h>
 #include <stdint.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
-
 #include "CommandConsole.h"
 #include "vPrintString.h"
 #include "TaskSleep.h"
@@ -22,7 +20,6 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // HAL includes for RTSW board
-
 #include "DeviceIOLib.h"
 #include "ADCLib.h"
 #include "DAC4921Lib.h"
@@ -37,8 +34,7 @@
 #include "StatusLED.h"
 
 ///////////////////////////////////////////////////////////////////////////////
-// Function prototypes
-
+// function prototypes
 static void HartbeatTask(void *pvParameters);
 static void StartHartbeatTask(void);
 
@@ -49,7 +45,6 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName);
 
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
-
 static TaskHandle_t handle_HartbeatTask = NULL;
 
 const uint8_t MotorDacChannel[N_MOTORS] = {0U, 1U, 2U};
@@ -57,7 +52,11 @@ const uint8_t MotorQcChannel[N_MOTORS] = {0U, 1U, 2U};
 
 ///////////////////////////////////////////////////////////////////////////////
 // void StartHartbeatTask(void)
-// Maakt de heartbeat-task aan. Deze task knippert alleen een LED, zodat je ziet dat het systeem leeft.
+/*
+ * Maakt de heartbeat-task aan voor de onboard status-LED.
+ * Invoer: geen.
+ * Uitvoer: geen returnwaarde; bewaart de task-handle als aanmaken lukt.
+ */
 static void StartHartbeatTask(void)
 {
 	BaseType_t result = pdFAIL;
@@ -77,7 +76,11 @@ bij de dergelijke situatie.
 
 ///////////////////////////////////////////////////////////////////////////////
 // void vApplicationIdleHook( void )
-//  Deze wordt automatisch door FreeRTOS aangeroepen wanneer er geen andere task klaarstaat om te draaien.
+/*
+ * FreeRTOS roept deze hook aan wanneer er geen andere task klaarstaat.
+ * Invoer: geen.
+ * Uitvoer: geen returnwaarde; momenteel wordt er niets uitgevoerd.
+ */
 void vApplicationIdleHook( void )
 {
 	//vPrintString("> idle task\n");
@@ -86,14 +89,12 @@ void vApplicationIdleHook( void )
 
 
 ///////////////////////////////////////////////////////////////////////////////
-/* void vApplicationIdleHook( void )
-
-Deze functie wordt alleen aangeroepen als FreeRTOS een stack overflow detecteert. 
-Laat dan snel de status-LED knipperen als foutindicatie.
-
-Stack overflow is een error dat optreed wanneer een programma meer 
-geheugen probeert te gebruiken dan dat er voor aangewezen is.
-*/
+// void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+/*
+ * FreeRTOS roept deze hook aan wanneer een task-stack overflow wordt gedetecteerd.
+ * Invoer: xTask en pcTaskName verwijzen naar de task met de stackfout.
+ * Uitvoer: geen returnwaarde; blijft snel met de status-LED knipperen als foutindicatie.
+ */
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char * pcTaskName)
 {
 	// Ga LED snel knipperen, fout indicatie
@@ -106,7 +107,11 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char * pcTaskName)
 
 ///////////////////////////////////////////////////////////////////////////////
 // void vApplicationMallocFailedHook(void)
-// Deze functie aangeroepen als een geheugentoewijzing mislukt.
+/*
+ * FreeRTOS roept deze hook aan wanneer dynamische geheugentoewijzing mislukt.
+ * Invoer: geen.
+ * Uitvoer: geen returnwaarde; blijft snel met de status-LED knipperen als foutindicatie.
+ */
 void vApplicationMallocFailedHook(void)
 {
 	// Ga LED snel knipperen, fout indicatie
@@ -120,7 +125,11 @@ void vApplicationMallocFailedHook(void)
 
 ///////////////////////////////////////////////////////////////////////////////
 // void HartbeatTask(void *pvParameters)
-// Oneindige taak die met de onboard LED puur een “alive”-indicatie geeft.
+/*
+ * Laat de onboard status-LED periodiek knipperen als alive-indicatie.
+ * Invoer: pvParameters wordt niet gebruikt.
+ * Uitvoer: geen returnwaarde; de taak blijft oneindig draaien.
+ */
 static void HartbeatTask(void *pvParameters)
 {
 	vPrintString("> Hartbeat should be running, flashing onboard LED...\n");
@@ -142,7 +151,12 @@ static void HartbeatTask(void *pvParameters)
 
 ///////////////////////////////////////////////////////////////////////////////
 // int main (void)
-
+/*
+ * Startpunt van de firmware.
+ * Initialiseert klok, board, hardwaredrivers, taken en de FreeRTOS scheduler.
+ * Invoer: geen.
+ * Uitvoer: normaal geen returnwaarde; de scheduler neemt de uitvoering over.
+ */
 int main (void)
 {
 	// Insert system clock initialization code here (sysclk_init()).

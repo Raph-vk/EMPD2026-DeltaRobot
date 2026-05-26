@@ -8,15 +8,15 @@ src\ControlTask.c
 
 src\ASF\common\services\spi\sam_spi\spi_master.c
 
+src\Homing.c
+
 src\InputHandlerTask.c
 
 src\DeltaKinematics.c
 
 src\MotorControl.c
 
-src\IMUTask.c
-
-src\Regelaar.c
+src\Screen.c
 
 src\temp.c
 

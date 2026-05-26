@@ -21,25 +21,29 @@
 #include "bits.h"
 #include "DAC4921Lib.h" //voor setDACoutput
 #include "PortIOLib.h"
+#include "QC7366Lib.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
-#include "MotorControl.h"
+#include "Homing.h"
+#include "MotorControl.h" // <- regelaarINIT
 #include "InputHandlerTask.h"
 #include "MotionEngine.h"
 #include "ApplicationTasks.h"
 #include "MachinePins.h"
 #include "temp.h"
-#include "Regelaar.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
 static SystemState_t state = STATE_INIT;
 
 ///////////////////////////////////////////////////////////////////////////////
-// const char *StateToString(SystemState_t state)
-//
-// Returns a readable name for the current system state.
+// static const char *StateToString(SystemState_t systemState)
+/*
+ * Zet een SystemState_t om naar een leesbare tekst voor debug-uitvoer.
+ * Invoer: systemState is de state die vertaald moet worden.
+ * Uitvoer: pointer naar een constante string met de statenaam.
+ */
 static const char *StateToString(SystemState_t systemState)
 {
 	switch (systemState)
@@ -56,9 +60,11 @@ static const char *StateToString(SystemState_t systemState)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// void ToState(newState)
+// void ToState(SystemState_t newState)
 /*
- * Wisseld correct naar een nieuwe state en communiceert dat.
+ * Schakelt de state machine naar een nieuwe state wanneer deze veranderd is.
+ * Invoer: newState is de gewenste nieuwe systeemstatus.
+ * Uitvoer: geen returnwaarde; de state queue en debug-uitvoer worden bijgewerkt.
 */
 void ToState(SystemState_t newState)
 {
@@ -74,8 +80,9 @@ void ToState(SystemState_t newState)
 ///////////////////////////////////////////////////////////////////////////////
 // bool InNoodsituatie(void)
 /*
- * Returns true if one of the fault inputs is still active.
- * PIN_NOOD is fail-safe active-low: set = OK, not set = Nood.
+ * Leest de directe status van de noodinput.
+ * PIN_NOOD is fail-safe actief-laag: hoog = OK, laag = nood.
+ * Uitvoer: true wanneer BIT_NOOD hoog is, false wanneer de input laag is.
 */
 bool InNoodsituatie(void)
 {
@@ -85,7 +92,9 @@ bool InNoodsituatie(void)
 ///////////////////////////////////////////////////////////////////////////////
 // void ClockInterruptHandler(uint32_t id, uint32_t mask)
 /*
- * wordt bij iedere clock puls geactiveerd (1 ms) door externe hardware clock
+ * Wordt bij iedere externe 1 ms clockpuls aangeroepen.
+ * Invoer: id en mask komen uit de interruptlaag en worden hier niet gebruikt.
+ * Uitvoer: geen returnwaarde; geeft ControlTask een task notification.
 */ 
 static void ClockInterruptHandler(uint32_t id, uint32_t mask)
 {
@@ -98,6 +107,11 @@ static void ClockInterruptHandler(uint32_t id, uint32_t mask)
 
 ///////////////////////////////////////////////////////////////////////////////
 // void NoodInterruptHandler(uint32_t id, uint32_t mask)
+/*
+ * Wordt aangeroepen wanneer de noodinput een vallende flank geeft.
+ * Invoer: id en mask komen uit de interruptlaag en worden hier niet gebruikt.
+ * Uitvoer: geen returnwaarde; geeft de nood-semaphore vrij vanuit de ISR.
+ */
 static void NoodInterruptHandler(uint32_t id, uint32_t mask)
 {
 	// NoodSemaphore vrijgeven bij trigger
@@ -108,13 +122,12 @@ static void NoodInterruptHandler(uint32_t id, uint32_t mask)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/* void ControlTask(void *pvParameters)
- *
- * State machine volgens ontwerp:
- * WAIT -> HOMING -> READY -> RUNNING -> READY
- * Bij fout/noodinput altijd naar FAULT.
- * Vanuit FAULT met reset + geen foutsignaal terug naar WAIT.
- *
+// void ControlTask(void *pvParameters)
+/*
+ * Hoofdtaak voor de systeem-state-machine van de robot.
+ * Verwerkt knoppen, noodsituaties, homing, stilstand en bewegingen.
+ * Invoer: pvParameters wordt niet gebruikt.
+ * Uitvoer: geen returnwaarde; de taak blijft draaien tot het systeem stopt.
 */
 void ControlTask(void *pvParameters)
 {
@@ -147,9 +160,10 @@ void ControlTask(void *pvParameters)
 	
 	//ALLES UITSCHAKELEN.
 	port_SetBit(BIT_GRIPPER, false);
-	for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+	port_SetBit(BIT_VOEDING, false);
+	for (uint8_t qc_channel = 0; qc_channel < QC_MAX_CHANNEL; qc_channel++)
 	{
-		dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
+		dac_SetOutputVoltage(qc_channel, 0.0f);
 	}
 
 	RunningLoopTimer_Init();
@@ -160,7 +174,6 @@ void ControlTask(void *pvParameters)
 	interrupt_Disable(PIN_CLOCK);
 	interrupt_Enable(PIN_CLOCK);
 
-	
 	// PIN_NOOD is fail-safe, pinSet = systemOK, not set = Nood
 	interrupt_AttachHandler(NoodInterruptHandler, PIN_NOOD, PIO_IT_FALL_EDGE);
 	interrupt_Disable(PIN_NOOD);
@@ -177,10 +190,12 @@ void ControlTask(void *pvParameters)
 	// Controleer al in nood is.
 	if( InNoodsituatie() )
 	{
+		vPrintString("> Systeem is al in noodSitautie!\n");
 		ToState(STATE_FAULT);
 	}
 	else
 	{
+		vPrintString("> Systeem prima.\n");
 		ToState(STATE_WAIT);
 	}
 	
@@ -201,6 +216,7 @@ void ControlTask(void *pvParameters)
 		
 		if ( xSemaphoreTake(handle_NoodSemaphore, 0) == pdTRUE || (hasCurrentSample == true && gemetenStroom >= (maxStroom-1.0) ) ) //
 		{
+			vPrintString("> handle_NoodSemaphore VRIJGEGEVEN!\n");
 			if (state != STATE_FAULT)
 			{
 				ToState(STATE_FAULT);
@@ -211,6 +227,7 @@ void ControlTask(void *pvParameters)
 				}
 				else if (gemetenStroom >= maxStroom)
 				{
+					port_SetBit(BIT_VOEDING, true);
 					vPrintString("> NOOD: Gemeten stroom te hoog, %.2f!\n", gemetenStroom);
 				}
 			}
@@ -222,7 +239,7 @@ void ControlTask(void *pvParameters)
 			case  STATE_WAIT:
 			{
 				// Wachten op start-of resetknop
-				if ((buttonBits & EVT_START_BUTTON) || (buttonBits & EVT_RESET_BUTTON))
+				if ((buttonBits & EVT_START_BUTTON)) //|| (buttonBits & EVT_RESET_BUTTON)
 				{
 					// Naar HomingState schakelen.
 					vPrintString("> WAIT -> HOMING ( Start-of Resetknop is ontvangen).\n");
@@ -247,7 +264,7 @@ void ControlTask(void *pvParameters)
 				// 1kHz take
 				ulTaskNotifyTake(pdTRUE, ticksToWait);
 
-				homingAllMotorsDone = homeAllMotors(); //<- MotorControl.c
+				homingAllMotorsDone = homeAllMotors(); //<- Homing.c
 				//homingAllMotorsDone = true;
 				
 				if (homingAllMotorsDone)
@@ -274,8 +291,9 @@ void ControlTask(void *pvParameters)
 					RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check		
 
 					SequenceRESET();
-					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
-					ToState(STATE_RUNNING);
+					//tijdelijk naar homing, normaliter naar; RUNNING
+					vPrintString("> READY -> HOMING (Startknop ontvangen.)\n");
+					ToState(STATE_HOMING);
 				}
 
 				break;
@@ -369,6 +387,7 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			default: // Onbekende Status?
 			{
+				vPrintString("> ONBEKENDE STATUS!!!\n");
 				ToState(STATE_FAULT);
 				break;
 			}

@@ -1,284 +1,290 @@
-ï»¿/*
+/*
  * MotorControl.c
  *
  * Created: 10-04-2026
- *  Author: Raph van Koeveringe
- */ 
+ * Author : Raph van Koeveringe
+ *
+ * Doel van deze module
+ * ---------------------
+ * Deze module bevat alleen motor-gerelateerde basisfuncties:
+ * - motor- en armposities uitlezen;
+ * - motor-DAC-uitgangen aansturen;
+ * - home-switches uitlezen;
+ * - PID-regelspanning berekenen.
+ *
+ * De homing-cyclus zelf staat in Homing.c. Daardoor blijft dit bestand een
+ * overzichtelijke hardware/motor-laag.
+ */
+
 #include "MotorControl.h"
+
 ///////////////////////////////////////////////////////////////////////////////
-// system includes
+// SYSTEM INCLUDES
+///////////////////////////////////////////////////////////////////////////////
 #include <asf.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 ///////////////////////////////////////////////////////////////////////////////
-// FreeRTOS includes
+// PROJECT / HAL INCLUDES
+///////////////////////////////////////////////////////////////////////////////
 #include "vPrintString.h"
 
-///////////////////////////////////////////////////////////////////////////////
-// HAL includes for RTSW board
-#include "LEDLib.h"
 #include "PortIOLib.h"
 #include "DAC4921Lib.h"
-#include "QC7366Lib.h" // LS7366R encoder counter
-#include "Map.h" //For constraint();
+#include "QC7366Lib.h"       // LS7366R quadrature encoder counter
 
-///////////////////////////////////////////////////////////////////////////////
-// application includes
+#include "Map.h"
+
 #include "QuadratureCounters.h"
-#include "ControlTask.h"
-#include "MachinePins.h"
-#include "Regelaar.h"
-#include "MotionEngine.h"
 
 ///////////////////////////////////////////////////////////////////////////////
-static const uint8_t MotorHomeLimitBit[N_MOTORS] = {BIT_M1_HOME, BIT_M2_HOME, BIT_M3_HOME};
-
-
+// PRIVATE CONSTANTEN
 ///////////////////////////////////////////////////////////////////////////////
-// globals
-//static const float degToRad = 0.01745329251994329576923690768489f; //PI / 180.0f; // conversiefactor van graden naar radialen
-//static const float RadToDeg = 57.295779513082320876798154814105f; // 180.0f / PI; // conversiefactor van radialen naar graden
 
-static float motorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
-static uint8_t motorIndex;
 /*
-///////////////////////////////////////////////////////////////////////////////
-// void motor_EnableESCONController(void)
-//
-//enable ESCON controller via output port bit 0
-void motor_EnableESCONController(void)
+ * Homing-switches zijn in deze hardware actief-laag:
+ * port_IsBitSet(...) == false betekent dat de switch actief is.
+ */
+static const uint8_t homeSwitchBit[N_MOTORS] =
 {
-	port_SetBit(ESCON_ENABLE, true);
+    BIT_M1_HOME,
+    BIT_M2_HOME,
+    BIT_M3_HOME
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// publieke functies - motoruitgangen
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+// void ZetMotorSpanning(uint8_t motorIndex, float spanningVolt)
+/*
+ * Stuurt een DAC-spanning naar een enkele motoruitgang.
+ * Invoer: motorIndex kiest de motor, spanningVolt is de gewenste uitgangsspanning.
+ * Uitvoer: geen returnwaarde; schrijft naar de bijbehorende DAC.
+ */
+uint32_t i = 0;
+void ZetMotorSpanning(uint8_t motorIndex, float spanningVolt)
+{
+    if (motorIndex >= N_MOTORS)
+    {
+	    vPrintString("> ERROR: motorindex buiten bereik!\n");
+	    return;
+    }
+	
+	/*
+	if (i > 100)
+	{
+		vPrintString("uDAC van %d is %.2f Volt.\n", motorIndex, spanningVolt);
+		i = 0;
+	}
+	else
+	{
+		i++;
+	}
+	//spanningVolt = constrain(spanningVolt, -2.0f, 2.0f);
+	*/
+    dac_SetOutputVoltage(MotorDacChannel[motorIndex], spanningVolt);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// void motor_DisableESCONController(void)
-//
-// disable ESCON controller via output port bit 0
-
-void motor_DisableESCONController(void)
-{
-	port_SetBit(ESCON_ENABLE, false);
+// void ZetMotorSpanningen(float spanningVolt)
+/*
+ * Stuurt dezelfde DAC-spanning naar alle motoruitgangen.
+ * Invoer: spanningVolt is de gewenste uitgangsspanning voor iedere motor.
+ * Uitvoer: geen returnwaarde; schrijft naar alle motor-DAC-kanalen.
+ */
+void ZetMotorSpanningen(float spanningVolt)
+{	
+    for (uint8_t motor = 0U; motor < N_MOTORS; motor++)
+    {
+        dac_SetOutputVoltage(MotorDacChannel[motor], spanningVolt);
+    }
+	
+	vPrintString("uDAC voor alle motoren is %.2f Volt.\n", spanningVolt);
 }
-*/
-		
+
+///////////////////////////////////////////////////////////////////////////////
+// publieke functies - home-switches
+///////////////////////////////////////////////////////////////////////////////
+
 ///////////////////////////////////////////////////////////////////////////////
 // bool motor_IsHomeLimitActive(uint8_t motorIndex)
-
-bool motor_IsHomeLimitActive(uint8_t index)
+/*
+ * Leest of de home-switch van een motor actief is.
+ * Invoer: motorIndex kiest de motor waarvan de switch gelezen wordt.
+ * Uitvoer: true wanneer de switch actief is of de index ongeldig is, anders false.
+ */
+bool motor_IsHomeLimitActive(uint8_t motorIndex)
 {
-	if (index >= N_MOTORS)
-	{
-		vPrintString(">INDEX MOTOR OUT OF RANGE!!");
-		return true;    // safe default
-	}
-	return !port_IsBitSet(MotorHomeLimitBit[index]);
+    if (motorIndex >= N_MOTORS)
+    {
+        /*
+         * Veilige default:
+         * Bij een ongeldige index doen we alsof de switch actief is.
+         */
+        return true;
+    }
+
+    return !port_IsBitSet(homeSwitchBit[motorIndex]);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Check of er nog een homeswitch actief is. 
+// bool anyHomeSwitchActive(void)
+/*
+ * Controleert of minimaal een home-switch actief is.
+ * Invoer: geen.
+ * Uitvoer: true wanneer een van de motoren de home-switch raakt, anders false.
+ */
 bool anyHomeSwitchActive(void)
-{	
-	for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
-	{
-		if (motor_IsHomeLimitActive(motorIndex))
-		{
-			return true;
-		}
-	}
+{
+    for (uint8_t motor = 0U; motor < N_MOTORS; motor++)
+    {
+        if (motor_IsHomeLimitActive(motor))
+        {
+            return true;
+        }
+    }
 
-	return false;
+    return false;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// REGELAAR FUNCTIES 
+///////////////////////////////////////////////////////////////////////////////
+static const float Tsample = 0.001f;
+
+// Regelaarconstanten
+static const float Kp    = 0.24225f;
+static const float Tau_d = 0.21429;
+static const float Tau_f = 0.0071429;
+static const float Tau_i = 0.71429f;
+
+
+// Regelaarcoëfficiënten uit de Tustinmethode
+static float a0;
+static float a1;
+static float a2;
+
+static float b0;
+static float b1;
+static float b2;
+
+//////////////////////////////////////////////////////////////////////////////
+// struct om historie waarden error en outputvoltage op te slaan.
+typedef struct
+{
+	// Fout-historie (input)
+	float e_1;   // e[n-1]
+	float e_2;   // e[n-2]
+
+	// voltage-historie (output)
+	float u_1;   // u[n-1]
+	float u_2;   // u[n-2]
+
+} MotorIOhistory_t;
+
+static MotorIOhistory_t motorHist[N_MOTORS]; //aanmaken struct
 
 ///////////////////////////////////////////////////////////////////////////////
-// bool homeAllMotors(void)
-//
-// - Motoren die nog niet op home zitten, omhoog aansturen
-// - Zodra limiet van die motor binnenkomt:
-//      * encoder van die motor op nul
-//      * motor in hold zetten
-// - return true als alle 3 klaar zijn
-// VOLTAGE negative is moving UP, positive is moving down
-static const float readyArmAngleRAD = -0.5235988f; //30graden hoek in rad, gewenste armpositie voordat homing benadering begint
-static const float Home_uDac = -1.0f;	// Homing-spanning per motor (omhoog gaande kopper).
-static const float slowHome_uDac = 0.5f;	// Homing-spanning per motor (omhoog gaande kopper).
-static const float Hold_uDac = 2.0f;
-
-static float motorControlOutput = 0.0f;
-static bool HomingStarted = false;
-static bool readyPos[N_MOTORS] = { false, false, false };
-static bool allReady = false;
-static bool motorHomed[N_MOTORS] = { false, false, false };
-static bool allHomed = false;
- 
-bool homeAllMotors(void)
+// void Regelaar_INIT(void)
+/*
+ * Berekent eenmalig de digitale PID-coefficienten en wist de historie.
+ * Invoer: geen.
+ * Uitvoer: geen returnwaarde; interne regelaarvariabelen worden geinitialiseerd.
+ */
+void Regelaar_INIT(void)
 {
-	motorIndex = 0;
-	 
-	// Eerste keer: initialiseren / starten
-	if (HomingStarted == false)
+	//Eenmalig termen bepalen voor overzichtelijkheid
+	const float Ti_term = (2.0f * Tau_i) / Tsample;
+	const float Tf_term = (2.0f * Tau_f) / Tsample;
+	const float Td_term = (2.0f * Tau_d) / Tsample;
+
+
+	a0 = Ti_term * (1.0f + Tf_term); 	// u[n]
+
+	a1 = -2.0f * Ti_term * Tf_term;		// u[n-1]
+
+	a2 = -Ti_term * (1.0f - Tf_term);	// u[n-2]
+
+	b0 = (1.0f + Td_term) * (1.0f + Ti_term);	// e[n]
+
+	b1 = ((1.0f + Td_term) * (1.0f - Ti_term)) + ((1.0f - Td_term) * (1.0f + Ti_term));	// e[n-1]
+
+	b2 = (1.0f - Td_term) * (1.0f - Ti_term); // e[n-2]
+
+	//historie waarden op nul stellen
+	for (uint8_t arm = 0; arm < N_MOTORS; arm++)
 	{
-		vPrintString("> Homing wordt gestart!\n");
-		
-		// DAC-spanning eerst op 0 forceren en alles false zetten
-		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
-		{
-			dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
-			readyPos[motorIndex] = false;
-			motorHomed[motorIndex] = false;
-		}
-		allReady = false;
-		allHomed = false;
-		
-		//Setup QCcounters.
-		HomingStarted = true;
-		QCEncodersSetup();
-		
-		// Voor iedere motor spanning opzetten, als deze nog niet op eindpositie is.
-		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
-		{
-			// Motor hoort niet al op limit te staan bij start:
-			if (motor_IsHomeLimitActive(motorIndex))
-			{
-				//Zet op nul en houdt op positie.
-				dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
-				vPrintString("> Bij starten van Homing is er al een home-switch actief!\n");
-				
-				//fault trigger?
-				ToState(STATE_FAULT);
-				
-				HomingStarted = false;
-				return false;
-			}
-			else
-			{
-				dac_SetOutputVoltage(MotorDacChannel[motorIndex], Home_uDac);
-			}
-		}
+		motorHist[arm].e_1 = 0.0f;
+		motorHist[arm].e_2 = 0.0f;
+
+		motorHist[arm].u_1 = 0.0f;
+		motorHist[arm].u_2 = 0.0f;
 	}
+}//end-function
 
-	///////////////////////////////////////////////
-	// extra Check of systeem in fout staat
-	if (InNoodsituatie())
-	{
-		//Iedere motor spanning afnemen.
-		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
-		{
-			dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
-		}
-		
-		vPrintString("> Er is een fout input actief!!\n");
-		HomingStarted = false;
-		
-		ToState(STATE_FAULT);
-		return false;
-	}
-
-
-	///////////////////////////////////////////////////////////////////////////////
-	// Eerst sensor opzoeken, als deze is op readyPositie zakken.
-	if (!allReady)
-	{
-		allReady = true; // Veilig aannemen
-		ReadMotorPositions(motorPos_Rad);
-		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
-		{
-			// Als motor nog niet op ready Positie is.
-			if (readyPos[motorIndex] == false)
-			{
-				// Als home switch actief is.
-				if (motor_IsHomeLimitActive(motorIndex))
-				{
-					// Motor stil zetten en nullen
-					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
-					qc_ClearCountRegister(MotorQcChannel[motorIndex]);
-
-					vPrintString("Motor: %u is at limit.\n", (unsigned)motorIndex);
-
-					readyPos[motorIndex] = true;
-				}
-				else
-				{
-					// Blijf homing-spanning uitsturen
-					dac_SetOutputVoltage(MotorDacChannel[motorIndex], Home_uDac);
-					allReady = false;
-				}
-			}
-			// Motor op ReadyPositie
-			else
-			{
-				// Op positie behouden met PID
-				float error = motorPos_Rad[motorIndex] - readyArmAngleRAD;
-				motorControlOutput = Hold_uDac + PIDregelaar(motorIndex, error); //motorspanning bepalen met PID-regelaar
-				motorControlOutput = constrain(motorControlOutput, DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // ongeveer +/-10V begrenzen.
-				dac_SetOutputVoltage(MotorDacChannel[motorIndex], motorControlOutput);
-			}
-		}// Eind per Motor For-loop
-
-		//Als alles Ready is, naar Backoff Positie gaan tot die positie bereikt is.
-		if(allReady)
-		{
-			float BackOffPos[N_MOTORS] = {readyArmAngleRAD, readyArmAngleRAD, readyArmAngleRAD};
-			allReady = HoldPosition(BackOffPos);
-		}
-	}// einde AllReady statement
-	///////////////////////////////////////////////////////////////////////////////
-	// Langzaam nulpositie benaderen, en vasthouden als is bereikt.
-	else if (!allHomed && allReady)
-	{
-		allHomed = true; // Veilig aannemen
-
-		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
-		{
-			// Als motor nog niet genult is.
-			if (motorHomed[motorIndex] == false)
-			{
-				// Als home switch actief is.
-				if (motor_IsHomeLimitActive(motorIndex))
-				{
-					vPrintString("Motor: %u is at Home.\n", (unsigned int)motorIndex);
-					
-					// Motor stil zetten en nullen
-					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
-
-					qc_ClearCountRegister(MotorQcChannel[motorIndex]);
-					
-					// Motor in hold zetten
-					dac_SetOutputVoltage(MotorDacChannel[motorIndex], Hold_uDac);
-					motorHomed[motorIndex] = true;
-				}
-				else // Blijf langzaam naar home positie bewegen
-				{
-					dac_SetOutputVoltage(MotorDacChannel[motorIndex], slowHome_uDac);
-					allHomed = false;
-				}
-			}
-		}// Eind forloop
-	}// einde AllHomed statement
-	///////////////////////////////////////////////////////////////////////////////
-	// Zekerheids check of echt alles klaar is
-	else
-	{	
-		//Voor iedere motor
-		for (motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
-		{
-			if (motorHomed[motorIndex] == false)
-			{
-				allHomed = false;
-				break;
-			}
-		}
-	}
+///////////////////////////////////////////////////////////////////////////////
+// void removeRegelaarHistory(void)
+/*
+ * Wist de regelaar historie.
+ * Invoer: arm/motor.
+ * Uitvoer: geen returnwaarde; interne regelaarvariabelen worden geinitialiseerd.
+ */
+void removeRegelaarHistory(uint8_t arm)
+{
+	//fout nullen
+	motorHist[arm].e_1 = 0.0f;
+	motorHist[arm].e_2 = 0.0f;
 	
-	///////////////////////////////////////////////////////////////////////////////
-	// Als alles genult is.
-	if (allHomed)
-	{
-		HomingStarted = false;
-		led_DisplayValue(0x0F);  //Alle ledjes op PCB aan.
-	}
+	//spanningnullen
+	motorHist[arm].u_1 = 0.0f;
+	motorHist[arm].u_2 = 0.0f;
+}//end-function
 
-	return allHomed;
-}//end-fuction
+//////////////////////////////////////////////////////////////////////////////
+// float PIDregelaar(uint8_t motorIndex, float error)
+/*
+ * Berekent de motorspanning met de digitale PID-regelaar.
+ * Invoer: motorIndex kiest de motor, error is de regelfout in motor-radialen.
+ * Uitvoer: gewenste motorspanning in volt.
+ */
+float PIDregelaar(uint8_t motorIndex, float error)
+{
+	 if (motorIndex >= N_MOTORS)
+	 {
+		 vPrintString("> Onbekende motor (Aoutput = 0V)");
+		 return 0.0f;
+	 }
+
+	 MotorIOhistory_t *hist = &motorHist[motorIndex];
+
+	//
+	float u_0 = ( (Kp * (b0 * error + b1 * hist->e_1 + b2 * hist->e_2)) - (a1 * hist->u_1) - (a2 * hist->u_2) ) / a0;
+
+	 // Historie doorschuiven
+	 hist->e_2 = hist->e_1;
+	 hist->e_1 = error;
+
+	 hist->u_2 = hist->u_1;
+	 hist->u_1 = u_0;
+
+	 return u_0;
+}// end-function
+
+
+//////////////////////////////////////////////////////////////////////////////
+// float FeedForward(float alpha)
+/*
+ * Berekent een feedforward-spanning uit de gewenste hoekacceleratie.
+ * Invoer: alpha is de gewenste motorhoekacceleratie.
+ * Uitvoer: feedforward-spanning in volt.
+ */
+float FeedForward(float alpha)
+{
+	const float Je_totaal = 0.000020378; //2.0378e-05// kgm^2, totale traagheidsmoment op de motoras
+	const float KaKt = 0.01016; // Nm/V (Ka [A/V] * Kt [Nm/A])
+	return (Je_totaal * alpha) / KaKt;
+}

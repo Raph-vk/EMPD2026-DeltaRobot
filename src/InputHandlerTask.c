@@ -36,19 +36,23 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////
-/* bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit))
-Helperfunctie die teruggeeft of een van de knoppen is ingedrukt 
-*/
+// static bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit)
+/*
+ * Controleert of een knop actief is via de PCB-switch of externe input.
+ * Invoer: pcbSwitch is de lokale switch, inputBit is de externe inputlijn.
+ * Uitvoer: true wanneer een van beide ingangen actief is, anders false.
+ */
 static bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit)
 {
 	return switch_IsPressed(pcbSwitch) || !port_IsBitSet(inputBit);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/* bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit))
- * 
- * Helperfunctie die debounce verwerkt en teruggeeft of een van de knoppen is ingedrukt en weer losgelaten.
- *  
+// static bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit)
+/*
+ * Verwerkt debounce en wacht tot de knop weer losgelaten is.
+ * Invoer: pcbSwitch is de lokale switch, inputBit is de externe inputlijn.
+ * Uitvoer: true wanneer een geldige knopdruk is afgerond, anders false.
  */
 static bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit)
 {
@@ -78,15 +82,17 @@ static bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit)
 
 
 ///////////////////////////////////////////////////////////////////////////////
-/* static void ProcessPotmeterData(uint32_t potData)
-
-Zorgt voor het uitlezen van de potmeter en het plaatsen van de procentuele stap-waarde in de Queue
-indien deze is veranderd. De waarde wordt afgerond naar dichtstbijzijnde stap van 5%.
-Met garantie op 0 en 100%.
-*/
+// potmeter percentage instellingen
 #define PERCENT_STEP_SIZE       5u
 static uint32_t lastProcent = UINT32_MAX;
 
+///////////////////////////////////////////////////////////////////////////////
+// static void ProcessPotmeterData(uint32_t potData)
+/*
+ * Zet de ADC-waarde van de potmeter om naar een percentage in stappen van 5%.
+ * Invoer: potData is de ruwe ADC-waarde.
+ * Uitvoer: geen returnwaarde; schrijft de nieuwe procentwaarde naar handle_potQueue.
+ */
 static void ProcessPotmeterData(uint32_t potData)
 {
     uint32_t procent;
@@ -115,14 +121,18 @@ static void ProcessPotmeterData(uint32_t potData)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/* static void ProcessCurrentSensorData(uint32_t stroomData)
-Leest een stroomsensor uit die 100mV/A als analoge uitgang geeft.
-De berekende stroom in ampere wordt in de stroom queue geplaatst.
-*/
+// status stroomsensor
 static bool hasCurrentSample = false;
 static uint32_t vorigeStroomData = 0;
 static float zeroCurrentVoltage = 2.5f;        // Better: measure this during startup
 
+///////////////////////////////////////////////////////////////////////////////
+// static void ProcessCurrentSensorData(uint32_t stroomData)
+/*
+ * Zet de ADC-waarde van de stroomsensor om naar een stroomwaarde in ampere.
+ * Invoer: stroomData is de ruwe ADC-waarde van de sensor.
+ * Uitvoer: geen returnwaarde; schrijft de berekende stroom naar handle_stroomQueue.
+ */
 static void ProcessCurrentSensorData(uint32_t stroomData)
 {
 	uint32_t verschil;
@@ -161,19 +171,22 @@ static void ProcessCurrentSensorData(uint32_t stroomData)
 
 
 ///////////////////////////////////////////////////////////////////////////////
-/* void InputHandlerTask(void *pvParameters)
- *
- * Bewaakt de knoppen Start, Stop en Reset en zet eventbits voor de ControlTask.
- *
- */
 uint8_t stroomChannel = 3;
 uint8_t potChannel = 4;
+
+///////////////////////////////////////////////////////////////////////////////
+// void InputHandlerTask(void *pvParameters)
+/*
+ * Bewaakt Start, Stop en Reset en verwerkt periodiek analoge ingangen.
+ * Invoer: pvParameters wordt niet gebruikt.
+ * Uitvoer: geen returnwaarde; zet eventbits en queue-waarden voor andere taken.
+ */
 void InputHandlerTask(void *pvParameters)
 {
 	vPrintString("> starting InputHandlerTask\n");
 
 	adc_EnableChannel(stroomChannel);
-	adc_EnableChannel(potChannel);
+	//adc_EnableChannel(potChannel);
 
 	uint8_t i = 0;
 	
@@ -208,14 +221,14 @@ void InputHandlerTask(void *pvParameters)
 			
 			//Starts conversie van alle kanalen en wacht tot klaar zijn.
 			adc_StartConversion();
-			while ((adc_IsConversionReady(potChannel) == false) ||
-				(adc_IsConversionReady(stroomChannel) == false))
+			while (
+				(adc_IsConversionReady(stroomChannel) == false)) //(adc_IsConversionReady(potChannel) == false) ||
 			{
 				taskSleep(0);
 			}
 
 			ProcessCurrentSensorData( adc_ReadData(stroomChannel));
-			ProcessPotmeterData( adc_ReadData(potChannel));
+			//ProcessPotmeterData( adc_ReadData(potChannel));
 		}
 		else
 		{
