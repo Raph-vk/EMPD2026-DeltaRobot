@@ -86,7 +86,7 @@ void ToState(SystemState_t newState)
 */
 bool InNoodsituatie(void)
 {
-	return port_IsBitSet(BIT_NOOD);
+	return !port_IsBitSet(BIT_NOOD);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -117,7 +117,7 @@ static void NoodInterruptHandler(uint32_t id, uint32_t mask)
 	// NoodSemaphore vrijgeven bij trigger
 	if (handle_NoodSemaphore != NULL)
 	{
-		xSemaphoreGiveFromISR(handle_NoodSemaphore, 0);
+		//xSemaphoreGiveFromISR(handle_NoodSemaphore, 0);
 	}
 }
 
@@ -150,7 +150,7 @@ void ControlTask(void *pvParameters)
 	float gemetenStroom = 0.0f;
 	BaseType_t hasCurrentSample = pdFALSE;
 	
-	float rustPositie[N_MOTORS] = {20.0f,20.0f,20.0f};
+	float rustPositie[N_MOTORS] = {0.0f,0.0f,0.0f};
 	///////////////////////////////////////////////////////////////////////////////
 	vPrintString("> starting ControlTask.\n");
 
@@ -292,8 +292,8 @@ void ControlTask(void *pvParameters)
 
 					SequenceRESET();
 					//tijdelijk naar homing, normaliter naar; RUNNING
-					vPrintString("> READY -> HOMING (Startknop ontvangen.)\n");
-					ToState(STATE_HOMING);
+					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
+					ToState(STATE_RUNNING);
 				}
 
 				break;

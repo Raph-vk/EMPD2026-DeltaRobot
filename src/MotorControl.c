@@ -157,10 +157,10 @@ bool anyHomeSwitchActive(void)
 static const float Tsample = 0.001f;
 
 // Regelaarconstanten
-static const float Kp    = 0.24225f;
-static const float Tau_d = 0.21429;
-static const float Tau_f = 0.0071429;
-static const float Tau_i = 0.71429f;
+static const float Kp    = 1.9775f;
+static const float Tau_d = 0.14832;
+static const float Tau_f = 0.00250;
+static const float Tau_i = 0.25f;
 
 
 // Regelaarcoëfficiënten uit de Tustinmethode

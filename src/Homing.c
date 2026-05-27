@@ -51,13 +51,13 @@
 #define RAD_TO_DEG					(57.2957795131f)
 
 #define HOME_RAD				    (0.0f)
-#define BACKOFF_RAD					(-10.0f * DEG_TO_RAD)
+#define BACKOFF_RAD					(30.0f * DEG_TO_RAD)
 
 //BIJV: 10 deg/s * 0.001 s = 0.01 graden per regelstap (bij 1kHz clock)
-#define GROF_ZOEK_SNELHEID_DEG_S    (10.0f)
+#define GROF_ZOEK_SNELHEID_DEG_S    (20.0f)
 #define GROF_ZOEK_SNELHEID_RAD_S    (GROF_ZOEK_SNELHEID_DEG_S * DEG_TO_RAD)
 
-#define FIJN_ZOEK_SNELHEID_DEG_S    (1.0f)
+#define FIJN_ZOEK_SNELHEID_DEG_S    (5.0f)
 #define FIJN_ZOEK_SNELHEID_RAD_S    (FIJN_ZOEK_SNELHEID_DEG_S * DEG_TO_RAD)
 
 /*
@@ -337,7 +337,7 @@ static void GrofZoeken(void)
 		else
 		{
 			// Met constante snelheid de referentie hoekpositie verhogen
-			RampArmDoelNaar(motor, INFINITY, GROF_ZOEK_SNELHEID_RAD_S);
+			RampArmDoelNaar(motor, -INFINITY, GROF_ZOEK_SNELHEID_RAD_S);
 		}
         
 		//De motorspanning met de fout bepalen en uitsturen.
@@ -445,7 +445,7 @@ static void NauwZoeken(void)
         else
         {
             //Vanaf BACKOFF_RAD langzaam terug richting HOME_RAD bewegen.
-			RampArmDoelNaar(motor, HOME_RAD, FIJN_ZOEK_SNELHEID_RAD_S);
+			RampArmDoelNaar(motor, -INFINITY, FIJN_ZOEK_SNELHEID_RAD_S);
         }
 
 		//Positie regeling aansturen

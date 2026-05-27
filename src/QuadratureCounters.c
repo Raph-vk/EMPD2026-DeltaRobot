@@ -32,7 +32,7 @@
 #define QC_MODE							(4U)
 #define ENCODER_COUNTS_PER_REVOLUTION	(ENCODER_CPT * QC_MODE) //bij QC4
 #define PI								(3.14159f)
-#define countsToRad						(- (2.0f * PI) / (float)ENCODER_COUNTS_PER_REVOLUTION)
+#define countsToRad						(- ((2.0f * PI) / (float)ENCODER_COUNTS_PER_REVOLUTION) )
 
 
 ///////////////////////////////////////////////////////////////////////////////

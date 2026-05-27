@@ -95,7 +95,7 @@ bool RunSequence(void)
 	{
 		case 0:
 		// Move to pick position
-		stepDone = Move_ToSetpoint(0.0f, 0.0f, 300.0f, 5.0f);
+		stepDone = Move_ToSetpoint(0.0f, 0.0f, 300.0f, 1.0f);
 		break;
 
 		case 1:
@@ -105,7 +105,7 @@ bool RunSequence(void)
 
 		case 2:
 		// Move upward
-		stepDone = Move_ToSetpoint(0.0f, 0.0f, 350.0f, 5.0f);
+		stepDone = Move_ToSetpoint(0.0f, 0.0f, 350.0f, 1.0f);
 		break;
 
 		case 3:
@@ -115,12 +115,12 @@ bool RunSequence(void)
 
 		case 4:
 		// Open gripper and wait
-		stepDone = GripperAtCurrentPosition(false, 5.0f);
+		stepDone = GripperAtCurrentPosition(false, 1.0f);
 		break;
 
 		case 5:
 		// Move to next position
-		stepDone = Move_ToSetpoint(50.0f, 50.0f, 400.0f, 1.0f);
+		stepDone = Move_ToSetpoint(0.0f, 0.0f, 400.0f, 1.0f);
 		break;
 
 		case 6:
@@ -154,24 +154,35 @@ static uint32_t analogPrintCounter = 0;
  * Invoer: analogvoltage is de laatst berekende motorspanning in volt.
  * Uitvoer: geen returnwaarde; schrijft alleen naar de debugconsole.
  */
+static float spikeVoltage = 0;
 static void printAnalogVoltage(float analogvoltage)
-{
-	analogPrintCounter++;
+{	
+	// spike voltage
+	if (analogvoltage > spikeVoltage)
+	{
+		spikeVoltage = analogvoltage;
+	}
 
+	// timer
 	if (analogPrintCounter >= 1000)
 	{
 		for (uint8_t i = 0; i < N_MOTORS; i++)
 		{
-			vPrintString("Motor %u voltage is: %.3f V\n",(unsigned int)i, analogvoltage);
+			vPrintString("Motor %u voltage is: %.3f V\n",(unsigned int)i, spikeVoltage);
 		}
 		analogPrintCounter = 0;
+		spikeVoltage = 0;
+	}
+	else
+	{
+		analogPrintCounter++;	
 	}
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////
 static const float largeErrorThreshold		= 0.1f;	// Wanneer fout groter is dan 0.1 motor-rad
-static const float slowApproachVoltage		= 0.75f;	// [V] Gewenste voltage voor langzame verplaatsing
+static const float slowApproachVoltage		= 2.0f;	// [V] Gewenste voltage voor langzame verplaatsing
 static float holdMotorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -197,19 +208,9 @@ bool HoldPosition(const float holdArmPos_RAD[N_MOTORS])
 		// Fout bepalen
 		Fout_motorRad[mI] = holdMotorPos_Rad[mI] - motorPos_Rad[mI];
 
-		//Als de fout extreem is, rustig naar referentie punt toe verplaatsen.
-		if (fabsf(Fout_motorRad[mI]) > largeErrorThreshold)
-		{
-			// Als fout positief is, voltage positief en visa versa.
-			motorControlOutput[mI] = (Fout_motorRad[mI] >= 0.0f) ? slowApproachVoltage : -slowApproachVoltage;
-			nearReference = false;
-		}
-		else
-		{
-			// Voltage berekenen mbv PID_Controller
-			motorControlOutput[mI] = PIDregelaar(mI, Fout_motorRad[mI] );
-		}
-		
+		// Voltage berekenen mbv PID_Controller
+		motorControlOutput[mI] = PIDregelaar(mI, Fout_motorRad[mI] );
+
 		printAnalogVoltage(motorControlOutput[mI]); //TEMP
 
 		// Zorg dat waarde niet groter is dan maximale DAC-waarde, en output.
@@ -436,6 +437,7 @@ bool Move_ToSetpoint(float x_mm, float y_mm, float z_mm, float maxTime_s)
 
 			verplaatsingKlaar = true;
 			setupMotionProfileDone = false;
+			vPrintString("setPointverplaatsing voldaan!\n");
 		}
 
 		// Bepalen van output voltage mbv Fout, PID_Controller + FeedForward
