@@ -25,6 +25,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <math.h> //for fabsf()
 
 ///////////////////////////////////////////////////////////////////////////////
 // PROJECT / HAL INCLUDES
@@ -36,11 +37,15 @@
 #include "QC7366Lib.h"       // LS7366R quadrature encoder counter
 
 #include "Map.h"
-
+#include "ControlTask.h"
 #include "QuadratureCounters.h"
 
 ///////////////////////////////////////////////////////////////////////////////
-// PRIVATE CONSTANTEN
+// CONSTANTEN
+#define DEG_TO_RAD		(0.01745329251994329576923690768489f) //PI / 180.0f; // conversiefactor van graden naar radialen
+#define RAD_TO_DEG		(57.295779513082320876798154814105f) // 180.0f / PI; // conversiefactor van radialen naar graden
+#define maxErrorM		(10.0f * DEG_TO_RAD * i_twk) //
+
 ///////////////////////////////////////////////////////////////////////////////
 
 /*
@@ -259,6 +264,14 @@ float PIDregelaar(uint8_t motorIndex, float error)
 		 return 0.0f;
 	 }
 
+	// bij een extreme positiefout naar error gaan, om optoeren te voorkomen.
+	if ( fabsf(error) > maxErrorM)
+	{
+		vPrintString("> Te grote fout, namelijk: %.2f graden op de arm.\n", ( error * RAD_TO_DEG)/i_twk );
+		ToState(STATE_FAULT);
+		 return 0.0f;		
+	}
+
 	 MotorIOhistory_t *hist = &motorHist[motorIndex];
 
 	//
@@ -273,7 +286,6 @@ float PIDregelaar(uint8_t motorIndex, float error)
 
 	 return u_0;
 }// end-function
-
 
 //////////////////////////////////////////////////////////////////////////////
 // float FeedForward(float alpha)

@@ -166,7 +166,7 @@ void ControlTask(void *pvParameters)
 		dac_SetOutputVoltage(qc_channel, 0.0f);
 	}
 
-	RunningLoopTimer_Init();
+	//RunningLoopTimer_Init();
 	Regelaar_INIT();
 	
 	// Bij opkomend signaal in PIN, run ClockInterruptHandler.
@@ -269,7 +269,7 @@ void ControlTask(void *pvParameters)
 				
 				if (homingAllMotorsDone)
 				{
-					HoldCurrentPosition(0.0f);
+					HoldCurrentPosition(false, 0.0f);
 					
 					vPrintString("> HOMING complete -> READY\n");
 					ToState(STATE_READY);
@@ -288,7 +288,7 @@ void ControlTask(void *pvParameters)
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
 				{
-					RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check		
+					//RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check		
 
 					SequenceRESET();
 					//tijdelijk naar homing, normaliter naar; RUNNING
@@ -327,12 +327,12 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_RUNNING:
 			{
-				RunningLoopTimer_End(); //ONLY for 1kHz loop check
+				//RunningLoopTimer_End(); //ONLY for 1kHz loop check
 				
 				// Sequence draaien op control tick
 				ulTaskNotifyTake(pdTRUE, ticksToWait);
 				
-				RunningLoopTimer_Begin();
+				//RunningLoopTimer_Begin();
 
 				// Uitvoeren van bepaalde stappen.
 				sequenceDone = RunSequence();
@@ -340,14 +340,12 @@ void ControlTask(void *pvParameters)
 				// Stopknop -> terug naar READY
 				if (buttonBits & EVT_STOP_BUTTON)
 				{
-					//HoldCurrentPosition(0);
 					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
 					ToState(STATE_PAUSE);
 				}
 				// Cyclus klaar -> terug naar READY
 				else if (sequenceDone)
 				{
-					//HoldCurrentPosition(0);
 					vPrintString("> RUNNING -> READY (cyclus voldaan).\n");
 					ToState(STATE_READY);
 				}

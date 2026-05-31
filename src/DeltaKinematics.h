@@ -23,6 +23,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes
 bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorAnglesRad[3]);
+bool DeltaKinematics_Forward(const float motorAnglesRad[3], float tcpPosition_mm[3]);
 
 
 #endif /* DELTAKINEMATICS_H_ */

@@ -51,7 +51,7 @@
 #define RAD_TO_DEG					(57.2957795131f)
 
 #define HOME_RAD				    (0.0f)
-#define BACKOFF_RAD					(30.0f * DEG_TO_RAD)
+#define BACKOFF_RAD					(15.0f * DEG_TO_RAD)
 
 //BIJV: 10 deg/s * 0.001 s = 0.01 graden per regelstap (bij 1kHz clock)
 #define GROF_ZOEK_SNELHEID_DEG_S    (20.0f)
@@ -77,8 +77,7 @@ typedef enum
 	HOMING_GROF_ZOEKEN,
 	HOMING_NAAR_BACKOFF,
 	HOMING_NAUW_ZOEKEN,
-	HOMING_KLAAR,
-	HOMING_FOUT
+	HOMING_KLAAR
 } HomingStatus;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -107,6 +106,7 @@ static bool fijnGevonden[N_MOTORS] = { false, false, false };
 
 
 static uint32_t stabilisatieTeller = 0U;
+
 static float uDac = 0.0f;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -233,7 +233,7 @@ static bool RampArmDoelNaar(uint8_t motor, float doelRad, float snelheidRadS)
  * Invoer: doelArmRad en gemetenArmRad zijn armhoeken in radialen.
  * Uitvoer: fout in motor-radialen, inclusief overbrengingsverhouding.
  */
-static uint32_t i=0;
+//static uint32_t i=0;
 static float bepaalFoutOpMotor(float doelArmRad, float gemetenArmRad)
 {
     /*
@@ -243,16 +243,18 @@ static float bepaalFoutOpMotor(float doelArmRad, float gemetenArmRad)
      */
 	float errorM = (doelArmRad - gemetenArmRad) * i_twk;
 	
+	/*
 	if (i > 100)
 	{
-		vPrintString("Fout op de arm: %.3f deg.\n", ( (errorM * RAD_TO_DEG) * 47));
+		vPrintString("Fout op de arm: %.3f deg, en op de motor: %.3f deg.\n", ( (errorM * RAD_TO_DEG) / i_twk), (errorM * RAD_TO_DEG) );
 		i = 0;
 	}
 	else
 	{
 		i++;
 	}
-		
+	*/
+	
     return errorM;
 }
 
@@ -278,10 +280,11 @@ static void Initialiseren(void)
 	    grofGevonden[motor] = false;
 	    armOpBackoffPos[motor] = false;
 	    fijnGevonden[motor] = false;
-		
 	    armDoelRad[motor] = HOME_RAD;
     }
-
+	
+	//niet essentieël, wel prettig.
+	uDac = 0.0f;
     //Initialiseer encoder teller
     QCEncodersSetup();
 
