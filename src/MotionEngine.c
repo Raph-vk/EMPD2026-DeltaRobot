@@ -33,8 +33,8 @@
 // const globals
 #define Ts							(0.001f)      // sample time, must match external clock
 #define N_TCP_AXES		(3U)
-//#define DEG_TO_RAD					(0.01745329251994329576923690768489f) //PI / 180.0f; // conversiefactor van graden naar radialen
-//#define const float RAD_TO_DEG		(57.295779513082320876798154814105f) // 180.0f / PI; // conversiefactor van radialen naar graden
+#define DEG_TO_RAD					(0.01745329251994329576923690768489f) //PI / 180.0f; // conversiefactor van graden naar radialen
+#define RAD_TO_DEG		(57.295779513082320876798154814105f) // 180.0f / PI; // conversiefactor van radialen naar graden
 
 ///////////////////////////////////////////////////////////////////////////////
 // globals vars
@@ -131,22 +131,22 @@ bool RunSequence(void)
 
 		case 1:
 		// Close gripper and wait
-		stepDone = MoveJ_XYZt(-75.0f, 75.0f, -490.0f, 1.0f);
+		stepDone = MoveL_XYZt(-75.0f, 75.0f, -490.0f, 1.0f);
 		break;
 
 		case 2:
 		// Move upward
-		stepDone = MoveJ_XYZt(-75.0f, -75.0f, -490.0f, 1.0f);
+		stepDone = MoveL_XYZt(-75.0f, -75.0f, -490.0f, 2.0f);
 		break;
 
 		case 3:
 		// Hold position shortly
-		stepDone = MoveJ_XYZt(75.0f, -75.0f, -490.0f, 1.0f);
+		stepDone = MoveL_XYZt(75.0f, -75.0f, -490.0f, 2.0f);
 		break;
 
 		case 4:
 		// Hold position shortly
-		stepDone = MoveJ_XYZt(75.0f, 75.0f, -490.0f, 1.0f);
+		stepDone = MoveL_XYZt(75.0f, 75.0f, -490.0f, 2.0f);
 		break;
 
 		case 5:
@@ -156,10 +156,15 @@ bool RunSequence(void)
 
 		case 6:
 		// Move to next position
-		stepDone = MoveJ_ArmRAD123t(0.0f, 0.0f, 0.0f, 5.0f);
+		stepDone = MoveJ_ArmDEG123t( 0.0f , -90.0f, -45.0f, 10.0f);
+		break;
+		
+		case 7:
+		// Move to next position
+		stepDone = MoveJ_ArmDEG123t(0.0f, 0.0f, 0.0f, 10.0f);
 		break;
 
-		case 7:
+		case 8:
 		// Sequence finished
 		currentStep = 0;
 		return true;
@@ -211,6 +216,12 @@ bool HoldPosition(const float holdArmPos_RAD[N_MOTORS])
 
 		// Zorg dat waarde niet groter is dan maximale DAC-waarde, en output.
 		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // min/max ongeveer +/-10V.
+		//dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
+	}
+	
+	//Iedere motor tegelijk bijregelen.
+	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+	{
 		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
 	}
 
@@ -419,7 +430,7 @@ bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 
 	if(verplaatsingKlaar)
 	{
-		vPrintString("setPointverplaatsing voldaan!\n");
+		vPrintString("MoveJ_XYZt voldaan!\n");
 	}
 
 	// Return true als beweging klaar is, anders false.
@@ -428,13 +439,13 @@ bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 }//END-function
 
 ///////////////////////////////////////////////////////////////////////////////
-// bool MoveJ_ArmRAD123t(const float armRadians[N_MOTORS], float maxTime_s)
+// bool MoveJ_ArmDEG123t(const float armRadians[N_MOTORS], float maxTime_s)
 /*
  * Beweegt de armen naar een gewenste hoekpositie met een rukbegrensd bewegingsprofiel.
  * Invoer: armRadians bevat de gewenste armhoeken in radialen; maxTime_s is de bewegingstijd.
  * Uitvoer: true wanneer de beweging klaar is, anders false.
  */
-bool MoveJ_ArmRAD123t(float M1RAD, float M2RAD, float M3RAD, float maxTime_s)
+bool MoveJ_ArmDEG123t(float M1DEG, float M2DEG, float M3DEG, float maxTime_s)
 {
 	// Validatie van input parameters
 	if (maxTime_s <= 0.0f)
@@ -452,9 +463,9 @@ bool MoveJ_ArmRAD123t(float M1RAD, float M2RAD, float M3RAD, float maxTime_s)
 
 		// Doelpositie direct overnemen in motor-radialen.
 		// Geen inverse kinematica meer.
-		motorTargetRad[0] = M1RAD;
-		motorTargetRad[1] = M2RAD;
-		motorTargetRad[2] = M3RAD;
+		motorTargetRad[0] = -M1DEG * DEG_TO_RAD * i_twk;
+		motorTargetRad[1] = -M2DEG * DEG_TO_RAD * i_twk;
+		motorTargetRad[2] = -M3DEG * DEG_TO_RAD * i_twk;
 		
 		// Bepalen van totaal incrementeel te verplaatsen motorhoek per motor
 		for (uint8_t mI = 0; mI < N_MOTORS; mI++)
@@ -563,7 +574,7 @@ bool MoveJ_ArmRAD123t(float M1RAD, float M2RAD, float M3RAD, float maxTime_s)
 
 	if(verplaatsingKlaar)
 	{
-		vPrintString("setPointverplaatsing voldaan!\n");
+		vPrintString("MoveJ_ArmDEG123t voldaan!\n");
 	}
 
 	// Return true als beweging klaar is, anders false.
@@ -790,7 +801,18 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 
 	if(verplaatsingKlaar)
 	{
-		vPrintString("MoveL verplaatsing voldaan!\n");
+		float tcpActual_mm[3];
+
+		if (DeltaKinematics_Forward(motorPos_Rad, tcpActual_mm))
+		{
+			float ex = tcpActual_mm[0] - tcpTarget_mm[0];
+			float ey = tcpActual_mm[1] - tcpTarget_mm[1];
+			float ez = tcpActual_mm[2] - tcpTarget_mm[2];
+			float eAbs = sqrtf(ex*ex + ey*ey + ez*ez);
+
+			vPrintString("MoveL done. ERROR is: X=%.2f Y=%.2f Z=%.2f mm, abs = %.2f mm\n",
+			ex, ey, ez, eAbs);
+		}
 	}
 
 	// Return true als beweging klaar is, anders false.

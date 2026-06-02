@@ -21,6 +21,6 @@ bool HoldPosition(const float holdArmPos_RAD[N_MOTORS]);
 bool HoldCurrentPosition(bool grab, float waitTime_s);
 bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s);
 bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s);
-bool MoveJ_ArmRAD123t(float M1RAD, float M2RAD, float M3RAD, float maxTime_s);
+bool MoveJ_ArmDEG123t(float M1RAD, float M2RAD, float M3RAD, float maxTime_s);
 
 #endif /* MOTIONENGINE_H_ */

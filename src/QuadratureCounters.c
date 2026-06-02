@@ -99,6 +99,9 @@ void EncodersClearCount(void)
 		qc_ClearCountRegister(MotorQcChannel[qcChannel]);
 		removeRegelaarHistory(qcChannel);
 		vPrintString("> Encoder count op nul gezet van motor: %d!\n", qcChannel);
+
+		int32_t raw = qc_ReadCountRegister(MotorQcChannel[qcChannel]);
+		vPrintString("motor %u raw count = %ld\n", qcChannel, (long)raw);
 	}
 }
 
@@ -123,6 +126,9 @@ void EncoderClearCount(uint8_t qcChannel)
     qc_ClearCountRegister(MotorQcChannel[qcChannel]);
 	removeRegelaarHistory(qcChannel);
 	vPrintString("> Encoder count op nul gezet van motor: %d!\n", qcChannel);
+	
+	int32_t raw = qc_ReadCountRegister(MotorQcChannel[qcChannel]);
+	vPrintString("motor %u raw count = %ld\n", qcChannel, (long)raw);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -152,6 +158,9 @@ void LeesArmPositiesRad(float armPos_Rad[N_MOTORS])
 	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
 	{
 		armPos_Rad[mI] = (qc_ReadCountRegister(MotorQcChannel[mI]) * countsToRad) / i_twk;
+		
+		int32_t raw = qc_ReadCountRegister(MotorQcChannel[mI]);
+		//vPrintString("motor %u raw count = %ld\n", mI, (long)raw);
 	}
 }
 
@@ -170,6 +179,9 @@ void LeesArmPositieRad(uint8_t motorIndex, float armPos_Rad[N_MOTORS])
 		vPrintString("> ERROR: motorindex buiten bereik!\n");
 		return;
 	}
+	
+	int32_t raw = qc_ReadCountRegister(MotorQcChannel[motorIndex]);
+	//vPrintString("motor %u raw count = %ld\n", motorIndex, (long)raw);
 	
 	//Bereken Count naar arm-radialen
 	armPos_Rad[motorIndex] = ((float)qc_ReadCountRegister(MotorQcChannel[motorIndex]) * countsToRad) / i_twk;

@@ -202,7 +202,6 @@ void VisualisationTask(void *pvParameters)
 		{
 			// Loop teller voor blink, praktisch; 7, 8, 9, 0, 1, 2 ....
 			i++;
-			taskSleep(100);
 		}
 		else
 		{
@@ -243,7 +242,8 @@ void VisualisationTask(void *pvParameters)
 				(void)Screen_Recover();
 				updateDisplay = true;
 			}
-		}
+		}//end-screen if-statement
+		taskSleep(100);
 	}
 	/* Should never get here */
 }

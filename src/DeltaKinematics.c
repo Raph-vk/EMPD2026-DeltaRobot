@@ -34,7 +34,6 @@ static const float Bovenarm_thetaMin = -80.0 * DEG_TO_RAD; // onderste limiet
 
 // constantes
 //Mechanische hoeklimieten van de bovenarm.
-
 static const float phi[N_MOTORS] = {0.0f, (120.0f * DEG_TO_RAD), (240.0f * DEG_TO_RAD)}; // 0deg, 120deg, 240deg in radialen voor rotatiematrix
 
 //////////////////////////////////////////////////////////////////////////////

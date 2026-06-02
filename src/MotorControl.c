@@ -44,7 +44,7 @@
 // CONSTANTEN
 #define DEG_TO_RAD		(0.01745329251994329576923690768489f) //PI / 180.0f; // conversiefactor van graden naar radialen
 #define RAD_TO_DEG		(57.295779513082320876798154814105f) // 180.0f / PI; // conversiefactor van radialen naar graden
-#define maxErrorM		(10.0f * DEG_TO_RAD * i_twk) //
+#define maxErrorM		(45.0f * DEG_TO_RAD * i_twk) //
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -167,7 +167,6 @@ static const float Tau_d = 0.14832;
 static const float Tau_f = 0.00250;
 static const float Tau_i = 0.25f;
 
-
 // Regelaarcoëfficiënten uit de Tustinmethode
 static float a0;
 static float a1;
@@ -271,7 +270,7 @@ float PIDregelaar(uint8_t motorIndex, float error)
 		ToState(STATE_FAULT);
 		 return 0.0f;		
 	}
-
+	
 	 MotorIOhistory_t *hist = &motorHist[motorIndex];
 
 	//

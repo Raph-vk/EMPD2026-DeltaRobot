@@ -23,5 +23,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes
 bool homeAllMotors(void);
+void resetHoming(void);
 
 #endif /* HOMING_H_ */

@@ -81,12 +81,11 @@ void ToState(SystemState_t newState)
 // bool InNoodsituatie(void)
 /*
  * Leest de directe status van de noodinput.
- * PIN_NOOD is fail-safe actief-laag: hoog = OK, laag = nood.
- * Uitvoer: true wanneer BIT_NOOD hoog is, false wanneer de input laag is.
+ * PIN_NOOD is fail-safe: set = OK, notSet = nood.
 */
 bool InNoodsituatie(void)
 {
-	return !port_IsBitSet(BIT_NOOD);
+	return port_IsBitSet(BIT_NOOD);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -117,7 +116,7 @@ static void NoodInterruptHandler(uint32_t id, uint32_t mask)
 	// NoodSemaphore vrijgeven bij trigger
 	if (handle_NoodSemaphore != NULL)
 	{
-		//xSemaphoreGiveFromISR(handle_NoodSemaphore, 0);
+		xSemaphoreGiveFromISR(handle_NoodSemaphore, 0);
 	}
 }
 
@@ -303,8 +302,7 @@ void ControlTask(void *pvParameters)
 			{
 				// Op vaste positie regelen op iedere control tick
 				ulTaskNotifyTake(pdTRUE, ticksToWait);
-				
-				HoldPosition(rustPositie); //Change to current/last position
+				HoldCurrentPosition(false, 0.0f); //Change to current/last position
 
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
@@ -366,8 +364,13 @@ void ControlTask(void *pvParameters)
 				// Alleen uit fault als reset is gedrukt EN foutsignaal weg is
 				if (buttonBits & EVT_RESET_BUTTON)
 				{
+					//debounce signal.
+					taskSleep(50);
+					
 					if (!InNoodsituatie())
 					{
+					    resetHoming();
+						homingAllMotorsDone = false;
 						vPrintString("> FAULT cleared -> WAIT (reset ontvangen, signaal ook actief)\n");
 						ToState(STATE_WAIT);
 					}

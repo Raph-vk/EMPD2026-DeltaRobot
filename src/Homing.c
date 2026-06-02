@@ -263,6 +263,31 @@ static float bepaalFoutOpMotor(float doelArmRad, float gemetenArmRad)
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
+// void resetHoming(void)
+/*
+ *
+ *
+*/
+void resetHoming(void)
+{
+	homingStatus = HOMING_IDLE;
+	stabilisatieTeller = 0U;
+	uDac = 0.0f;
+
+	for (uint8_t motor = 0U; motor < N_MOTORS; motor++)
+	{
+		armDoelRad[motor] = 0.0f;
+		armPositieRad[motor] = 0.0f;
+
+		grofGevonden[motor] = false;
+		armOpBackoffPos[motor] = false;
+		fijnGevonden[motor] = false;
+
+		removeRegelaarHistory(motor);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // static void Initialiseren(void)
 /*
  * Zet de homing-status, doelposities en encodertellers klaar voor een nieuwe cyclus.
@@ -280,7 +305,7 @@ static void Initialiseren(void)
 	    grofGevonden[motor] = false;
 	    armOpBackoffPos[motor] = false;
 	    fijnGevonden[motor] = false;
-	    armDoelRad[motor] = HOME_RAD;
+	    armDoelRad[motor] = 0.0f;
     }
 	
 	//niet essentieël, wel prettig.
@@ -332,7 +357,7 @@ static void GrofZoeken(void)
 
             grofGevonden[motor] = true;
             armDoelRad[motor] = HOME_RAD;
-
+			armPositieRad[motor] = HOME_RAD;   // important
             vPrintString("> Motor %u: grove homing gevonden, encoder genuld.\n",
                          (unsigned int)motor);
         }
@@ -437,6 +462,7 @@ static void NauwZoeken(void)
 
             fijnGevonden[motor] = true;
             armDoelRad[motor] = HOME_RAD;
+			armPositieRad[motor] = HOME_RAD;
 
             vPrintString("> Motor %u: nauwkeurige homing gevonden, encoder definitief genuld.\n",
                          (unsigned int)motor);
