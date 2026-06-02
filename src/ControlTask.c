@@ -85,7 +85,7 @@ void ToState(SystemState_t newState)
 */
 bool InNoodsituatie(void)
 {
-	return port_IsBitSet(BIT_NOOD);
+	return !port_IsBitSet(BIT_NOOD);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
