@@ -54,7 +54,7 @@
 #define BACKOFF_RAD					(15.0f * DEG_TO_RAD)
 
 //BIJV: 10 deg/s * 0.001 s = 0.01 graden per regelstap (bij 1kHz clock)
-#define GROF_ZOEK_SNELHEID_DEG_S    (20.0f)
+#define GROF_ZOEK_SNELHEID_DEG_S    (30.0f)
 #define GROF_ZOEK_SNELHEID_RAD_S    (GROF_ZOEK_SNELHEID_DEG_S * DEG_TO_RAD)
 
 #define FIJN_ZOEK_SNELHEID_DEG_S    (5.0f)
@@ -195,7 +195,6 @@ static bool AlleFlagsWaar(const bool flags[N_MOTORS])
     return true;
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////
 // static bool RampArmDoelNaar(uint8_t motor, float doelRad, float snelheidRadS)
 /*
@@ -241,21 +240,7 @@ static float bepaalFoutOpMotor(float doelArmRad, float gemetenArmRad)
      * Homing bewaart armDoelRad en armPositieRad in arm-radialen.
      * PIDregelaar() krijgt dezelfde eenheid als MotionEngine.c: motor-radialen.
      */
-	float errorM = (doelArmRad - gemetenArmRad) * i_twk;
-	
-	/*
-	if (i > 100)
-	{
-		vPrintString("Fout op de arm: %.3f deg, en op de motor: %.3f deg.\n", ( (errorM * RAD_TO_DEG) / i_twk), (errorM * RAD_TO_DEG) );
-		i = 0;
-	}
-	else
-	{
-		i++;
-	}
-	*/
-	
-    return errorM;
+    return (doelArmRad - gemetenArmRad) * i_twk;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

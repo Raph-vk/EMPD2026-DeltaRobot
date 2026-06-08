@@ -14,6 +14,10 @@ src\InputHandlerTask.c
 
 src\DeltaKinematics.c
 
+src\MotionPlanning.c
+
+src\MotionProfiles.c
+
 src\MotorControl.c
 
 src\Screen.c

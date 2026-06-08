@@ -8,6 +8,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 #include <asf.h>
+#include <math.h> //for INFINITY
 
 ///////////////////////////////////////////////////////////////////////////////
 // FreeRTOS includes
@@ -29,9 +30,12 @@
 #include "MotorControl.h" // <- regelaarINIT
 #include "InputHandlerTask.h"
 #include "MotionEngine.h"
+#include "MotionPlanning.h"
 #include "ApplicationTasks.h"
 #include "MachinePins.h"
 #include "temp.h"
+#include "MotionPlanning.h"
+#include "QuadratureCounters.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
@@ -85,7 +89,7 @@ void ToState(SystemState_t newState)
 */
 bool InNoodsituatie(void)
 {
-	return !port_IsBitSet(BIT_NOOD);
+	return !port_IsBitSet(BIT_NOOD); //!
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -94,7 +98,7 @@ bool InNoodsituatie(void)
  * Wordt bij iedere externe 1 ms clockpuls aangeroepen.
  * Invoer: id en mask komen uit de interruptlaag en worden hier niet gebruikt.
  * Uitvoer: geen returnwaarde; geeft ControlTask een task notification.
-*/ 
+*/
 static void ClockInterruptHandler(uint32_t id, uint32_t mask)
 {
 	// Als ControlTask bestaat, geef een task notification.
@@ -139,27 +143,32 @@ void ControlTask(void *pvParameters)
 	//EventBits_t threadBits = 0;
 	const BaseType_t stayAllbits  = pdFALSE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
 	const BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
-	
-	const TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
-	// const float RustPostitie[N_MOTORS] = {20.0f,20.0f,20.0f};
-	
-	bool homingAllMotorsDone = false;
-	bool sequenceDone  = false;
 
+	const TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
+
+
+	bool homingAllMotorsDone = false;
+
+	//const float rustPositie[N_MOTORS] = {0.0f,0.0f,0.0f};
+	//float pauseTargetPos[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+	//bool pauseSetupDone = false;
+	bool sequenceDone  = false;
+	bool TakenNood = false;
+	uint8_t noodCount = 0;
+	
 	float gemetenStroom = 0.0f;
 	BaseType_t hasCurrentSample = pdFALSE;
-	
-	float rustPositie[N_MOTORS] = {0.0f,0.0f,0.0f};
+
 	///////////////////////////////////////////////////////////////////////////////
 	vPrintString("> starting ControlTask.\n");
 
 	ToState(STATE_INIT);
 	///////////////////////////////////////////////////////////////////////////////
 	//opstart instellingen
-	
+
 	//ALLES UITSCHAKELEN.
 	port_SetBit(BIT_GRIPPER, false);
-	port_SetBit(BIT_VOEDING, false);
+	port_SetBit(BIT_DISABLE_MOTORS, true);
 	for (uint8_t qc_channel = 0; qc_channel < QC_MAX_CHANNEL; qc_channel++)
 	{
 		dac_SetOutputVoltage(qc_channel, 0.0f);
@@ -167,7 +176,8 @@ void ControlTask(void *pvParameters)
 
 	//RunningLoopTimer_Init();
 	Regelaar_INIT();
-	
+	BuildSequence();
+
 	// Bij opkomend signaal in PIN, run ClockInterruptHandler.
 	interrupt_AttachHandler(ClockInterruptHandler, PIN_CLOCK, PIO_IT_RISE_EDGE);
 	interrupt_Disable(PIN_CLOCK);
@@ -182,10 +192,10 @@ void ControlTask(void *pvParameters)
 	// wait for all tasks to get up and running:
 	vPrintString("> ControlTask wachtende op helper taken...\n");
 	xEventGroupWaitBits(handle_ThreadEventGroup, BIT_0 | BIT_1, stayAllbits, waitForAllbits, ticksToWait);
-	
+
 	// Helper taken zijn ready
 	vPrintString("> helper taken draaien, ControlTask wordt nu ook gestart.\n");
-	
+
 	// Controleer al in nood is.
 	if( InNoodsituatie() )
 	{
@@ -197,11 +207,14 @@ void ControlTask(void *pvParameters)
 		vPrintString("> Systeem prima.\n");
 		ToState(STATE_WAIT);
 	}
-	
+
 	///////////////////////////////////////////////////////////////////////////
 	// oneindige loop
 	while (true)
 	{
+		//1kHz externe clockTake
+		ulTaskNotifyTake(pdTRUE, ticksToWait);
+		
 		// Lees uit of er een knop ingedrukt is.
 		buttonBits = xEventGroupWaitBits(handle_ButtonEventGroup,
 			EVT_START_BUTTON | EVT_STOP_BUTTON | EVT_RESET_BUTTON,
@@ -210,26 +223,40 @@ void ControlTask(void *pvParameters)
 			0				// niet blokkeren
 		);
 
-		// Nood check via Semaphore, of als fout actief is, of als stroom te hoog oploopt.
-		hasCurrentSample = xQueuePeek(handle_stroomQueue, &gemetenStroom, 0);
-		
-		if ( xSemaphoreTake(handle_NoodSemaphore, 0) == pdTRUE || (hasCurrentSample == true && gemetenStroom >= (maxStroom-1.0) ) ) //
+		// Controleren of Semaphore vrij gegeven is!
+		if ( xSemaphoreTake(handle_NoodSemaphore, 0) == pdTRUE)
 		{
 			vPrintString("> handle_NoodSemaphore VRIJGEGEVEN!\n");
-			if (state != STATE_FAULT)
-			{
-				ToState(STATE_FAULT);
+			TakenNood = true;
+			noodCount = 0;
+		}
+		//Debounce delay
+		else if (TakenNood && InNoodsituatie() )
+		{
+			noodCount++;
+			vPrintString("> noodCount + 1!\n");
 
-				if(InNoodsituatie())
-				{
-					vPrintString("> Noodinput actief!\n");
-				}
-				else if (gemetenStroom >= maxStroom)
-				{
-					port_SetBit(BIT_VOEDING, true);
-					vPrintString("> NOOD: Gemeten stroom te hoog, %.2f!\n", gemetenStroom);
-				}
+			if (noodCount > 2)
+			{
+				vPrintString("> Systeem in fout gezet na noodSemaphore.\n");
+				ToState(STATE_FAULT);
+				noodCount = 0;
+				TakenNood = false;
 			}
+		}
+		else if ( TakenNood && !InNoodsituatie())
+		{
+			vPrintString("> Systeem niet meer in noodSituatie na Semaphore.\n");
+			TakenNood = false;
+			noodCount = 0;
+		}
+
+		//als fout actief is, of als stroom te hoog oploopt.
+		hasCurrentSample = xQueuePeek(handle_stroomQueue, &gemetenStroom, 0);
+		if ( (hasCurrentSample == true && gemetenStroom >= (maxStroom-1.0) ) )
+		{
+			vPrintString("> NOOD: Gemeten stroom te hoog, %.2f!\n", gemetenStroom);
+			ToState(STATE_FAULT);
 		}
 
 		switch (state)
@@ -253,23 +280,17 @@ void ControlTask(void *pvParameters)
 					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
 				}
 
-				taskSleep(10);
+				//taskSleep(10);
 				break;
 			}
 
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_HOMING:
 			{
-				// 1kHz take
-				ulTaskNotifyTake(pdTRUE, ticksToWait);
-
 				homingAllMotorsDone = homeAllMotors(); //<- Homing.c
-				//homingAllMotorsDone = true;
-				
+
 				if (homingAllMotorsDone)
 				{
-					HoldCurrentPosition(false, 0.0f);
-					
 					vPrintString("> HOMING complete -> READY\n");
 					ToState(STATE_READY);
 				}
@@ -280,14 +301,13 @@ void ControlTask(void *pvParameters)
 			case  STATE_READY:
 			{
 				// Op vaste positie regelen op iedere control tick
-				ulTaskNotifyTake(pdTRUE, ticksToWait);
 				
-				HoldPosition(rustPositie);
+				HoldCurrentPosition(false, INFINITY);
 
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
 				{
-					//RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check		
+					//RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check
 
 					SequenceRESET();
 					//tijdelijk naar homing, normaliter naar; RUNNING
@@ -301,8 +321,21 @@ void ControlTask(void *pvParameters)
 			case  STATE_PAUSE:
 			{
 				// Op vaste positie regelen op iedere control tick
-				ulTaskNotifyTake(pdTRUE, ticksToWait);
-				HoldCurrentPosition(false, 0.0f); //Change to current/last position
+				HoldCurrentPosition(false, INFINITY);
+
+				/*
+				//capture currect position
+				if (!pauseSetupDone)
+				{
+					LeesArmPositiesRad(pauseTargetPos);
+					for (uint8_t m = 0; m < N_MOTORS; m++)
+					{
+						removeRegelaarHistory(m);
+					}
+					pauseSetupDone = true;
+				}
+				HoldPosition(pauseTargetPos);
+				*/
 
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
@@ -310,12 +343,14 @@ void ControlTask(void *pvParameters)
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
 					ToState(STATE_RUNNING);
 					RunningLoopTimer_ResetWindow();
+					//pauseSetupDone = false;
 				}
 				// Resetknop -> READY
 				if (buttonBits & EVT_RESET_BUTTON)
 				{
 					vPrintString("> RESET -> READY (Startknop ontvangen.)\n");
 					ToState(STATE_READY);
+					//pauseSetupDone = false;
 				}
 
 				break;
@@ -326,10 +361,10 @@ void ControlTask(void *pvParameters)
 			case  STATE_RUNNING:
 			{
 				//RunningLoopTimer_End(); //ONLY for 1kHz loop check
-				
+
 				// Sequence draaien op control tick
-				ulTaskNotifyTake(pdTRUE, ticksToWait);
 				
+
 				//RunningLoopTimer_Begin();
 
 				// Uitvoeren van bepaalde stappen.
@@ -355,6 +390,7 @@ void ControlTask(void *pvParameters)
 			{
 				//Iedere motor geen kracht forceren.
 				port_SetBit(BIT_GRIPPER, false);
+				port_SetBit(BIT_DISABLE_MOTORS, true);
 				for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 				{
 					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
@@ -364,9 +400,8 @@ void ControlTask(void *pvParameters)
 				// Alleen uit fault als reset is gedrukt EN foutsignaal weg is
 				if (buttonBits & EVT_RESET_BUTTON)
 				{
-					//debounce signal.
-					taskSleep(50);
-					
+
+					//Als noodsignaal niet opgelost is, niet vrijgeven. Anders naar WAIT state
 					if (!InNoodsituatie())
 					{
 					    resetHoming();
@@ -379,9 +414,9 @@ void ControlTask(void *pvParameters)
 						vPrintString("> RESET ontvangen, maar PIN_NOOD heeft nog steeds geen signaal!\n");
 					}
 				}
-				
-				taskSleep(1);
-				
+
+				//taskSleep(1);
+
 				break;
 			}
 
@@ -392,11 +427,11 @@ void ControlTask(void *pvParameters)
 				ToState(STATE_FAULT);
 				break;
 			}
-			
+
 		}//End-SwitchCase
-	
+
 	}//End-WhileLoop
-	
+
 	/* Should never get here */
 	vTaskDelete(NULL);
 }//End-ControlTask

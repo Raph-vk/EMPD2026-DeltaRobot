@@ -44,7 +44,7 @@
 // CONSTANTEN
 #define DEG_TO_RAD		(0.01745329251994329576923690768489f) //PI / 180.0f; // conversiefactor van graden naar radialen
 #define RAD_TO_DEG		(57.295779513082320876798154814105f) // 180.0f / PI; // conversiefactor van radialen naar graden
-#define maxErrorM		(45.0f * DEG_TO_RAD * i_twk) //
+#define maxErrorM		(10.0f * DEG_TO_RAD * i_twk) //
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -162,10 +162,10 @@ bool anyHomeSwitchActive(void)
 static const float Tsample = 0.001f;
 
 // Regelaarconstanten
-static const float Kp    = 1.9775f;
-static const float Tau_d = 0.14832;
-static const float Tau_f = 0.00250;
-static const float Tau_i = 0.25f;
+static const float Kp    = 7.9101f;
+static const float Tau_d = 0.0375;
+static const float Tau_f = 0.00125;
+static const float Tau_i = 0.125;
 
 // Regelaarcoëfficiënten uit de Tustinmethode
 static float a0;
@@ -206,17 +206,12 @@ void Regelaar_INIT(void)
 	const float Tf_term = (2.0f * Tau_f) / Tsample;
 	const float Td_term = (2.0f * Tau_d) / Tsample;
 
-
 	a0 = Ti_term * (1.0f + Tf_term); 	// u[n]
-
 	a1 = -2.0f * Ti_term * Tf_term;		// u[n-1]
-
 	a2 = -Ti_term * (1.0f - Tf_term);	// u[n-2]
 
 	b0 = (1.0f + Td_term) * (1.0f + Ti_term);	// e[n]
-
 	b1 = ((1.0f + Td_term) * (1.0f - Ti_term)) + ((1.0f - Td_term) * (1.0f + Ti_term));	// e[n-1]
-
 	b2 = (1.0f - Td_term) * (1.0f - Ti_term); // e[n-2]
 
 	//historie waarden op nul stellen
@@ -295,7 +290,7 @@ float PIDregelaar(uint8_t motorIndex, float error)
  */
 float FeedForward(float alpha)
 {
-	const float Je_totaal = 0.000020378; //2.0378e-05// kgm^2, totale traagheidsmoment op de motoras
+	const float Je_totaal = 0.000012557; // kgm^2, totale traagheidsmoment op de motoras
 	const float KaKt = 0.01016; // Nm/V (Ka [A/V] * Kt [Nm/A])
 	return (Je_totaal * alpha) / KaKt;
 }

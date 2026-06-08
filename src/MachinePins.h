@@ -41,7 +41,7 @@
 #define BIT_LAMP_ORANGE		2   // PIN_40
 #define	BIT_LAMP_RED		3   // PIN_41
 #define	BIT_GRIPPER         4   // PIN_42
-#define BIT_VOEDING			5	// PIN_43
+#define BIT_DISABLE_MOTORS	5	// PIN_43
 //#define   6 // PIN_44
 //#define   7 // PIN_45
 

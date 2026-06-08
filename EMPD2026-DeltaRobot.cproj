@@ -733,6 +733,18 @@
     <Compile Include="src\MachinePins.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\MotionPlanning.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\MotionPlanning.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\MotionProfiles.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\MotionProfiles.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\MotorControl.c">
       <SubType>compile</SubType>
     </Compile>
