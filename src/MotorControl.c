@@ -162,10 +162,20 @@ bool anyHomeSwitchActive(void)
 static const float Tsample = 0.001f;
 
 // Regelaarconstanten
-static const float Kp    = 7.9101f;
-static const float Tau_d = 0.0375;
-static const float Tau_f = 0.00125;
-static const float Tau_i = 0.125;
+// Testopstelling
+//static const float Kp    = 7.9101f;
+//static const float Tau_d = 0.0375;
+//static const float Tau_f = 0.00125;
+//static const float Tau_i = 0.125;
+
+// Deltarobot
+static const float Kp    = 2.0257f;
+static const float Tau_d = 0.056929;
+static const float Tau_f = 0.0018976;
+static const float Tau_i = 0.18976;
+
+
+
 
 // Regelaarcoëfficiënten uit de Tustinmethode
 static float a0;

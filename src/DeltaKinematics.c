@@ -128,7 +128,7 @@ bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 		if(theta_plus > Bovenarm_thetaMin && theta_plus < Bovenarm_thetaMax){
 
 			// Geldige oplossing gevonden, opslaan en doorgaan naar volgende motor.
-			motorRad[motorIndex] = theta_plus * i_twk;
+			motorRad[motorIndex] = -theta_plus * i_twk;
 		}
 		else
 		{
@@ -140,7 +140,7 @@ bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 
 			//Als geldige oplossing gevonden, opslaan en doorgaan naar volgende motor.
 			if(theta_minus > Bovenarm_thetaMin && theta_minus < Bovenarm_thetaMax){		
-				motorRad[motorIndex] = theta_minus * i_twk;
+				motorRad[motorIndex] = -theta_minus * i_twk;
 			}
 			// Beide oplossingen liggen buiten de mechanische limieten.
 			else{
@@ -183,7 +183,7 @@ bool DeltaKinematics_Forward(const float motorRad[N_MOTORS], float tcpPosition_m
 	// naar de echte bovenarmhoek via de tandwielkastverhouding i_twk.
 	for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 	{
-		float armTheta = motorRad[motorIndex] / i_twk;
+		float armTheta = -motorRad[motorIndex] / i_twk;
 		float radius_xy = rBase - rPols + LengteBovenarm * cosf(armTheta);
 
 		// Projecteer het bolcentrum naar het globale robotcoordinatenstelsel.
