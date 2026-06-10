@@ -1,0 +1,10 @@
+Debug/
+.vs/
+.idea/
+
+*.o
+*.elf
+*.hex
+*.map
+*.bin
+*.d
