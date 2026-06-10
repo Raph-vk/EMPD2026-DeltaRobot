@@ -36,6 +36,8 @@
 #include "temp.h"
 #include "MotionPlanning.h"
 #include "QuadratureCounters.h"
+#include "Regelaar.h"
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
@@ -236,7 +238,7 @@ void ControlTask(void *pvParameters)
 			noodCount++;
 			vPrintString("> noodCount + 1!\n");
 
-			if (noodCount > 2)
+			if (noodCount > 25)
 			{
 				vPrintString("> Systeem in fout gezet na noodSemaphore.\n");
 				ToState(STATE_FAULT);
@@ -293,6 +295,7 @@ void ControlTask(void *pvParameters)
 				{
 					vPrintString("> HOMING complete -> READY\n");
 					ToState(STATE_READY);
+					MotionPlanning_RESET();
 				}
 				break;
 			}
@@ -322,20 +325,6 @@ void ControlTask(void *pvParameters)
 			{
 				// Op vaste positie regelen op iedere control tick
 				HoldCurrentPosition(false, INFINITY);
-
-				/*
-				//capture currect position
-				if (!pauseSetupDone)
-				{
-					LeesArmPositiesRad(pauseTargetPos);
-					for (uint8_t m = 0; m < N_MOTORS; m++)
-					{
-						removeRegelaarHistory(m);
-					}
-					pauseSetupDone = true;
-				}
-				HoldPosition(pauseTargetPos);
-				*/
 
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)

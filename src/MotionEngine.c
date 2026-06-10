@@ -35,20 +35,27 @@ static inline void MoveLXYZ(float x_mm, float y_mm, float z_mm, float time_s);
  */
 void BuildSequence(void)
 {
+	//setup
 	sequenceLength = 0;
 	sequenceOverflow = false;
-	MoveJDEG(0.0f, 0.0f, 0.0f, 1.0f);
-	Hold(true, 0.1f);
- 
+	MoveJDEG(0.0f, 0.0f, 0.0f, 1.0f);	
+	Hold(false, 0.1f);	
+	
+	
+	//begin move
+	for (uint8_t i = 0; i < 3; i++)
+	{
+		MoveLXYZ(80.0f, 80.0f, -475.0f, 0.500);
+		Hold(false, 0.1f);
+		MoveLXYZ(80.0f,-80.0f, -475.0f, 0.500);
+		Hold(false, 0.1f);
+		MoveLXYZ(-80.0f, -80.0f, -475.0f, 0.500);
+		Hold(false, 0.1f);
+		MoveLXYZ(-80.0f, 80.0f, -475.0f, 0.500);
+		Hold(false, 0.1f);
+	}
 
-	MoveLXYZ(80.0f, 80.0f, -480.0f, 0.250);
-	Hold(true, 0.250f);
-	MoveLXYZ(80.0f, -80.0f, -480.0f, 0.250);
-	Hold(true, 0.250f);
-	MoveLXYZ(-80.0f, -80.0f, -480.0f, 0.250);
-	Hold(true, 0.250f);
-	MoveLXYZ(-80.0f, 80.0f, -480.0f, 0.250);
-	Hold(true, 0.250f);
+
 
 	MoveJDEG(0.0f, 0.0f, 0.0f, 1.0f);
 	Hold(false, 0.1f);

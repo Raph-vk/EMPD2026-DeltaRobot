@@ -30,11 +30,5 @@ bool anyHomeSwitchActive(void);
 void ZetMotorSpanning(uint8_t motorIndex, float spanningVolt);
 void ZetMotorSpanningen(float spanningVolt);
 
-void Regelaar_INIT(void);
-void removeRegelaarHistory(uint8_t arm);
-float PIDregelaar(uint8_t motorIndex, float error);
-float FeedForward(float alpha);
-
-
 
 #endif /* MOTORCONTROL_H_ */

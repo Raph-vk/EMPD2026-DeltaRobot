@@ -82,17 +82,15 @@ static bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit)
 
 
 ///////////////////////////////////////////////////////////////////////////////
-// potmeter percentage instellingen
-#define PERCENT_STEP_SIZE       5u
-static uint32_t lastProcent = UINT32_MAX;
-
-///////////////////////////////////////////////////////////////////////////////
 // static void ProcessPotmeterData(uint32_t potData)
+//#define PERCENT_STEP_SIZE       5u
+//static uint32_t lastProcent = UINT32_MAX;
 /*
  * Zet de ADC-waarde van de potmeter om naar een percentage in stappen van 5%.
  * Invoer: potData is de ruwe ADC-waarde.
  * Uitvoer: geen returnwaarde; schrijft de nieuwe procentwaarde naar handle_potQueue.
  */
+/*
 static void ProcessPotmeterData(uint32_t potData)
 {
     uint32_t procent;
@@ -119,7 +117,7 @@ static void ProcessPotmeterData(uint32_t potData)
         lastProcent = procent;
     }
 }
-
+*/
 ///////////////////////////////////////////////////////////////////////////////
 // status stroomsensor
 static bool hasCurrentSample = false;

@@ -28,6 +28,7 @@
 #include "MotorControl.h"
 #include "ControlTask.h"
 #include "MotionProfiles.h"
+#include "Regelaar.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // const globals
@@ -75,7 +76,7 @@ static void printAnalogVoltage(uint8_t m,  float analogvoltage)
 	{
 		for (uint8_t i = 0; i < N_MOTORS; i++)
 		{
-			vPrintString("Motor %u voltage is: %.2f V\n",(unsigned int)i, spikeVoltage[i]);
+			//vPrintString("Motor %u voltage is: %.2f V\n",(unsigned int)i, spikeVoltage[i]);
 			spikeVoltage[i] = 0.0f;
 		}
 		analogPrintCounter = 0;
@@ -207,6 +208,7 @@ bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	// Eenmalig nieuw bewegingsprofiel berekenen.
 	if(!setupMotionProfileDone)
 	{
+		vPrintString("> instellen beweging.\n");
 		t0 = g_time; // starttijd van de beweging
 
 		//float eindPos_M0, eindPos_M1, eindPos_M2 = NULL;

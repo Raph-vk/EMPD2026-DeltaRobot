@@ -41,6 +41,8 @@
 
 #include "ControlTask.h"
 #include "MachinePins.h"
+#include "Regelaar.h"
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // HOMING INSTELLINGEN
@@ -51,7 +53,7 @@
 #define RAD_TO_DEG					(57.2957795131f)
 
 #define HOME_RAD				    (0.0f)
-#define BACKOFF_RAD					(15.0f * DEG_TO_RAD)
+#define BACKOFF_RAD					(5.0f * DEG_TO_RAD)
 
 //BIJV: 10 deg/s * 0.001 s = 0.01 graden per regelstap (bij 1kHz clock)
 #define GROF_ZOEK_SNELHEID_DEG_S    (30.0f)
@@ -172,6 +174,31 @@ bool homeAllMotors(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// void resetHoming(void)
+/*
+ *
+ *
+*/
+void resetHoming(void)
+{
+	homingStatus = HOMING_IDLE;
+	stabilisatieTeller = 0U;
+	uDac = 0.0f;
+
+	for (uint8_t motor = 0U; motor < N_MOTORS; motor++)
+	{
+		armDoelRad[motor] = 0.0f;
+		armPositieRad[motor] = 0.0f;
+
+		grofGevonden[motor] = false;
+		armOpBackoffPos[motor] = false;
+		fijnGevonden[motor] = false;
+
+		removeRegelaarHistory(motor);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // PRIVATE HELPER FUNCTIONS
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -246,31 +273,6 @@ static float bepaalFoutOpMotor(float doelArmRad, float gemetenArmRad)
 ///////////////////////////////////////////////////////////////////////////////
 // PRIVATE HOMING STATE HANDLERS
 ///////////////////////////////////////////////////////////////////////////////
-
-///////////////////////////////////////////////////////////////////////////////
-// void resetHoming(void)
-/*
- *
- *
-*/
-void resetHoming(void)
-{
-	homingStatus = HOMING_IDLE;
-	stabilisatieTeller = 0U;
-	uDac = 0.0f;
-
-	for (uint8_t motor = 0U; motor < N_MOTORS; motor++)
-	{
-		armDoelRad[motor] = 0.0f;
-		armPositieRad[motor] = 0.0f;
-
-		grofGevonden[motor] = false;
-		armOpBackoffPos[motor] = false;
-		fijnGevonden[motor] = false;
-
-		removeRegelaarHistory(motor);
-	}
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 // static void Initialiseren(void)

@@ -751,6 +751,12 @@
     <Compile Include="src\MotorControl.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\Regelaar.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\Regelaar.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\Screen.c">
       <SubType>compile</SubType>
     </Compile>

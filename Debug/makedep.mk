@@ -20,6 +20,8 @@ src\MotionProfiles.c
 
 src\MotorControl.c
 
+src\Regelaar.c
+
 src\Screen.c
 
 src\temp.c
