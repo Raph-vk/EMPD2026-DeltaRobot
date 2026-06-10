@@ -89,7 +89,7 @@ void ToState(SystemState_t newState)
 */
 bool InNoodsituatie(void)
 {
-	return !port_IsBitSet(BIT_NOOD); //!
+	return port_IsBitSet(BIT_NOOD); //!
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -184,7 +184,7 @@ void ControlTask(void *pvParameters)
 	interrupt_Enable(PIN_CLOCK);
 
 	// PIN_NOOD is fail-safe, pinSet = systemOK, not set = Nood
-	interrupt_AttachHandler(NoodInterruptHandler, PIN_NOOD, PIO_IT_FALL_EDGE);
+	interrupt_AttachHandler(NoodInterruptHandler, PIN_NOOD, PIO_IT_RISE_EDGE);
 	interrupt_Disable(PIN_NOOD);
 	interrupt_Enable(PIN_NOOD);
 
