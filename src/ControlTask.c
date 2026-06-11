@@ -156,6 +156,8 @@ void ControlTask(void *pvParameters)
 	//bool pauseSetupDone = false;
 	bool sequenceDone  = false;
 	bool TakenNood = false;
+	bool goToHome = false;
+	bool atHome = false;
 	uint8_t noodCount = 0;
 	
 	float gemetenStroom = 0.0f;
@@ -323,23 +325,38 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_PAUSE:
 			{
-				// Op vaste positie regelen op iedere control tick
-				HoldCurrentPosition(false, INFINITY);
+				if (goToHome)
+				{
+					atHome = MoveJ_ArmDEG123t(0.0f, 0.0f, 0.0f, 2.5f);
+					if (atHome)
+					{
+						ToState(STATE_READY);
+						MotionPlanning_RESET();
+						atHome = false;
+						goToHome = false;
+					}
+				}
+				else
+				{
+					// Op vaste positie regelen op iedere control tick
+					HoldCurrentPosition(false, INFINITY);					
+				}
+
 
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
 				{
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
 					ToState(STATE_RUNNING);
+					MotionPlanning_RESET();
 					RunningLoopTimer_ResetWindow();
-					//pauseSetupDone = false;
 				}
 				// Resetknop -> READY
 				if (buttonBits & EVT_RESET_BUTTON)
 				{
 					vPrintString("> RESET -> READY (Startknop ontvangen.)\n");
-					ToState(STATE_READY);
-					//pauseSetupDone = false;
+					//ToState(STATE_READY);
+					goToHome = true;
 				}
 
 				break;
@@ -363,12 +380,14 @@ void ControlTask(void *pvParameters)
 				if (buttonBits & EVT_STOP_BUTTON)
 				{
 					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
+					MotionPlanning_RESET();
 					ToState(STATE_PAUSE);
 				}
 				// Cyclus klaar -> terug naar READY
 				else if (sequenceDone)
 				{
 					vPrintString("> RUNNING -> READY (cyclus voldaan).\n");
+					MotionPlanning_RESET();
 					ToState(STATE_READY);
 				}
 				break;
