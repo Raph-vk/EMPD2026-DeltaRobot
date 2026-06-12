@@ -149,10 +149,11 @@ void ControlTask(void *pvParameters)
 	///////////////////////////////////////////////////////////////////////////////
 	// flags
 	bool homingAllMotorsDone = false;
+	bool homingWaitDone = false;
 	bool sequenceDone  = false;
 	bool TakenNood = false;
-	bool goToHome = false;
-	bool atHome = false;
+	bool goToRust = false;
+	bool atRust = false;
 	
 	uint8_t noodCount = 0;
 	float gemetenStroom = 0.0f;
@@ -267,6 +268,8 @@ void ControlTask(void *pvParameters)
 					// Naar HomingState schakelen.
 					vPrintString("> WAIT -> HOMING ( Start-of Resetknop is ontvangen).\n");
 					homingAllMotorsDone = false;
+					homingWaitDone = false;
+					atRust = false;
 					ToState(STATE_HOMING);
 				}
 
@@ -280,16 +283,40 @@ void ControlTask(void *pvParameters)
 			}
 
 			/////////////////////////////////////////////////////////////////////
-			case  STATE_HOMING:
+			case STATE_HOMING:
 			{
-				homingAllMotorsDone = homeAllMotors(); //<- Homing.c
-
-				if (homingAllMotorsDone)
+				if (!homingAllMotorsDone)
 				{
-					vPrintString("> HOMING complete -> READY\n");
-					ToState(STATE_READY);
-					MotionPlanning_RESET();
+					homingAllMotorsDone = homeAllMotors();
+
+					if (homingAllMotorsDone)
+					{
+						MotionPlanning_RESET();   // prepare fresh hold timer
+					}
 				}
+				else if (!homingWaitDone)
+				{
+					homingWaitDone = HoldCurrentPosition(false, 1.0f);
+
+					if (homingWaitDone)
+					{
+						MotionPlanning_RESET();   // prepare fresh MoveJ profile
+					}
+				}
+				else
+				{
+					atRust = MoveJ_ArmDEG123t(25.0f, 25.0f, 25.0f, 2.5f);
+
+					if (atRust)
+					{
+						vPrintString("> HOMING complete, at +25deg -> READY\n");
+						MotionPlanning_RESET();
+						atRust = false;
+						homingWaitDone = false;
+						ToState(STATE_READY);
+					}
+				}
+
 				break;
 			}
 
@@ -315,15 +342,15 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_PAUSE:
 			{
-				if (goToHome)
+				if (goToRust)
 				{
-					atHome = MoveJ_ArmDEG123t(25.0f, 25.0f, 25.0f, 2.5f);
-					if (atHome)
+					atRust = MoveJ_ArmDEG123t(25.0f, 25.0f, 25.0f, 2.5f);
+					if (atRust)
 					{
 						ToState(STATE_READY);
 						MotionPlanning_RESET();
-						atHome = false;
-						goToHome = false;
+						atRust = false;
+						goToRust = false;
 					}
 				}
 				else
@@ -345,7 +372,7 @@ void ControlTask(void *pvParameters)
 				if (buttonBits & EVT_RESET_BUTTON)
 				{
 					vPrintString("> RESET -> READY (Startknop ontvangen.)\n");
-					goToHome = true;
+					goToRust = true;
 				}
 				break;
 			}
@@ -394,6 +421,8 @@ void ControlTask(void *pvParameters)
 					{
 					    resetHoming();
 						homingAllMotorsDone = false;
+						homingWaitDone = false;
+						atRust = false;
 						vPrintString("> FAULT cleared -> WAIT (reset ontvangen, signaal ook actief)\n");
 						ToState(STATE_WAIT);
 					}
