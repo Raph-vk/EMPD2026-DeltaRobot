@@ -175,7 +175,7 @@ void ControlTask(void *pvParameters)
 		dac_SetOutputVoltage(qc_channel, 0.0f);
 	}
 
-	//RunningLoopTimer_Init();
+	RunningLoopTimer_Init();
 	Regelaar_INIT();
 	BuildSequence();
 
@@ -214,6 +214,7 @@ void ControlTask(void *pvParameters)
 	{
 		//1kHz externe clockTake
 		ulTaskNotifyTake(pdTRUE, ticksToWait);
+		RunningLoopTimer_Begin();
 
 		// Lees uit of er een knop ingedrukt is.
 		buttonBits = xEventGroupWaitBits(handle_ButtonEventGroup,
@@ -230,6 +231,7 @@ void ControlTask(void *pvParameters)
 			TakenNood = true;
 			noodCount = 0;
 		}
+		
 		//Debounce delay
 		else if (TakenNood && InNoodsituatie() )
 		{
@@ -328,7 +330,7 @@ void ControlTask(void *pvParameters)
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
 				{
-					//RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check
+					RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check
 
 					SequenceRESET();
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
@@ -337,7 +339,7 @@ void ControlTask(void *pvParameters)
 				// resetknop -> opnieuw homen.
 				else if (buttonBits & EVT_RESET_BUTTON)
 				{
-					//RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check
+					RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check
 					homingAllMotorsDone = false;
 					homingWaitDone = false;
 					MotionPlanning_RESET();	
@@ -470,6 +472,8 @@ void ControlTask(void *pvParameters)
 				break;
 			}
 		}//End-SwitchCase
+
+		RunningLoopTimer_End();
 
 	}//End-WhileLoop
 

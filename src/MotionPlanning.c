@@ -257,8 +257,6 @@ bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 		//Bewegingsprofiel bepalen
 		MotionProfileRef_t ref;
 		motionProfile(thetaMax_inc[mI], maxTime_s, tau, &ref);
-		
-		vPrintString("pos: %.1f. velocity: %.1f. acceleration: %.1f.", ref.pos, ref.vel, ref.acc);
 
 		verplaatsingKlaar = ref.klaar;
 

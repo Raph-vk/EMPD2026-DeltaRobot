@@ -21,6 +21,8 @@ static uint32_t runLoopCyclesPerMs = 0U;
 static uint32_t runLoopStartCycles = 0U;
 static uint32_t runLoopLastCycles = 0U;
 static uint32_t runLoopMaxCycles = 0U;
+static uint64_t runLoopTotalCycles = 0U;
+static uint32_t runLoopSamples = 0U;
 static uint32_t runLoopPrintRefCycles = 0U;
 static uint32_t runLoopOverruns = 0U;
 
@@ -40,7 +42,7 @@ void RunningLoopTimer_Init(void)
 	DWT->CYCCNT = 0U;
 	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 
-	runLoopPrintRefCycles = DWT->CYCCNT;
+	RunningLoopTimer_ResetWindow();
 }
 
 
@@ -49,12 +51,14 @@ void RunningLoopTimer_Init(void)
 /*
  * Wist de meetwaarden van het huidige timingvenster.
  * Invoer: geen.
- * Uitvoer: geen returnwaarde; maximale looptijd en overruns worden gereset.
+ * Uitvoer: geen returnwaarde; gemiddelde/maximale looptijd en overruns worden gereset.
  */
 void RunningLoopTimer_ResetWindow(void)
 {
 	runLoopLastCycles = 0U;
 	runLoopMaxCycles = 0U;
+	runLoopTotalCycles = 0U;
+	runLoopSamples = 0U;
 	runLoopOverruns = 0U;
 	runLoopPrintRefCycles = DWT->CYCCNT;
 }
@@ -74,7 +78,7 @@ void RunningLoopTimer_Begin(void)
 ///////////////////////////////////////////////////////////////////////////////
 // void RunningLoopTimer_End(void)
 /*
- * Sluit een control-loop meting af en print periodiek de maximale looptijd.
+ * Sluit een control-loop meting af en print periodiek gemiddelde/maximale looptijd.
  * Invoer: geen.
  * Uitvoer: geen returnwaarde; meetstatistieken en overrun-teller worden bijgewerkt.
  */
@@ -82,7 +86,14 @@ void RunningLoopTimer_End(void)
 {
 	uint32_t nowCycles;
 
+	if (runLoopCpuHz == 0U)
+	{
+		return;
+	}
+
 	runLoopLastCycles = DWT->CYCCNT - runLoopStartCycles;
+	runLoopTotalCycles += runLoopLastCycles;
+	runLoopSamples++;
 
 	if (runLoopLastCycles > runLoopMaxCycles)
 	{
@@ -98,15 +109,30 @@ void RunningLoopTimer_End(void)
 
 	if ((uint32_t)(nowCycles - runLoopPrintRefCycles) >= runLoopCpuHz)
 	{
-		uint32_t max_us  = (uint32_t)(((uint64_t)runLoopMaxCycles  * 1000000U) / runLoopCpuHz);
+		uint32_t avgCycles = 0U;
+		uint32_t avgUs = 0U;
+		uint32_t maxUs = 0U;
 
-		vPrintString("> RUN loop: max=%lu.%03lu ms, overruns=%lu\n",
-		(unsigned long)(max_us / 1000U),
-		(unsigned long)(max_us % 1000U),
+		if (runLoopSamples > 0U)
+		{
+			avgCycles = (uint32_t)(runLoopTotalCycles / runLoopSamples);
+			avgUs = (uint32_t)(((uint64_t)avgCycles * 1000000U) / runLoopCpuHz);
+		}
+		
+		maxUs = (uint32_t)(((uint64_t)runLoopMaxCycles * 1000000U) / runLoopCpuHz);
+
+		vPrintString("> RUN loop: avg=%lu.%03lu ms, max=%lu.%03lu ms, samples=%lu, overruns=%lu\n",
+		(unsigned long)(avgUs / 1000U),
+		(unsigned long)(avgUs % 1000U),
+		(unsigned long)(maxUs / 1000U),
+		(unsigned long)(maxUs % 1000U),
+		(unsigned long)runLoopSamples,
 		(unsigned long)runLoopOverruns);
 
 		runLoopPrintRefCycles = nowCycles;
 		runLoopMaxCycles = 0U;
+		runLoopTotalCycles = 0U;
+		runLoopSamples = 0U;
 		runLoopOverruns = 0U;
 	}
 }
