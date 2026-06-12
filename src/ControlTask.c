@@ -154,6 +154,8 @@ void ControlTask(void *pvParameters)
 	bool TakenNood = false;
 	bool goToRust = false;
 	bool atRust = false;
+	bool toBackoffPos = false;
+	bool atBackoff = false;
 	
 	uint8_t noodCount = 0;
 	float gemetenStroom = 0.0f;
@@ -212,7 +214,7 @@ void ControlTask(void *pvParameters)
 	{
 		//1kHz externe clockTake
 		ulTaskNotifyTake(pdTRUE, ticksToWait);
-		
+
 		// Lees uit of er een knop ingedrukt is.
 		buttonBits = xEventGroupWaitBits(handle_ButtonEventGroup,
 			EVT_START_BUTTON | EVT_STOP_BUTTON | EVT_RESET_BUTTON,
@@ -323,18 +325,44 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_READY:
 			{
-				// Op vaste positie regelen op iedere control tick
-				HoldCurrentPosition(false, INFINITY);
-
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
 				{
 					//RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check
 
 					SequenceRESET();
-					//tijdelijk naar homing, normaliter naar; RUNNING
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
 					ToState(STATE_RUNNING);
+				}
+				// resetknop -> opnieuw homen.
+				else if (buttonBits & EVT_RESET_BUTTON)
+				{
+					//RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check
+					homingAllMotorsDone = false;
+					homingWaitDone = false;
+					MotionPlanning_RESET();	
+					toBackoffPos = true;				
+					vPrintString("> Naar Backoffpositie (resetknop ontvangen).\n");
+				}
+				
+				//indien resetknop ingedrukt is eerst naar positie verplaatsen.
+				if (toBackoffPos)
+				{
+					atBackoff = MoveJ_ArmDEG123t(0.0f,0.0f,0.0f, 2.0f);
+					
+					if (atBackoff)
+					{
+						vPrintString("> READY -> HOMING (op backoffpositie.)\n");
+						atBackoff = false;
+						toBackoffPos = false;
+						ToState(STATE_HOMING);
+					}
+					//tijdelijk naar homing, normaliter naar; RUNNING					
+				}
+				else
+				{
+					// Op vaste positie regelen op iedere control tick
+					HoldCurrentPosition(false, INFINITY);
 				}
 
 				break;

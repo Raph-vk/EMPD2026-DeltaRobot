@@ -35,7 +35,7 @@
 #define Ts							(0.001f)      // sample time, must match external clock
 #define N_TCP_AXES					(3U)
 #define DEG_TO_RAD					(0.01745329251994329576923690768489f) // PI / 180.0f
-#define HOP_DISTANCE_FACTOR			(0.25f)       // [mm lift / mm XY] gewenste hophoogte uit horizontale afstand
+#define HOP_DISTANCE_FACTOR			(0.20f)       // [mm lift / mm XY] gewenste hophoogte uit horizontale afstand
 #define HOP_MIN_HEIGHT_MM			(0.0f)        // geen geforceerde minimumhop; gebruik MoveL als hoppen niet nodig is
 #define HOP_MAX_HEIGHT_MM			(60.0f)       // absolute begrenzing van extra Z-lift
 #define HOP_MAX_Z_ACCEL_MM_S2		(10000.0f)    // effectieve Z-versnellingslimiet voor automatische hophoogte

@@ -36,52 +36,47 @@ static inline void MoveHopXYZ(float x_mm, float y_mm, float z_mm, float time_s);
  */
 void BuildSequence(void)
 {
-	float wait = 0.1f; // s
-	float move = 0.25f; // s
+	float wait = 0.5f; // s
+	float move = 0.50f; // s
 	float zHeight = -420.0f; //mm
 	
 	//setup
 	sequenceLength = 0;
 	sequenceOverflow = false;
-	MoveJDEG(25.0f, 25.0f, 25.0f, move);	
-	Hold(false, 0.1f);	
-	MoveJXYZ(0.0f, 0.0f, zHeight, move);
-	
-	for (uint8_t i = 0; i < 5; i++)
-	{
-		MoveLXYZ(80.0f, 80.0f, zHeight, move);
-		Hold(false, wait);
-		MoveLXYZ(-80.0f, 80.0f, zHeight, move);
-		Hold(false, wait);
-		MoveLXYZ(-80.0f, -80.0f, zHeight, move);
-		Hold(false, wait);
-		MoveLXYZ(80.0f, -80.0f, zHeight, move);
-		Hold(false, wait);
-		MoveLXYZ(80.0f, 80.0f, zHeight, move);
-		Hold(false, wait);
-		MoveLXYZ(0.0f, 0.0f, zHeight, move);
-		Hold(false, wait);
-	}
-	
-	MoveJXYZ(0.0f, 0.0f, zHeight, move);
-	Hold(false, wait);
 
 	/*
-	//begin move
 	for (uint8_t i = 0; i < 5; i++)
 	{
-		MoveLXYZ(80.0f, 80.0f, -400.0f, 0.250);
-		Hold(false, wait);
-		MoveLXYZ(80.0f,-80.0f, -400.0f, 0.2500);
-		Hold(false, wait);
-		MoveLXYZ(-80.0f,-80.0f, -400.0f, 0.2500);
-		Hold(false, wait);
-		MoveLXYZ(-80.0f,80.0f, -400.0f, 0.2500);
-		Hold(false, wait);
+		MoveLXYZ(80.0f, 80.0f, zHeight, move);
+		Hold(true, wait);
+		MoveLXYZ(-80.0f, 80.0f, zHeight, move);
+		Hold(true, wait);
+		MoveLXYZ(-80.0f, -80.0f, zHeight, move);
+		Hold(true, wait);
+		MoveLXYZ(80.0f, -80.0f, zHeight, move);
+		Hold(true, wait);
+		MoveLXYZ(80.0f, 80.0f, zHeight, move);
+		Hold(true, wait);
+		MoveLXYZ(0.0f, 0.0f, zHeight, move);
+		Hold(false, move);
 	}
 	*/
-
-
+	
+	Hold(false, 0.1f);
+	MoveJXYZ(0.0f, 0.0f, zHeight, move);
+	
+	for (uint8_t i = 0; i < 5; i++)
+	{
+		MoveHopXYZ(80.0f,80.0f,zHeight, move);
+		Hold(false, wait);
+		MoveHopXYZ(80.0f,-80.0f,zHeight, move);
+		Hold(false, wait);
+		MoveHopXYZ(-80.0f,-80.0f,zHeight, move);
+		Hold(false, wait);
+		MoveHopXYZ(-80.0f,80.0f,zHeight, move);
+		Hold(false, wait);
+	}
+	
 	MoveJDEG(25.0f, 25.0f, 25.0f, 1.0f);
 	Hold(false, 0.1f);
 }

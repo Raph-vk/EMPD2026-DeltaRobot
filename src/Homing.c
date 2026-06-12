@@ -56,7 +56,7 @@
 #define BACKOFF_RAD					(5.0f * DEG_TO_RAD)
 
 //BIJV: 10 deg/s * 0.001 s = 0.01 graden per regelstap (bij 1kHz clock)
-#define GROF_ZOEK_SNELHEID_DEG_S    (30.0f)
+#define GROF_ZOEK_SNELHEID_DEG_S    (25.0f)
 #define GROF_ZOEK_SNELHEID_RAD_S    (GROF_ZOEK_SNELHEID_DEG_S * DEG_TO_RAD)
 
 #define FIJN_ZOEK_SNELHEID_DEG_S    (5.0f)
@@ -335,7 +335,7 @@ static void GrofZoeken(void)
 		//Als homeSwitch al gevonden is, rustig naar BACKOFF Positie bewegen.
 		if (grofGevonden[motor])
 		{
-			RampArmDoelNaar(motor, BACKOFF_RAD, GROF_ZOEK_SNELHEID_RAD_S);
+			RampArmDoelNaar(motor, BACKOFF_RAD, FIJN_ZOEK_SNELHEID_RAD_S);
 		}
 		//Als home-switch actief is
         else if (motor_IsHomeLimitActive(motor))
@@ -390,7 +390,7 @@ static void NaarBackoffPositie(void)
 	for (uint8_t motor = 0; motor < N_MOTORS; motor++)
 	{
 		//armDoel naar BACKOFF Positie bewegen.
-		if (RampArmDoelNaar(motor, BACKOFF_RAD, GROF_ZOEK_SNELHEID_RAD_S) )
+		if (RampArmDoelNaar(motor, BACKOFF_RAD, FIJN_ZOEK_SNELHEID_RAD_S) )
 		{
 			//arm is (ECHT) op positie als gemeten binnen 0.5 graad van gewenste positie
 			armOpBackoffPos[motor] = ( fabsf(armPositieRad[motor] - BACKOFF_RAD) <= (0.5 * DEG_TO_RAD));
