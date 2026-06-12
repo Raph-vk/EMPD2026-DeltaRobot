@@ -15,7 +15,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // sequence settings
-#define MAX_SEQUENCE_STEPS		(64U)  //voor vaste memory grootte
+#define MAX_SEQUENCE_STEPS		(128U)  //voor vaste memory grootte
 ///////////////////////////////////////////////////////////////////////////////
 // globals vars
 static uint16_t sequenceLength = 0;
@@ -27,6 +27,7 @@ static inline void Hold(bool gripper, float time_s);
 static inline void MoveJXYZ(float x_mm, float y_mm, float z_mm, float time_s);
 static inline void MoveJDEG(float m1_deg, float m2_deg, float m3_deg, float time_s);
 static inline void MoveLXYZ(float x_mm, float y_mm, float z_mm, float time_s);
+static inline void MoveHopXYZ(float x_mm, float y_mm, float z_mm, float time_s);
 
 ///////////////////////////////////////////////////////////////////////////////
 // static void BuildSequence(void)
@@ -35,29 +36,53 @@ static inline void MoveLXYZ(float x_mm, float y_mm, float z_mm, float time_s);
  */
 void BuildSequence(void)
 {
+	float wait = 0.1f; // s
+	float move = 0.25f; // s
+	float zHeight = -420.0f; //mm
+	
 	//setup
 	sequenceLength = 0;
 	sequenceOverflow = false;
-	MoveJDEG(0.0f, 0.0f, 0.0f, 1.0f);	
+	MoveJDEG(25.0f, 25.0f, 25.0f, move);	
 	Hold(false, 0.1f);	
+	MoveJXYZ(0.0f, 0.0f, zHeight, move);
 	
-	
-	//begin move
-	for (uint8_t i = 0; i < 3; i++)
+	for (uint8_t i = 0; i < 5; i++)
 	{
-		MoveLXYZ(80.0f, 80.0f, -475.0f, 0.500);
-		Hold(false, 0.1f);
-		MoveLXYZ(80.0f,-80.0f, -475.0f, 0.500);
-		Hold(false, 0.1f);
-		MoveLXYZ(-80.0f, -80.0f, -475.0f, 0.500);
-		Hold(false, 0.1f);
-		MoveLXYZ(-80.0f, 80.0f, -475.0f, 0.500);
-		Hold(false, 0.1f);
+		MoveLXYZ(80.0f, 80.0f, zHeight, move);
+		Hold(false, wait);
+		MoveLXYZ(-80.0f, 80.0f, zHeight, move);
+		Hold(false, wait);
+		MoveLXYZ(-80.0f, -80.0f, zHeight, move);
+		Hold(false, wait);
+		MoveLXYZ(80.0f, -80.0f, zHeight, move);
+		Hold(false, wait);
+		MoveLXYZ(80.0f, 80.0f, zHeight, move);
+		Hold(false, wait);
+		MoveLXYZ(0.0f, 0.0f, zHeight, move);
+		Hold(false, wait);
 	}
+	
+	MoveJXYZ(0.0f, 0.0f, zHeight, move);
+	Hold(false, wait);
+
+	/*
+	//begin move
+	for (uint8_t i = 0; i < 5; i++)
+	{
+		MoveLXYZ(80.0f, 80.0f, -400.0f, 0.250);
+		Hold(false, wait);
+		MoveLXYZ(80.0f,-80.0f, -400.0f, 0.2500);
+		Hold(false, wait);
+		MoveLXYZ(-80.0f,-80.0f, -400.0f, 0.2500);
+		Hold(false, wait);
+		MoveLXYZ(-80.0f,80.0f, -400.0f, 0.2500);
+		Hold(false, wait);
+	}
+	*/
 
 
-
-	MoveJDEG(0.0f, 0.0f, 0.0f, 1.0f);
+	MoveJDEG(25.0f, 25.0f, 25.0f, 1.0f);
 	Hold(false, 0.1f);
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -65,7 +90,7 @@ void BuildSequence(void)
 ///////////////////////////////////////////////////////////////////////////////
 // bool RunSequence(void)
 static uint16_t currentStep = 0;
-typedef enum {STEP_HOLD_CURRENT,  STEP_MOVEJ_XYZ,  STEP_MOVEJ_DEG,  STEP_MOVEL_XYZ  } StepType_t;
+typedef enum {STEP_HOLD_CURRENT,  STEP_MOVEJ_XYZ,  STEP_MOVEJ_DEG,  STEP_MOVEL_XYZ, STEP_MOVEHOP_XYZ  } StepType_t;
 typedef struct{ StepType_t type;   bool gripper;   float p1;   float p2;  float p3;  float time_s;  } SequenceStep_t;
 static SequenceStep_t sequence[MAX_SEQUENCE_STEPS]; // De sequencielijst!
 /*
@@ -102,6 +127,10 @@ bool RunSequence(void)
 
 		case STEP_MOVEL_XYZ:
 		stepDone = MoveL_XYZt(step->p1, step->p2, step->p3, step->time_s);
+		break;
+
+		case STEP_MOVEHOP_XYZ:
+		stepDone = MoveHop_XYZt(step->p1, step->p2, step->p3, step->time_s);
 		break;
 
 		default:
@@ -174,4 +203,9 @@ static inline void MoveJDEG(float m1_deg, float m2_deg, float m3_deg, float time
 static inline void MoveLXYZ(float x_mm, float y_mm, float z_mm, float time_s)
 {
 	StoreStep(STEP_MOVEL_XYZ, false, x_mm, y_mm, z_mm, time_s);
+}
+
+static inline void MoveHopXYZ(float x_mm, float y_mm, float z_mm, float time_s)
+{
+	StoreStep(STEP_MOVEHOP_XYZ, false, x_mm, y_mm, z_mm, time_s);
 }

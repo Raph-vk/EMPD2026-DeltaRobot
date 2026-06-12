@@ -173,7 +173,7 @@ float PIDregelaar(uint8_t motorIndex, float error)
 	{
 		for (uint8_t i = 0; i < N_MOTORS; i++)
 		{
-			vPrintString("Motor %u error peak: %.2f V\n",(unsigned int)i, ( (spikeError[motorIndex] * RAD_TO_DEG)/i_twk ));
+			vPrintString("Motor %u error peak: %.6f deg\n",(unsigned int)i, ( (spikeError[motorIndex] * RAD_TO_DEG)/i_twk ));
 			spikeError[i] = 0.0f;
 		}
 		printCount = 0;

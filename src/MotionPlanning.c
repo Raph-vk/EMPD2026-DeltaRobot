@@ -35,6 +35,13 @@
 #define Ts							(0.001f)      // sample time, must match external clock
 #define N_TCP_AXES					(3U)
 #define DEG_TO_RAD					(0.01745329251994329576923690768489f) // PI / 180.0f
+#define HOP_DISTANCE_FACTOR			(0.25f)       // [mm lift / mm XY] gewenste hophoogte uit horizontale afstand
+#define HOP_MIN_HEIGHT_MM			(0.0f)        // geen geforceerde minimumhop; gebruik MoveL als hoppen niet nodig is
+#define HOP_MAX_HEIGHT_MM			(60.0f)       // absolute begrenzing van extra Z-lift
+#define HOP_MAX_Z_ACCEL_MM_S2		(10000.0f)    // effectieve Z-versnellingslimiet voor automatische hophoogte
+#define HOP_PATH_CHECK_SAMPLES		(12U)         // aantal tussenpunten voor IK-controle bij het instellen
+#define HOP_PROFILE_ACCEL_FACTOR	(5.8f)        // piekwaarde van vijfdegraads profielversnelling
+#define HOP_LIFT_ACCEL_FACTOR		(30.0f)       // conservatieve factor voor extra parabolische lift
 
 ///////////////////////////////////////////////////////////////////////////////
 // globals vars
@@ -72,11 +79,11 @@ static void printAnalogVoltage(uint8_t m,  float analogvoltage)
 	}
 
 	// timer
-	if (analogPrintCounter >= 3000)
+	if (analogPrintCounter >= 1500)
 	{
 		for (uint8_t i = 0; i < N_MOTORS; i++)
 		{
-			//vPrintString("Motor %u voltage is: %.2f V\n",(unsigned int)i, spikeVoltage[i]);
+			vPrintString("Motor %u voltage is: %.2f V\n",(unsigned int)i, spikeVoltage[i]);
 			spikeVoltage[i] = 0.0f;
 		}
 		analogPrintCounter = 0;
@@ -208,7 +215,7 @@ bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	// Eenmalig nieuw bewegingsprofiel berekenen.
 	if(!setupMotionProfileDone)
 	{
-		vPrintString("> instellen beweging.\n");
+		vPrintString("start MoveL X=%.1fdeg, Y=%.1fdeg, Z=%.1fdeg.\n",x_mm, y_mm, z_mm);
 		t0 = g_time; // starttijd van de beweging
 
 		//float eindPos_M0, eindPos_M1, eindPos_M2 = NULL;
@@ -303,6 +310,8 @@ bool MoveJ_ArmDEG123t(float M1DEG, float M2DEG, float M3DEG, float maxTime_s)
 	// Eenmalig nieuw bewegingsprofiel berekenen.
 	if(!setupMotionProfileDone)
 	{
+		vPrintString("start MoveJ M1=%.1fdeg, M2=%.1fdeg, M3=%.1fdeg.\n",M1DEG, M2DEG, M3DEG);
+
 		t0 = g_time; // starttijd van de beweging
 
 		// Doelpositie direct overnemen in motor-radialen.
@@ -380,13 +389,14 @@ static float motorOmegaPrevRad_s[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Vorige motor
 	
 static float omegaRef[N_MOTORS];		// Motor-snelheidsreferentie [rad/s]
 static float alphaRef[N_MOTORS];		// Motor-acceleratiereferentie [rad/s^2]
+
 ///////////////////////////////////////////////////////////////////////////////	
 bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 {
 	// Validatie van input parameters
 	if (maxTime_s <= 0.0f)
 	{
-		vPrintString("maxMoveTime problem!\n");
+		vPrintString("maxMoveTime mag niet <=0.0 zijn!\n");
 		return false;
 	}
 
@@ -397,6 +407,7 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	// Eenmalig nieuw TCP-bewegingsprofiel berekenen.
 	if(!setupMotionProfileDone)
 	{
+		vPrintString("start MoveL X=%.1fmm, Y=%.1fmm,Z=%.1fmm.\n",x_mm,y_mm,z_mm);
 		t0 = g_time; // starttijd van de beweging
 
 		// Huidige TCP-positie bepalen uit de actuele motorhoeken.
@@ -527,6 +538,222 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 
 			vPrintString("MoveL done. ERROR is: X=%.2f Y=%.2f Z=%.2f mm, abs = %.2f mm\n",
 			ex, ey, ez, eAbs);
+		}
+	}
+	// Return true als beweging klaar is, anders false.
+	return verplaatsingKlaar;
+
+}//END-function
+
+///////////////////////////////////////////////////////////////////////////////
+// bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
+/*
+ * Beweegt de TCP via een automatisch geschaalde parabolische hop naar de doelpositie.
+ * De hophoogte wordt bepaald uit XY-afstand en beschikbare Z-versnelling.
+ * Invoer: x_mm, y_mm en z_mm zijn de TCP-doelpositie; maxTime_s is de bewegingstijd.
+ * Uitvoer: true wanneer de beweging klaar is, anders false.
+ */
+bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
+{
+	static float hopHeight_mm = 0.0f;		// Automatisch berekende extra Z-lift [mm]
+
+	// Validatie van input parameters
+	if (maxTime_s <= 0.0f)
+	{
+		vPrintString("maxMoveTime kan niet nul zijn!\n");
+		return false;
+	}
+
+	// Uitlezen van actuele positie
+	LeesMotorPositiesRad(motorPos_Rad);
+	verplaatsingKlaar = false;
+
+	// Eenmalig nieuw TCP-hopprofiel berekenen.
+	if(!setupMotionProfileDone)
+	{
+		vPrintString("start MoveHop X=%.1fmm, Y=%.1fmm,Z=%.1fmm.\n",x_mm,y_mm,z_mm);
+		t0 = g_time; // starttijd van de beweging
+
+		// Huidige TCP-positie bepalen uit de actuele motorhoeken.
+		if (!DeltaKinematics_Forward(motorPos_Rad, tcpStart_mm))
+		{
+			verplaatsingKlaar = false;
+			vPrintString("FOUT: huidige motorpositie geeft geen geldige TCP-positie.\n");
+			setupMotionProfileDone = false;
+
+			ToState(STATE_PAUSE);
+			return false;
+		}
+
+		// Startpunt vooraf controleren met inverse kinematica.
+		if (!DeltaKinematics_Inverse(tcpStart_mm, motorTargetRad))
+		{
+			verplaatsingKlaar = false;
+			vPrintString("FOUT: huidige TCP-positie ongeldig voor inverse kinematica.\n");
+			setupMotionProfileDone = false;
+
+			ToState(STATE_PAUSE);
+			return false;
+		}
+
+		for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+		{
+			motorTargetPrevRad[mI] = motorTargetRad[mI];
+			motorOmegaPrevRad_s[mI] = 0.0f;
+		}
+
+		// ingegeven posities in array voegen.
+		tcpTarget_mm[0] = x_mm;
+		tcpTarget_mm[1] = y_mm;
+		tcpTarget_mm[2] = z_mm;
+		
+		// Eindpunt bepalen en controleren of geldig is.
+		if (!DeltaKinematics_Inverse(tcpTarget_mm, motorTargetRad))
+		{
+			verplaatsingKlaar = false;
+			vPrintString("FOUT: ongeldige eindpositie voor inverse kinematica.\n");
+			setupMotionProfileDone = false;
+
+			ToState(STATE_PAUSE);
+			return false;
+		}
+
+		// Bepalen van totaal incrementeel te verplaatsen TCP-afstand per as (XYZ).
+		for (uint8_t axisI = 0; axisI < N_TCP_AXES; axisI++)
+		{
+			// X=[0], Y=[1], Z=[2]
+			tcpMax_inc_mm[axisI] = tcpTarget_mm[axisI] - tcpStart_mm[axisI];
+		}
+
+		const float xyDistance_mm = sqrtf(tcpMax_inc_mm[0]*tcpMax_inc_mm[0] + tcpMax_inc_mm[1]*tcpMax_inc_mm[1]);
+		const float heightFromDistance_mm = HOP_DISTANCE_FACTOR * xyDistance_mm;
+
+		// bepalen of met acceleratie wel Z-hop verstandig is.
+		const float zMoveAccel_mm_s2 = (HOP_PROFILE_ACCEL_FACTOR * fabsf( tcpMax_inc_mm[2])) / (maxTime_s * maxTime_s);
+		float availableLiftAccel_mm_s2 = HOP_MAX_Z_ACCEL_MM_S2 - zMoveAccel_mm_s2;
+		if (availableLiftAccel_mm_s2 < 0.0f)
+		{
+			availableLiftAccel_mm_s2 = 0.0f;
+		}
+
+		// kleinste hoogte verplaatsing bepalen t.o.v. de acceleratie
+		const float heightFromAccel_mm = (availableLiftAccel_mm_s2 * maxTime_s * maxTime_s) / HOP_LIFT_ACCEL_FACTOR;
+		float calculatedHeight_mm = heightFromDistance_mm;
+		
+		if (heightFromAccel_mm < heightFromDistance_mm)
+		{
+			calculatedHeight_mm = heightFromAccel_mm;
+		}
+
+		hopHeight_mm = constrain(calculatedHeight_mm, HOP_MIN_HEIGHT_MM, HOP_MAX_HEIGHT_MM);
+		/*
+		//Controleren of hopPath wel haalbaar is.
+		bool hopPathReachable = true;
+		float tcpCheck_mm[N_TCP_AXES];
+		float motorCheckRad[N_MOTORS];
+
+		for (uint8_t sampleI = 1; sampleI < HOP_PATH_CHECK_SAMPLES; sampleI++)
+		{
+			const float s = (float)sampleI / (float)HOP_PATH_CHECK_SAMPLES;
+			const float hopLift_mm = hopHeight_mm * 4.0f * s * (1.0f - s);
+
+			tcpCheck_mm[0] = tcpStart_mm[0] + tcpMax_inc_mm[0] * s;
+			tcpCheck_mm[1] = tcpStart_mm[1] + tcpMax_inc_mm[1] * s;
+			tcpCheck_mm[2] = tcpStart_mm[2] + tcpMax_inc_mm[2] * s + hopLift_mm;
+
+			if (!DeltaKinematics_Inverse(tcpCheck_mm, motorCheckRad))
+			{
+				hopPathReachable = false;
+				break;
+			}
+		}
+
+		if (!hopPathReachable)
+		{
+			verplaatsingKlaar = false;
+			vPrintString("FOUT: MoveHop padpunt ongeldig voor inverse kinematica.\n");
+			setupMotionProfileDone = false;
+
+			ToState(STATE_PAUSE);
+			return false;
+		}
+		*/
+		vPrintString("MoveHop hoogte: %.2f mm\n", hopHeight_mm);
+		setupMotionProfileDone = true;
+		
+	}//eind-setupMotionProfile
+
+	//Tijd bepalen in bewegingprofiel (per tick)
+	tau = g_time - t0;
+	//Tijd bijhouden
+	g_time += Ts; 
+
+	// TCP-gewenste/referentie positie bepalen met een scalar padprofiel.
+	MotionProfileRef_t pathRef;
+	motionProfile(1.0f, maxTime_s, tau, &pathRef);
+	verplaatsingKlaar = pathRef.klaar;
+
+	const float s = pathRef.pos;
+	const float hopLift_mm = hopHeight_mm * 4.0f * s * (1.0f - s);
+
+	tcpRef_mm[0] = tcpStart_mm[0] + tcpMax_inc_mm[0] * s;
+	tcpRef_mm[1] = tcpStart_mm[1] + tcpMax_inc_mm[1] * s;
+	tcpRef_mm[2] = tcpStart_mm[2] + tcpMax_inc_mm[2] * s + hopLift_mm;
+
+	// de TCP-referentie omzetten naar motorreferenties.
+	if (!DeltaKinematics_Inverse(tcpRef_mm, motorTargetRad))
+	{
+		verplaatsingKlaar = false;
+		vPrintString("FOUT: MoveHop padpunt ongeldig voor inverse kinematica.\n");
+		setupMotionProfileDone = false;
+
+		ToState(STATE_PAUSE);
+		return false;
+	}
+
+	// Bepalen van output voltage mbv Fout, PID_Controller + FeedForward
+	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+	{
+		// Het profiel is in TCP-ruimte; motor-acceleratie wordt uit opeenvolgende IK-referenties geschat.
+		if (verplaatsingKlaar)
+		{
+			omegaRef[mI] = 0.0f;
+			alphaRef[mI] = 0.0f;
+		}
+		else
+		{
+			omegaRef[mI] = (motorTargetRad[mI] - motorTargetPrevRad[mI]) / Ts;
+			alphaRef[mI] = (omegaRef[mI] - motorOmegaPrevRad_s[mI]) / Ts;
+		}
+
+		Fout_motorRad[mI] = motorTargetRad[mI] - motorPos_Rad[mI];
+		motorControlOutput[mI] = PIDregelaar(mI, Fout_motorRad[mI]) + FeedForward(alphaRef[mI]);
+		printAnalogVoltage(mI, motorControlOutput[mI]); //TEMP
+		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE);
+	}
+
+	// Daadwerkelijk iedere motor outputvoltage zetten.
+	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+	{
+		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
+		
+		motorTargetPrevRad[mI] = motorTargetRad[mI];
+		motorOmegaPrevRad_s[mI] = omegaRef[mI];
+	}
+
+	if(verplaatsingKlaar)
+	{
+		setupMotionProfileDone = false;
+		float tcpActual_mm[3];
+
+		if (DeltaKinematics_Forward(motorPos_Rad, tcpActual_mm))
+		{
+			float ex = tcpActual_mm[0] - tcpTarget_mm[0];
+			float ey = tcpActual_mm[1] - tcpTarget_mm[1];
+			float ez = tcpActual_mm[2] - tcpTarget_mm[2];
+			float eAbs = sqrtf(ex*ex + ey*ey + ez*ez);
+
+			vPrintString("MoveHop done. ERROR is: X=%.2f Y=%.2f Z=%.2f mm, abs = %.2f mm\n",ex, ey, ez, eAbs);
 		}
 	}
 	// Return true als beweging klaar is, anders false.

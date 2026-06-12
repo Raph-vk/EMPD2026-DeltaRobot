@@ -17,6 +17,7 @@ void MotionPlanning_RESET(void);
 bool HoldCurrentPosition(bool grab, float waitTime_s);
 bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s);
 bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s);
+bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s);
 bool MoveJ_ArmDEG123t(float M1DEG, float M2DEG, float M3DEG, float maxTime_s);
 
 #endif /* MOTIONPLANNING_H_ */
