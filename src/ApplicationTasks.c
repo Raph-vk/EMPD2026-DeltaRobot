@@ -20,7 +20,7 @@ Deze file is de centrale opstart van de applicatie.
 #include "ControlTask.h"
 #include "InputHandlerTask.h"
 #include "VisualisationTask.h"
-
+#include "DisturbanceCompensation.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // application tasks handler declarations
@@ -40,7 +40,7 @@ SemaphoreHandle_t	handle_NoodSemaphore = NULL;
 QueueHandle_t		handle_StateQueue = NULL;
 QueueHandle_t		handle_potQueue = NULL;
 QueueHandle_t		handle_stroomQueue = NULL;
-
+QueueHandle_t		handle_DisturbanceQueue = NULL;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -106,6 +106,14 @@ void StartApplicationTasks(void)
 		vPrintString("handle_stroomQueue create failed.\n");
 	}
 
+	// Aanmaken van "Disturbance queue"
+	// Geeft de actuele X- en Y-verstoring van het frame door.
+	handle_DisturbanceQueue = xQueueCreate(QueueSize, sizeof(DisturbanceMeasurement_t));
+
+	if (handle_DisturbanceQueue == NULL)
+	{
+		vPrintString("handle_DisturbanceQueue create failed.\n");
+	}
 	
 	/**************************************************** Taken aanmaken ****************************************************/
 	// De taken worden aangemaakt en in de ready list geplaatst.

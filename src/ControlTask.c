@@ -37,7 +37,7 @@
 #include "MotionPlanning.h"
 #include "QuadratureCounters.h"
 #include "Regelaar.h"
-
+#include "DisturbanceCompensation.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
