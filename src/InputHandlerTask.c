@@ -28,6 +28,7 @@
 // application includes
 #include "MachinePins.h"
 #include "ApplicationTasks.h"
+#include "DisturbanceCompensation.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // defines
@@ -217,6 +218,8 @@ void InputHandlerTask(void *pvParameters)
 		{
 			i = 0;
 			
+			//DisturbanceCompensation_UpdateQueue();
+
 			//Starts conversie van alle kanalen en wacht tot klaar zijn.
 			adc_StartConversion();
 			while (

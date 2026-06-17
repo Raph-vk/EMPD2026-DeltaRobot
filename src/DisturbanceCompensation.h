@@ -31,5 +31,6 @@ typedef struct
 // function prototypes
 void DisturbanceCompensation_Init(QueueHandle_t queue);
 void DisturbanceCompensation_UpdateQueue(void);
+void DisturbanceCompensationTask(void *pvParameters);
 
 #endif /* DISTURBANCECOMPENSATION_H_ */

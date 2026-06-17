@@ -314,6 +314,8 @@ void ControlTask(void *pvParameters)
 					if (atRust)
 					{
 						vPrintString("> HOMING complete, at +25deg -> READY\n");
+						//DisturbanceCompensation_Init(handle_DisturbanceQueue);
+						//DisturbanceCompensation_UpdateQueue();
 						MotionPlanning_RESET();
 						atRust = false;
 						homingWaitDone = false;
