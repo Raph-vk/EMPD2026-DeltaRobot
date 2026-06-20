@@ -67,13 +67,13 @@ void BuildSequence(void)
 	
 	for (uint8_t i = 0; i < 5; i++)
 	{
-		MoveHopXYZ(80.0f,80.0f,zHeight, move);
+		MoveJXYZ(80.0f,80.0f,zHeight, move);
 		Hold(false, wait);
-		MoveHopXYZ(80.0f,-80.0f,zHeight, move);
+		MoveJXYZ(80.0f,-80.0f,zHeight, move);
 		Hold(false, wait);
-		MoveHopXYZ(-80.0f,-80.0f,zHeight, move);
+		MoveJXYZ(-80.0f,-80.0f,zHeight, move);
 		Hold(false, wait);
-		MoveHopXYZ(-80.0f,80.0f,zHeight, move);
+		MoveJXYZ(-80.0f,80.0f,zHeight, move);
 		Hold(false, wait);
 	}
 	

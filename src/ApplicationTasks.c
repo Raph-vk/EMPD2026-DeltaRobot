@@ -20,7 +20,7 @@ Deze file is de centrale opstart van de applicatie.
 #include "ControlTask.h"
 #include "InputHandlerTask.h"
 #include "VisualisationTask.h"
-#include "DisturbanceCompensation.h"
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // application tasks handler declarations
@@ -36,11 +36,14 @@ EventGroupHandle_t handle_ThreadEventGroup = NULL;
 EventGroupHandle_t handle_ButtonEventGroup = NULL;
 
 SemaphoreHandle_t	handle_NoodSemaphore = NULL;
+SemaphoreHandle_t	handle_OffsetZeroRequest = NULL;
+SemaphoreHandle_t	handle_OffsetZeroDone = NULL;
 
 QueueHandle_t		handle_StateQueue = NULL;
-QueueHandle_t		handle_potQueue = NULL;
-QueueHandle_t		handle_stroomQueue = NULL;
-QueueHandle_t		handle_DisturbanceQueue = NULL;
+//QueueHandle_t		handle_potQueue = NULL;
+//QueueHandle_t		handle_stroomQueue = NULL;
+QueueHandle_t		handle_OffsetQueue = NULL;
+//QueueHandle_t		handle_DisturbanceQueue = NULL;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -81,6 +84,20 @@ void StartApplicationTasks(void)
 		vPrintString("handle_NoodSemaphore create failed.\n");
 	}
 
+	// Semaphore waarmee Homing/InputHandler een offset-nulmeting kan aanvragen.
+	handle_OffsetZeroRequest = xSemaphoreCreateBinary();
+	if (handle_OffsetZeroRequest == NULL)
+	{
+		vPrintString("handle_OffsetZeroRequest create failed.\n");
+	}
+
+	// Semaphore waarmee InputHandler meldt dat offset-nulmeting klaar is.
+	handle_OffsetZeroDone = xSemaphoreCreateBinary();
+	if (handle_OffsetZeroDone == NULL)
+	{
+		vPrintString("handle_OffsetZeroDone create failed.\n");
+	}
+
 	// Aanmaken van "SystemState queue"
 	// Geeft de actuele status waarin de machine zich bevindt door.
 	handle_StateQueue = xQueueCreate(QueueSize, sizeof(SystemState_t));
@@ -89,7 +106,15 @@ void StartApplicationTasks(void)
 		vPrintString("handle_StateQueue create failed.\n");
 	}
 	
-
+	// Aanmaken van "Offset queue"
+	// Geeft de actuele X- en Y-offset van de frame-sensoren door.
+	handle_OffsetQueue = xQueueCreate(QueueSize, sizeof(OffsetPos_t));
+	if (handle_OffsetQueue == NULL)
+	{
+		vPrintString("handle_OffsetQueue create failed.\n");
+	}
+	
+	/*
 	// Aanmaken van "potQueue"
 	// Geeft de actuele procentuele stap-waarde van de potmeter door.
 	handle_potQueue = xQueueCreate(QueueSize, sizeof(uint32_t));
@@ -105,15 +130,16 @@ void StartApplicationTasks(void)
 	{
 		vPrintString("handle_stroomQueue create failed.\n");
 	}
-
+	
 	// Aanmaken van "Disturbance queue"
 	// Geeft de actuele X- en Y-verstoring van het frame door.
 	handle_DisturbanceQueue = xQueueCreate(QueueSize, sizeof(DisturbanceMeasurement_t));
-
 	if (handle_DisturbanceQueue == NULL)
 	{
 		vPrintString("handle_DisturbanceQueue create failed.\n");
 	}
+	
+	*/
 	
 	/**************************************************** Taken aanmaken ****************************************************/
 	// De taken worden aangemaakt en in de ready list geplaatst.
@@ -136,4 +162,3 @@ void StartApplicationTasks(void)
 	}
 	/**************************************************** Taken aanmaken ****************************************************/
 }
-

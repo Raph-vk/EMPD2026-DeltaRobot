@@ -83,8 +83,8 @@ void VisualisationTask(void *pvParameters)
 	SystemState_t vorigeStatus = (SystemState_t)-1;
 	uint32_t i = 0;
 
-	char potLine[24];
-	char stroomLine[24];
+	//char potLine[24];
+	//char stroomLine[24];
 	char stateLine[24];
 	const char *stateString = ""; // Moeten const en pointer zijn!
 	const char *operatorLine1 = "";
@@ -206,10 +206,11 @@ void VisualisationTask(void *pvParameters)
 		else
 		{
 			// Scherm schrijven
-			uint32_t procent;
-			float stroom;
+			//uint32_t procent;
+			//float stroom;
 
 			// Potmeterwaarde niet-destructief uit de queue lezen
+			/*
 			if (xQueuePeek(handle_potQueue, &procent, 0) == pdTRUE)
 			{
 				snprintf(potLine, sizeof(potLine), "vMax:%0u%%", (unsigned int)procent);
@@ -229,10 +230,11 @@ void VisualisationTask(void *pvParameters)
 			{
 				snprintf(stroomLine, sizeof(stroomLine), "Stroom:---A");
 			}
+			*/
 
 			// Infolijn toevoegen.
 			snprintf(stateLine, sizeof(stateLine), "Status: %s", stateString);
-			if (Screen_DrawStatus(stateLine, operatorLine1, operatorLine2, stroomLine, potLine))
+			if (Screen_DrawStatus(stateLine, operatorLine1, operatorLine2))
 			{
 				updateDisplay = false;
 			}

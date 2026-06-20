@@ -37,7 +37,7 @@
 #include "MotionPlanning.h"
 #include "QuadratureCounters.h"
 #include "Regelaar.h"
-#include "DisturbanceCompensation.h"
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
@@ -158,8 +158,8 @@ void ControlTask(void *pvParameters)
 	bool atBackoff = false;
 	
 	uint8_t noodCount = 0;
-	float gemetenStroom = 0.0f;
-	BaseType_t hasCurrentSample = pdFALSE;
+	//float gemetenStroom = 0.0f;
+	//BaseType_t hasCurrentSample = pdFALSE;
 	
 	///////////////////////////////////////////////////////////////////////////////
 	vPrintString("> starting ControlTask.\n");
@@ -253,6 +253,7 @@ void ControlTask(void *pvParameters)
 			noodCount = 0;
 		}
 
+		/*
 		//als fout actief is, of als stroom te hoog oploopt.
 		hasCurrentSample = xQueuePeek(handle_stroomQueue, &gemetenStroom, 0);
 		if ( (hasCurrentSample == true && gemetenStroom >= (maxStroom-1.0) ) )
@@ -260,6 +261,7 @@ void ControlTask(void *pvParameters)
 			vPrintString("> NOOD: Gemeten stroom te hoog, %.2f!\n", gemetenStroom);
 			ToState(STATE_FAULT);
 		}
+		*/
 
 		switch (state)
 		{

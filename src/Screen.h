@@ -17,11 +17,7 @@
 // function prototypes
 
 bool Screen_Init(void);
-bool Screen_DrawStatus(const char *stateTxt,
-					   const char *opTxt1,
-					   const char *opTxt2,
-					   const char *stroomTxt,
-					   const char *potTxt);
+bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2 );
 bool Screen_Recover(void);
 status_code_t Screen_GetLastTransferStatus(void);
 

@@ -39,9 +39,11 @@
 #include "MotorControl.h" //<-- helper functies motor-aansturing
 #include "QuadratureCounters.h" //<-- Lees motorposities
 
+#include "ApplicationTasks.h"
 #include "ControlTask.h"
 #include "MachinePins.h"
 #include "Regelaar.h"
+
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -107,6 +109,7 @@ static bool fijnGevonden[N_MOTORS] = { false, false, false };
 
 
 static uint32_t stabilisatieTeller = 0U;
+static bool offsetZeroRequested = false;
 
 static float uDac = 0.0f;
 
@@ -286,6 +289,7 @@ static void Initialiseren(void)
     
 	//Reset flags en teller
 	stabilisatieTeller = 0U;
+	offsetZeroRequested = false;
     for (uint8_t motor = 0U; motor < N_MOTORS; motor++)
     {
 	    grofGevonden[motor] = false;
@@ -399,21 +403,32 @@ static void NaarBackoffPositie(void)
 		ZetMotorSpanning(motor, uDac);
 	}
 
-	//Als alle armen op terugpositie zijn,
-	if (AlleFlagsWaar(armOpBackoffPos) )
+	// Als op positie even stabiliseren en offset nullen
+	if (AlleFlagsWaar(armOpBackoffPos))
 	{
 		//Armen nog even uitstabiliseren op hoek.
 		stabilisatieTeller++;
 		if (stabilisatieTeller > STABILISATIE_TIJD_MS)
 		{
-		    vPrintString("> Backoff gestabiliseerd. Start nauwkeurig zoeken.\n");
-			homingStatus = HOMING_NAUW_ZOEKEN;
+			// Vragen of offsetmeting genult wordt.
+			if (!offsetZeroRequested)
+			{
+				vPrintString("> Backoff gestabiliseerd. Offset meting nullen.\n");
+				xSemaphoreTake(handle_OffsetZeroDone, 0);      // oude done wissen
+				xSemaphoreGive(handle_OffsetZeroRequest);      // zeroing starten
+				offsetZeroRequested = true;
+			}
+
+			if (xSemaphoreTake(handle_OffsetZeroDone, 0) == pdTRUE)
+			{
+				offsetZeroRequested = false;
+				stabilisatieTeller = 0;
+				vPrintString("> OffsetMeting genult. Start nauwkeurig zoeken.\n");
+				homingStatus = HOMING_NAUW_ZOEKEN;
+			}
 		}
-	}
-	else
-	{
-		stabilisatieTeller = 0;
-	}
+	}//end stabilisatie
+
 } //eind NaarBackoffPositie();
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -65,11 +65,7 @@ bool Screen_Init(void)
  * Invoer: tekstregels voor status, operatorinformatie, stroom en potmeter.
  * Uitvoer: true wanneer de transfer gelukt is, anders false.
  */
-bool Screen_DrawStatus(const char *stateTxt,
-					   const char *opTxt1,
-					   const char *opTxt2,
-					   const char *stroomTxt,
-					   const char *potTxt)
+bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2 )
 {
 	if (g_oledReady == false)
 	{
@@ -92,9 +88,9 @@ bool Screen_DrawStatus(const char *stateTxt,
 		u8g2_DrawStr(&g_u8g2, 0, 31, opTxt2);
 
 		// Onderste data regel
-		u8g2_SetFont(&g_u8g2, u8g2_font_5x7_tr);
-		u8g2_DrawStr(&g_u8g2, 0, 62,  stroomTxt);
-		u8g2_DrawStr(&g_u8g2, 80, 62, potTxt);
+		//u8g2_SetFont(&g_u8g2, u8g2_font_5x7_tr);
+		//u8g2_DrawStr(&g_u8g2, 0, 62,  stroomTxt);
+		//u8g2_DrawStr(&g_u8g2, 80, 62, potTxt);
 	} while (u8g2_NextPage(&g_u8g2));
 
 	if (g_oledTransferError)

@@ -10,6 +10,7 @@
 #include <asf.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <math.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // HAL includes for RTSW board
@@ -28,13 +29,21 @@
 // application includes
 #include "MachinePins.h"
 #include "ApplicationTasks.h"
-#include "DisturbanceCompensation.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // defines
 #define ADC_REFERENCE_VOLTAGE         3.3f
 #define CURRENT_SENSOR_VOLTS_PER_AMP  0.1f
+#define adcMaxValue					  4095.0f
+#define mmStroke					30.0f
+#define mmThreshold					0.01f
 
+#define xDisturbanceChannel 3U
+#define yDisturbanceChannel 4U
+
+#define calibrationSamples 100U
+///////////////////////////////////////////////////////////////////////////////
+//file globals
 
 ///////////////////////////////////////////////////////////////////////////////
 // static bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit)
@@ -119,19 +128,20 @@ static void ProcessPotmeterData(uint32_t potData)
     }
 }
 */
-///////////////////////////////////////////////////////////////////////////////
-// status stroomsensor
-static bool hasCurrentSample = false;
-static uint32_t vorigeStroomData = 0;
-static float zeroCurrentVoltage = 2.5f;        // Better: measure this during startup
+
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // static void ProcessCurrentSensorData(uint32_t stroomData)
+//static bool hasCurrentSample = false;
+//static uint32_t vorigeStroomData = 0;
+//static float zeroCurrentVoltage = 2.5f;        // Better: measure this during startup
 /*
  * Zet de ADC-waarde van de stroomsensor om naar een stroomwaarde in ampere.
  * Invoer: stroomData is de ruwe ADC-waarde van de sensor.
  * Uitvoer: geen returnwaarde; schrijft de berekende stroom naar handle_stroomQueue.
  */
+/*
 static void ProcessCurrentSensorData(uint32_t stroomData)
 {
 	uint32_t verschil;
@@ -165,13 +175,68 @@ static void ProcessCurrentSensorData(uint32_t stroomData)
 	// ACS712: uitgang is rond VCC/2 bij 0A
 	float stroom = (spanning - zeroCurrentVoltage) * 10.0f; // *10.0f is gelijk aan delen door 100mV/A
 	xQueueOverwrite(handle_stroomQueue, &stroom);
-}
-
+}*/
 
 
 ///////////////////////////////////////////////////////////////////////////////
-uint8_t stroomChannel = 3;
-uint8_t potChannel = 4;
+// static void UpdateMovingAverageFilter(...)
+#define MovingAverageSamples    (9U)
+#define OFFSET_FILTER_X         (0U)
+#define OFFSET_FILTER_Y         (1U)
+#define FILTERCHANNELS		    (2U)
+/*
+ * Werkt het moving average filter bij voor een enkel ADC-kanaal.
+ */
+static void MovingAverageFilter(uint8_t fc, uint16_t AdcRaw, float *AdcFiltered, bool resetFilter)
+{
+	static uint8_t adcFilterReady[FILTERCHANNELS] = { 0U, 0U };
+	static uint8_t adcFilterIndex[FILTERCHANNELS] = { 0U, 0U };
+
+	static uint32_t adcSum[FILTERCHANNELS] = { 0U, 0U };
+	static uint16_t adcBuffer[FILTERCHANNELS][MovingAverageSamples];
+
+	//veiligheid afscherming
+	if ((fc >= FILTERCHANNELS) || (AdcFiltered == NULL))
+	{
+		return;
+	}
+
+	// controleren geheugen gevuld/gereset moet worden.
+	if ((adcFilterReady[fc] == 0U) || resetFilter)
+	{
+		adcSum[fc] = 0U;
+
+		//door alle geheugens loopen
+		for (uint8_t i = 0U; i < MovingAverageSamples; i++)
+		{
+			adcBuffer[fc][i] = AdcRaw;
+			adcSum[fc] += AdcRaw;
+		}
+
+		adcFilterIndex[fc] = 0U;
+		adcFilterReady[fc] = 1U;
+	}
+	// volgens RingBuffer de samples vervangen.
+	else
+	{
+		uint8_t index = adcFilterIndex[fc];
+
+		adcSum[fc] -= adcBuffer[fc][index];
+		adcBuffer[fc][index] = AdcRaw;
+		adcSum[fc] += AdcRaw;
+
+		//naar volgende sample gaan.
+		index++;
+		if (index >= MovingAverageSamples)
+		{
+			index = 0U;
+		}
+		adcFilterIndex[fc] = index;
+	}
+
+	//Output waarde
+	*AdcFiltered = (float)adcSum[fc] / (float)MovingAverageSamples;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // void InputHandlerTask(void *pvParameters)
@@ -183,11 +248,24 @@ uint8_t potChannel = 4;
 void InputHandlerTask(void *pvParameters)
 {
 	vPrintString("> starting InputHandlerTask\n");
+	float xZeroPos = 0.0f;
+	float yZeroPos = 0.0f;
+		
+	//oneindiggrote waarde zodat eerste keer altijd groot verschil is.
+	OffsetPos_t previousMeasurement = { INFINITY, INFINITY }; 
+	OffsetPos_t measurement = { 0.0f, 0.0f };
 
-	adc_EnableChannel(stroomChannel);
-	//adc_EnableChannel(potChannel);
+	bool zeroingActive = false;
+	bool offsetZeroed = false;
+	bool resetFilter = false;
+	//bool previousMeasurementValid = false;
+	//bool offsetQueueReadyPrinted = false;
+	uint32_t xSum = 0, ySum = 0;
+	uint16_t xAdcRaw = 0, yAdcRaw = 0;
+	uint16_t sampleCount = 0;
 
-	uint8_t i = 0;
+	adc_EnableChannel(xDisturbanceChannel);
+	adc_EnableChannel(yDisturbanceChannel);
 	
 	// Apart aangeven dat deze task actief is
 	vPrintString("> running InputHandlerTask\n");
@@ -213,28 +291,87 @@ void InputHandlerTask(void *pvParameters)
 			vPrintString("> RESET button is pressed!\n");
 			xEventGroupSetBits(handle_ButtonEventGroup, EVT_RESET_BUTTON);
 		}
-		
-		if (i >= 10)
+
+
+
+		// Analoge kanalen uitlezen
+		adc_StartConversion();
+		while ((adc_IsConversionReady(xDisturbanceChannel) == false) ||
+		(adc_IsConversionReady(yDisturbanceChannel) == false))
 		{
-			i = 0;
+			taskSleep(0);
+		}
+		xAdcRaw = (uint16_t)adc_ReadData(xDisturbanceChannel);
+		yAdcRaw = (uint16_t)adc_ReadData(yDisturbanceChannel);
+
+		// Als zero wordt aangevraagd, deze pakken en "zeroingActive" flag op true zetten
+		if (xSemaphoreTake(handle_OffsetZeroRequest, 0) == pdTRUE)
+		{
+			zeroingActive = true;
+			offsetZeroed = false;
+			sampleCount = 0;
+			xSum = 0;
+			ySum = 0;
+			xSemaphoreTake(handle_OffsetZeroDone, 0);
+			vPrintString("> Offset zeroing requested.\n");
+		}
+
+		// als offset positie genult moet worden.
+		if (zeroingActive)
+		{
+			// uitlezen van data en toevoegen.
+			xSum += xAdcRaw;
+			ySum += yAdcRaw;
+			sampleCount++;
 			
-			//DisturbanceCompensation_UpdateQueue();
-
-			//Starts conversie van alle kanalen en wacht tot klaar zijn.
-			adc_StartConversion();
-			while (
-				(adc_IsConversionReady(stroomChannel) == false)) //(adc_IsConversionReady(potChannel) == false) ||
+			// als er genoeg samples gevonden zijn
+			if (sampleCount >= calibrationSamples)
 			{
-				taskSleep(0);
+				// Als de hoeveelheid samples gehaald zijn.
+				xZeroPos = (float)xSum / (float)calibrationSamples;
+				yZeroPos = (float)ySum / (float)calibrationSamples;
+				vPrintString("> Offset calibratie klaar.\n");
+				
+				//vPrintString("> xZeroAdc: %.2f\n", xZeroPos);
+				//vPrintString("> yZeroAdc: %.2f\n", yZeroPos);
+				zeroingActive = false;
+				offsetZeroed = true;
+				previousMeasurement.xOffset = INFINITY;
+				previousMeasurement.yOffset = INFINITY;
+				resetFilter = true;
+				xSemaphoreGive(handle_OffsetZeroDone);
 			}
-
-			ProcessCurrentSensorData( adc_ReadData(stroomChannel));
-			//ProcessPotmeterData( adc_ReadData(potChannel));
 		}
-		else
+		else if (offsetZeroed)
 		{
-			i++;
-		}
+			float xAdcFiltered = 0.0f;
+			float yAdcFiltered = 0.0f;
+
+			MovingAverageFilter(OFFSET_FILTER_X, xAdcRaw, &xAdcFiltered, resetFilter);
+			MovingAverageFilter(OFFSET_FILTER_Y, yAdcRaw, &yAdcFiltered, resetFilter);
+			resetFilter = false;
+
+			measurement.xOffset = ((xAdcFiltered - xZeroPos) / adcMaxValue) * mmStroke;
+			measurement.yOffset = ((yAdcFiltered - yZeroPos) / adcMaxValue) * mmStroke;
+				
+			// Bepaal het verschil met de vorige meting die naar de queue is geschreven.
+			// De treshold werkt dus niet ten opzichte van 0 mm, maar ten opzichte van
+			// de laatst gebruikte verstoringswaarde.
+			//
+			// Als X of Y genoeg veranderd is, naar de queue schrijven.
+			if ( (fabsf(measurement.xOffset - previousMeasurement.xOffset) > mmThreshold) ||
+			     (fabsf(measurement.yOffset - previousMeasurement.yOffset) > mmThreshold) )
+			{
+				if (handle_OffsetQueue != NULL)
+				{
+					if (xQueueOverwrite(handle_OffsetQueue, &measurement) == pdPASS)
+					{
+						previousMeasurement = measurement;
+					}
+				}
+			}
+		}//end-Offset bepaling
+		
 		taskSleep(10);
 	}
 /*Should never get Here*/
