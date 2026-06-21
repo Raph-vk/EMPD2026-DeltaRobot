@@ -32,16 +32,18 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // defines
-#define ADC_REFERENCE_VOLTAGE         3.3f
-#define CURRENT_SENSOR_VOLTS_PER_AMP  0.1f
-#define adcMaxValue					  4095.0f
-#define mmStroke					30.0f
-#define mmThreshold					0.01f
+#define ADC_REFERENCE_VOLTAGE         (3.3f)
+#define CURRENT_SENSOR_VOLTS_PER_AMP  (0.1f)
 
-#define xDisturbanceChannel 3U
-#define yDisturbanceChannel 4U
+#define adcMaxValue					  (4095.0f)
+#define mmStroke					(30.0f)
+#define mmThreshold					(0.01f)
 
-#define calibrationSamples 100U
+#define xDisturbanceChannel (3U)
+#define yDisturbanceChannel (4U)
+
+#define calibrationSamples (100U)
+#define MOVING_AVERAGE_SAMPLES (9U)
 ///////////////////////////////////////////////////////////////////////////////
 //file globals
 
@@ -90,46 +92,68 @@ static bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit)
 	return true;
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////
-// static void ProcessPotmeterData(uint32_t potData)
-//#define PERCENT_STEP_SIZE       5u
-//static uint32_t lastProcent = UINT32_MAX;
+// static void UpdateMovingAverageFilter(...)
 /*
- * Zet de ADC-waarde van de potmeter om naar een percentage in stappen van 5%.
- * Invoer: potData is de ruwe ADC-waarde.
- * Uitvoer: geen returnwaarde; schrijft de nieuwe procentwaarde naar handle_potQueue.
+ * Werkt het moving average filter bij met de nieuwste X- en Y-ADC-meting.
  */
-/*
-static void ProcessPotmeterData(uint32_t potData)
+static void MovingAverageFilter(uint16_t xAdcRaw, uint16_t yAdcRaw, OffsetPos_t *ADCfiltered, bool resetFilter)
 {
-    uint32_t procent;
-    uint32_t adcPercentScale = potData * 100u;
+	static uint8_t ADCsampleIndex = 0;
+	static uint16_t xADCbuffer[MOVING_AVERAGE_SAMPLES] = {0}, yADCbuffer[MOVING_AVERAGE_SAMPLES] = {0};	
+	static uint32_t xADCsum = 0, yADCsum = 0;
+	static bool ADCfilterReady = false;
+	
+	//als filter nog niet geinitialiseerd
+	if (!ADCfilterReady || resetFilter)
+	{
+		//sommaties op nul zetten
+		xADCsum = 0;
+		yADCsum = 0;
 
-    if (adcPercentScale < (ADC_MAX_VALUE * PERCENT_STEP_SIZE))
-    {
-        procent = 0u;
-    }
-    else if (adcPercentScale > (ADC_MAX_VALUE * (100u - PERCENT_STEP_SIZE) ))
-    {
-        procent = 100u;
-    }
-    else
-    {
-        uint32_t step = ((potData * 20) + (ADC_MAX_VALUE / 2u)) / ADC_MAX_VALUE;
-        procent = step * PERCENT_STEP_SIZE;
-    }
+		// iedere sample vullen met huidig gemeten waarde
+		for (uint8_t i = 0; i < MOVING_AVERAGE_SAMPLES; i++)
+		{
+			//gehele buffer vullen met actuele meetwaarde
+			xADCbuffer[i] = xAdcRaw;
+			yADCbuffer[i] = yAdcRaw;
 
-    if (procent != lastProcent)
-    {
-        xQueueOverwrite(handle_potQueue, &procent);
-        vPrintString("> Operation Percentage is set to %lu%%\n", (unsigned long)procent);
-        lastProcent = procent;
-    }
+			//sommatie optellen
+			xADCsum += xAdcRaw;
+			yADCsum += yAdcRaw;
+		}
+
+		ADCsampleIndex = 0;
+		ADCfilterReady = true;
+	}
+	// Volgens "Ringbuffer" 
+	// de oudste waarde met nieuwe waarde vervangen 
+	//en gemiddelde uitsturen
+	else
+	{
+		//oude waarde van sommatie aftrekken
+		xADCsum -= xADCbuffer[ADCsampleIndex];
+		yADCsum -= yADCbuffer[ADCsampleIndex];
+		
+		//nieuwe waarde in buffer plaatsen
+		xADCbuffer[ADCsampleIndex] = xAdcRaw;
+		yADCbuffer[ADCsampleIndex] = yAdcRaw;
+		
+		//nieuwe waarde in sommatie plaatsen
+		xADCsum += xAdcRaw;
+		yADCsum += yAdcRaw;
+
+		//sampleIndex optellen
+		ADCsampleIndex++;
+		if (ADCsampleIndex >= MOVING_AVERAGE_SAMPLES)
+		{
+			ADCsampleIndex = 0;
+		}
+	}
+
+	ADCfiltered->x = (float)xADCsum / (float)MOVING_AVERAGE_SAMPLES;
+	ADCfiltered->y = (float)yADCsum / (float)MOVING_AVERAGE_SAMPLES;
 }
-*/
-
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // static void ProcessCurrentSensorData(uint32_t stroomData)
@@ -178,65 +202,114 @@ static void ProcessCurrentSensorData(uint32_t stroomData)
 }*/
 
 
-///////////////////////////////////////////////////////////////////////////////
-// static void UpdateMovingAverageFilter(...)
-#define MovingAverageSamples    (9U)
-#define OFFSET_FILTER_X         (0U)
-#define OFFSET_FILTER_Y         (1U)
-#define FILTERCHANNELS		    (2U)
-/*
- * Werkt het moving average filter bij voor een enkel ADC-kanaal.
- */
-static void MovingAverageFilter(uint8_t fc, uint16_t AdcRaw, float *AdcFiltered, bool resetFilter)
+// static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
+static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
 {
-	static uint8_t adcFilterReady[FILTERCHANNELS] = { 0U, 0U };
-	static uint8_t adcFilterIndex[FILTERCHANNELS] = { 0U, 0U };
+	//static wordt eenmalig aangemaakt
+	static OffsetPos_t previousMeasurement = { INFINITY, INFINITY }; //oneindig zodat waarde altijd te groot is voor treshold
+	static OffsetPos_t measurement = { 0.0f, 0.0f };
+	static OffsetPos_t ZeroPos = {0.0f, 0.0f};
+	static OffsetPos_t ADCfiltered = {0.0f, 0.0f};
 
-	static uint32_t adcSum[FILTERCHANNELS] = { 0U, 0U };
-	static uint16_t adcBuffer[FILTERCHANNELS][MovingAverageSamples];
+	static uint32_t xSum = 0, ySum = 0;
+	static uint8_t sampleCount = 0;
 
-	//veiligheid afscherming
-	if ((fc >= FILTERCHANNELS) || (AdcFiltered == NULL))
+	static bool zeroingActive = true;
+	static bool offsetGehomed = true;
+	static bool resetFilter = true;
+
+	
+	// Als zero wordt aangevraagd, TAKE
+	// "zeroingActive" flag op true zetten
+	// en variabelen goed zetten.
+	if (handle_OffsetZeroRequest != NULL)
 	{
-		return;
-	}
-
-	// controleren geheugen gevuld/gereset moet worden.
-	if ((adcFilterReady[fc] == 0U) || resetFilter)
-	{
-		adcSum[fc] = 0U;
-
-		//door alle geheugens loopen
-		for (uint8_t i = 0U; i < MovingAverageSamples; i++)
+		if (xSemaphoreTake(handle_OffsetZeroRequest, 0) == pdTRUE)
 		{
-			adcBuffer[fc][i] = AdcRaw;
-			adcSum[fc] += AdcRaw;
+			zeroingActive = true;
+			offsetGehomed = false;
+			sampleCount = 0;
+			xSum = 0;
+			ySum = 0;
+			
+			//voor zekerheid óók taken
+			if (handle_OffsetZeroDone != NULL)
+			{
+				xSemaphoreTake(handle_OffsetZeroDone, 0); 
+			}
+			vPrintString("> Offset nullen requested.\n");
 		}
-
-		adcFilterIndex[fc] = 0U;
-		adcFilterReady[fc] = 1U;
 	}
-	// volgens RingBuffer de samples vervangen.
-	else
+
+	// als offset positie genult moet worden.
+	if (zeroingActive)
 	{
-		uint8_t index = adcFilterIndex[fc];
-
-		adcSum[fc] -= adcBuffer[fc][index];
-		adcBuffer[fc][index] = AdcRaw;
-		adcSum[fc] += AdcRaw;
-
-		//naar volgende sample gaan.
-		index++;
-		if (index >= MovingAverageSamples)
+		// uitlezen van data en toevoegen.
+		xSum += xAdcRaw;
+		ySum += yAdcRaw;
+		sampleCount++;
+	
+		// als er genoeg samples gevonden zijn
+		if (sampleCount >= calibrationSamples)
 		{
-			index = 0U;
-		}
-		adcFilterIndex[fc] = index;
-	}
+			vPrintString("> Offset calibratie klaar.\n");
+			
+			ZeroPos.x = (float)xSum / (float)calibrationSamples;
+			ZeroPos.y = (float)ySum / (float)calibrationSamples;
+			previousMeasurement = (OffsetPos_t){ INFINITY, INFINITY };			
 
-	//Output waarde
-	*AdcFiltered = (float)adcSum[fc] / (float)MovingAverageSamples;
+			zeroingActive = false;
+			offsetGehomed = true;
+			
+
+			//filter wordt eenmalig gereset 
+			resetFilter = true;
+			ADCfiltered = (OffsetPos_t){0.0f, 0.0f};
+			MovingAverageFilter(xAdcRaw, yAdcRaw, &ADCfiltered, resetFilter);
+			resetFilter = false;
+			
+			// nieuwe waarde naar queue schrijven
+			measurement.x = ((ADCfiltered.x - ZeroPos.x) / adcMaxValue) * mmStroke;
+			measurement.y = ((ADCfiltered.y - ZeroPos.y) / adcMaxValue) * mmStroke;
+			if (handle_OffsetQueue != NULL)
+			{
+				if (xQueueOverwrite(handle_OffsetQueue, &measurement) == pdPASS)
+				{
+					previousMeasurement = measurement;
+				}
+			}
+			//vrij geven dat nullen voldaan is.
+			if (handle_OffsetZeroDone != NULL)
+			{
+				xSemaphoreGive(handle_OffsetZeroDone);
+			}
+		}
+	}
+	else if (offsetGehomed)
+	{
+		ADCfiltered = (OffsetPos_t){0.0f, 0.0f};
+		MovingAverageFilter(xAdcRaw, yAdcRaw, &ADCfiltered, resetFilter);
+
+		measurement.x = ((ADCfiltered.x - ZeroPos.x) / adcMaxValue) * mmStroke;
+		measurement.y = ((ADCfiltered.y - ZeroPos.y) / adcMaxValue) * mmStroke;
+	
+		// Bepaal het verschil met de vorige meting die naar de queue is geschreven.
+		// Als X of Y genoeg veranderd is, naar de queue schrijven.
+		if ( (fabsf(measurement.x - previousMeasurement.x) > mmThreshold) ||
+		(fabsf(measurement.y - previousMeasurement.y) > mmThreshold) )
+		{
+			if (handle_OffsetQueue != NULL)
+			{
+				if (xQueueOverwrite(handle_OffsetQueue, &measurement) == pdPASS)
+				{
+					previousMeasurement = measurement;
+				}
+			}
+		}
+	}//end-Offset bepaling	
 }
+
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // void InputHandlerTask(void *pvParameters)
@@ -248,24 +321,10 @@ static void MovingAverageFilter(uint8_t fc, uint16_t AdcRaw, float *AdcFiltered,
 void InputHandlerTask(void *pvParameters)
 {
 	vPrintString("> starting InputHandlerTask\n");
-	float xZeroPos = 0.0f;
-	float yZeroPos = 0.0f;
-		
-	//oneindiggrote waarde zodat eerste keer altijd groot verschil is.
-	OffsetPos_t previousMeasurement = { INFINITY, INFINITY }; 
-	OffsetPos_t measurement = { 0.0f, 0.0f };
-
-	bool zeroingActive = false;
-	bool offsetZeroed = false;
-	bool resetFilter = false;
-	//bool previousMeasurementValid = false;
-	//bool offsetQueueReadyPrinted = false;
-	uint32_t xSum = 0, ySum = 0;
-	uint16_t xAdcRaw = 0, yAdcRaw = 0;
-	uint16_t sampleCount = 0;
 
 	adc_EnableChannel(xDisturbanceChannel);
 	adc_EnableChannel(yDisturbanceChannel);
+	uint16_t xAdcRaw = 0, yAdcRaw = 0;
 	
 	// Apart aangeven dat deze task actief is
 	vPrintString("> running InputHandlerTask\n");
@@ -303,74 +362,8 @@ void InputHandlerTask(void *pvParameters)
 		}
 		xAdcRaw = (uint16_t)adc_ReadData(xDisturbanceChannel);
 		yAdcRaw = (uint16_t)adc_ReadData(yDisturbanceChannel);
-
-		// Als zero wordt aangevraagd, deze pakken en "zeroingActive" flag op true zetten
-		if (xSemaphoreTake(handle_OffsetZeroRequest, 0) == pdTRUE)
-		{
-			zeroingActive = true;
-			offsetZeroed = false;
-			sampleCount = 0;
-			xSum = 0;
-			ySum = 0;
-			xSemaphoreTake(handle_OffsetZeroDone, 0);
-			vPrintString("> Offset zeroing requested.\n");
-		}
-
-		// als offset positie genult moet worden.
-		if (zeroingActive)
-		{
-			// uitlezen van data en toevoegen.
-			xSum += xAdcRaw;
-			ySum += yAdcRaw;
-			sampleCount++;
-			
-			// als er genoeg samples gevonden zijn
-			if (sampleCount >= calibrationSamples)
-			{
-				// Als de hoeveelheid samples gehaald zijn.
-				xZeroPos = (float)xSum / (float)calibrationSamples;
-				yZeroPos = (float)ySum / (float)calibrationSamples;
-				vPrintString("> Offset calibratie klaar.\n");
-				
-				//vPrintString("> xZeroAdc: %.2f\n", xZeroPos);
-				//vPrintString("> yZeroAdc: %.2f\n", yZeroPos);
-				zeroingActive = false;
-				offsetZeroed = true;
-				previousMeasurement.xOffset = INFINITY;
-				previousMeasurement.yOffset = INFINITY;
-				resetFilter = true;
-				xSemaphoreGive(handle_OffsetZeroDone);
-			}
-		}
-		else if (offsetZeroed)
-		{
-			float xAdcFiltered = 0.0f;
-			float yAdcFiltered = 0.0f;
-
-			MovingAverageFilter(OFFSET_FILTER_X, xAdcRaw, &xAdcFiltered, resetFilter);
-			MovingAverageFilter(OFFSET_FILTER_Y, yAdcRaw, &yAdcFiltered, resetFilter);
-			resetFilter = false;
-
-			measurement.xOffset = ((xAdcFiltered - xZeroPos) / adcMaxValue) * mmStroke;
-			measurement.yOffset = ((yAdcFiltered - yZeroPos) / adcMaxValue) * mmStroke;
-				
-			// Bepaal het verschil met de vorige meting die naar de queue is geschreven.
-			// De treshold werkt dus niet ten opzichte van 0 mm, maar ten opzichte van
-			// de laatst gebruikte verstoringswaarde.
-			//
-			// Als X of Y genoeg veranderd is, naar de queue schrijven.
-			if ( (fabsf(measurement.xOffset - previousMeasurement.xOffset) > mmThreshold) ||
-			     (fabsf(measurement.yOffset - previousMeasurement.yOffset) > mmThreshold) )
-			{
-				if (handle_OffsetQueue != NULL)
-				{
-					if (xQueueOverwrite(handle_OffsetQueue, &measurement) == pdPASS)
-					{
-						previousMeasurement = measurement;
-					}
-				}
-			}
-		}//end-Offset bepaling
+		
+		ProcessOffsetPositionData(xAdcRaw, yAdcRaw);
 		
 		taskSleep(10);
 	}

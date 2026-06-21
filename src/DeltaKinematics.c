@@ -21,7 +21,6 @@
 
 #define DEG_TO_RAD		(0.01745329252f)
 #define RAD_TO_DEG		(57.2957795131f)
-#define DELTAKINEMATICS_PRINT_IK	(0)
 
 //////////////////////////////////////////////////////////////////////////////
 //file globals
@@ -46,9 +45,7 @@ static const float phi[N_MOTORS] = {0.0f, (120.0f * DEG_TO_RAD), (240.0f * DEG_T
  */
 bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOTORS]) // 
 {
-	#if DELTAKINEMATICS_PRINT_IK
-		vPrintString("IK input was: X = %.1f, Y = %.1f, Z = %.1f [mm]\n", tcpPosition_mm[0], tcpPosition_mm[1], tcpPosition_mm[2]);
-	#endif
+	//vPrintString("IK input was: X = %.1f, Y = %.1f, Z = %.1f [mm]\n", tcpPosition_mm[0], tcpPosition_mm[1], tcpPosition_mm[2]);
 	//////////////////////////////////////////////////////////////////////////
 	// functie declaraties
 	//x = tcpPosition_mm[0];
@@ -149,13 +146,12 @@ bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 		}
 	}//eind motor loop
 
-	#if DELTAKINEMATICS_PRINT_IK
+
 	vPrintString(
 	"IK result: armDeg M1=%.3f, M2=%.3f, M3=%.3f graden\n",
 	(motorRad[0] / i_twk) * RAD_TO_DEG,
 	(motorRad[1] / i_twk) * RAD_TO_DEG,
 	(motorRad[2] / i_twk) * RAD_TO_DEG );
-	#endif
 
 
 	// Alle motorhoeken zijn berekend en geldig

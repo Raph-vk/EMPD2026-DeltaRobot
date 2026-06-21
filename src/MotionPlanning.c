@@ -29,6 +29,8 @@
 #include "ControlTask.h"
 #include "MotionProfiles.h"
 #include "Regelaar.h"
+#include "InputHandlerTask.h"
+#include "ApplicationTasks.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // const globals
@@ -57,9 +59,30 @@ static float Fout_motorRad[N_MOTORS] = {0.0f, 0.0f, 0.0f};	// Berekende fout in 
 static float motorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};	// Gemeten motor-as positie [rad]
 static bool setupMotionProfileDone = false;
 static bool verplaatsingKlaar = false;
-static bool gripperSetupDone = false;
+static bool setupDone = false;
 static float t0 = 0.0f;
 static float tau = 0.0f; // [s] tijd sinds start van beweging
+
+static float motorTargetRad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Berekende motor-eindpositie [rad]
+static float thetaStart[N_MOTORS];		// Motorpositie aan het begin van de beweging [rad]
+static float thetaMax_inc[N_MOTORS];	// Totale incrementele motorverplaatsing [rad]
+
+
+static float tcpStart_mm[N_TCP_AXES]		= {0.0f, 0.0f, 0.0f};	// TCP-startpositie [mm]
+static float tcpTarget_mm[N_TCP_AXES]		= {0.0f, 0.0f, 0.0f};	// TCP-eindpositie [mm]
+static float tcpMax_inc_mm[N_TCP_AXES]		= {0.0f, 0.0f, 0.0f};	// Totale incrementele TCP-verplaatsing [mm]
+
+static float tcpRef_mm[N_TCP_AXES]			= {0.0f, 0.0f, 0.0f};	// TCP-positiereferentie [mm]
+
+static float motorTargetPrevRad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Vorige IK-motorreferentie [rad]
+static float motorOmegaPrevRad_s[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Vorige motor-snelheidsreferentie [rad/s]
+
+static float omegaRef[N_MOTORS];		// Motor-snelheidsreferentie [rad/s]
+static float alphaRef[N_MOTORS];		// Motor-acceleratiereferentie [rad/s^2]
+
+static OffsetPos_t offset = {0.0f, 0.0f};
+static OffsetPos_t vorigeOffset = {0.0f, 0.0f};
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // static void printAnalogVoltage(float analogvoltage)
@@ -68,10 +91,11 @@ static float tau = 0.0f; // [s] tijd sinds start van beweging
  * Invoer: analogvoltage is de laatst berekende motorspanning in volt.
  * Uitvoer: geen returnwaarde; schrijft alleen naar de debugconsole.
  */
-static uint32_t analogPrintCounter = 0;
-static float spikeVoltage[N_MOTORS] = {0.0f, 0.0f, 0.0f};
 static void printAnalogVoltage(uint8_t m,  float analogvoltage)
 {
+	static uint32_t analogPrintCounter = 0;
+	static float spikeVoltage[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+		
 	// spike voltage
 	if (fabsf(analogvoltage) > fabsf(spikeVoltage[m]))
 	{
@@ -104,11 +128,40 @@ void MotionPlanning_RESET(void)
 	g_time = 0.0f;
 	setupMotionProfileDone = false;
 	verplaatsingKlaar = false;
-	gripperSetupDone = false;
+	setupDone = false;
 }
+	
+	
 
 ///////////////////////////////////////////////////////////////////////////////
-static float holdMotorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
+// void ApplyTcpOffset(float *compensatedTCPref_mm[N_TCP_AXES])
+/*
+ * Helper functie om tcpoffset toe te voegen aan
+ * TCPref[X,Y,z] in mm.
+ */
+static bool VoegTCPoffsetToe(float tcp_mm[N_TCP_AXES])
+{
+	static OffsetPos_t laatsteOffset = {INFINITY, INFINITY};
+	static OffsetPos_t nieuweOffset = {0.0f, 0.0f};
+	bool offsetGewijzigd = false;
+
+	//uitlezen of er een nieuwe waarde is.
+	if (xQueuePeek(handle_OffsetQueue, &nieuweOffset, 0) == pdTRUE)
+	{
+		offsetGewijzigd = nieuweOffset.x != laatsteOffset.x || nieuweOffset.y != laatsteOffset.y;
+
+		laatsteOffset = nieuweOffset;
+	}
+
+	//compensatie toevoegen
+	tcp_mm[0] += nieuweOffset.x;
+	tcp_mm[1] += nieuweOffset.y;
+
+
+	return offsetGewijzigd;
+}
+
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // bool HoldPosition(const float holdArmPos_RAD[N_MOTORS])
@@ -119,6 +172,8 @@ static float holdMotorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden m
  */
 static void HoldPosition(const float holdArmPos_RAD[N_MOTORS])
 {	
+	static float holdMotorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
+
 	// Lees motorposities uit.
 	LeesMotorPositiesRad(motorPos_Rad);
 
@@ -149,6 +204,7 @@ static void HoldPosition(const float holdArmPos_RAD[N_MOTORS])
 }//End HoldPosition();
 
 
+
 ///////////////////////////////////////////////////////////////////////////////
 // bool HoldCurrentPosition(bool grab, float waitTime_s)
 /*
@@ -159,7 +215,7 @@ static void HoldPosition(const float holdArmPos_RAD[N_MOTORS])
 bool HoldCurrentPosition(bool grab, float waitTime_s)
 {
 	//eerste keer
-	if (!gripperSetupDone)
+	if (!setupDone)
 	{
 		port_SetBit(BIT_GRIPPER, grab);
 
@@ -168,13 +224,13 @@ bool HoldCurrentPosition(bool grab, float waitTime_s)
 		
 		//check time
 		t0 = g_time;
-		gripperSetupDone = true;
+		setupDone = true;
 	}
 	
 	// Als tijd voorbij is
 	else if (g_time - t0 >= waitTime_s)
 	{
-		gripperSetupDone = false;
+		setupDone = false;
 		g_time += Ts;
 		return true; // Hold positie voldaan
 	}
@@ -188,11 +244,112 @@ bool HoldCurrentPosition(bool grab, float waitTime_s)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// status bewegingsprofiel
-static float motorTargetRad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Berekende motor-eindpositie [rad]
+// bool HoldCurrentXYZPosition(bool grab, float waitTime_s)
+/*
+ * Houdt de huidige TCP-positie vast en compenseert gemeten X/Y-frameverstoring.
+ *
+ * Bij de eerste aanroep wordt de actuele TCP-positie bepaald uit de gemeten
+ * motorposities en opgeslagen als vaste holdpositie. Daarna wordt de nieuwste
+ * offset uit de queue gelezen. Alleen wanneer de offset verandert,
+ * wordt een nieuwe gecompenseerde TCP-positie berekend en via inverse kinematica
+ * omgerekend naar armposities. De bestaande HoldPosition-functie houdt vervolgens
+ * de armen in regeling.
+ *
+ * Invoer:
+ * grab bepaalt de gripperstand.
+ * waitTime_s is de tijd in seconden dat de positie vastgehouden moet worden.
+ *
+ * Uitvoer:
+ * true wanneer de wachttijd verstreken is, anders false.
+ */
+bool HoldCurrentXYZPosition(bool grab, float waitTime_s)
+{
+	static bool holdTargetGeldig = false;
 
-static float thetaStart[N_MOTORS];		// Motorpositie aan het begin van de beweging [rad]
-static float thetaMax_inc[N_MOTORS];	// Totale incrementele motorverplaatsing [rad]
+	//grijper aan/uit zetten en positie uitlezen 
+	if (!setupDone)
+	{
+		//grijper instellen
+		port_SetBit(BIT_GRIPPER, grab);
+
+		//motorpositie uitlezen en XYZ-pos bepalen
+		LeesMotorPositiesRad(motorPos_Rad);
+		if (!DeltaKinematics_Forward(motorPos_Rad, tcpRef_mm)) 
+		{
+			//als FK niet lukt
+			ToState(STATE_PAUSE);
+			return false;
+		}
+
+		verplaatsingKlaar = false;
+		t0 = g_time;
+		setupDone = true;
+		holdTargetGeldig = false;
+	}
+	// Als wachttijd verstreken is
+	else if (g_time - t0 >= waitTime_s)
+	{
+		setupDone = false;
+		verplaatsingKlaar = true;
+	}
+
+	/*
+	// controleer of er een nieuwe waarde is
+	if (xQueuePeek(handle_OffsetQueue, &offset, 0) == pdTRUE)
+	{
+		if (offset.x != previousOffset.x || offset.y != previousOffset.y) //!previousDisturbanceValid ||
+		{
+			//nog dubbelchecken of +/- offset is
+			vPrintString("> Offset X=%.2fmm en Y=%.2fmm.\n", offset.x, offset.y);
+			
+			compensatedTCPref_mm[0] = tcpRef_mm[0] ; //- offset.x
+			compensatedTCPref_mm[1] = tcpRef_mm[1] ; //- offset.y
+			compensatedTCPref_mm[2] = tcpRef_mm[2];
+
+			// bepaal nieuwe motorposities
+			if (!DeltaKinematics_Inverse(compensatedTCPref_mm, motorTargetRad))
+			{
+				//als IK niet lukt
+				ToState(STATE_PAUSE);
+				return false;
+			}
+			
+			for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+			{
+				holdTargetPos[mI] = motorTargetRad[mI] / i_twk; //terug in armRAD
+			}
+			previousOffset = offset;	
+		}
+	}
+	*/
+	
+	float tcpHoldRef_mm[N_TCP_AXES] = {
+		tcpRef_mm[0],
+		tcpRef_mm[1],
+		tcpRef_mm[2]
+	};
+
+	bool offsetGewijzigd = VoegTCPoffsetToe(tcpHoldRef_mm);
+
+	if (offsetGewijzigd || !holdTargetGeldig)
+	{
+		if (!DeltaKinematics_Inverse(tcpHoldRef_mm, motorTargetRad))
+		{
+			ToState(STATE_PAUSE);
+			return false;
+		}
+
+		for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+		{
+			holdTargetPos[mI] = motorTargetRad[mI] / i_twk;
+		}
+	}
+
+	HoldPosition(holdTargetPos);
+	g_time += Ts;
+	return verplaatsingKlaar;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 /*
@@ -215,7 +372,7 @@ bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	// Eenmalig nieuw bewegingsprofiel berekenen.
 	if(!setupMotionProfileDone)
 	{
-		vPrintString("start MoveL X=%.1fdeg, Y=%.1fdeg, Z=%.1fdeg.\n",x_mm, y_mm, z_mm);
+		vPrintString("start MoveL X=%.1mm, Y=%.1fmm, Z=%.1fmm.\n",x_mm, y_mm, z_mm);
 		t0 = g_time; // starttijd van de beweging
 
 		//float eindPos_M0, eindPos_M1, eindPos_M2 = NULL;
@@ -376,18 +533,6 @@ bool MoveJ_ArmDEG123t(float M1DEG, float M2DEG, float M3DEG, float maxTime_s)
  * Invoer: x_mm, y_mm en z_mm zijn de TCP-doelpositie; maxTime_s is de bewegingstijd.
  * Uitvoer: true wanneer de beweging klaar is, anders false.
  */
-static float tcpStart_mm[N_TCP_AXES]		= {0.0f, 0.0f, 0.0f};	// TCP-startpositie [mm]
-static float tcpTarget_mm[N_TCP_AXES]		= {0.0f, 0.0f, 0.0f};	// TCP-eindpositie [mm]
-static float tcpMax_inc_mm[N_TCP_AXES]		= {0.0f, 0.0f, 0.0f};	// Totale incrementele TCP-verplaatsing [mm]
-
-static float tcpRef_mm[N_TCP_AXES]			= {0.0f, 0.0f, 0.0f};	// TCP-positiereferentie [mm]
-
-static float motorTargetPrevRad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Vorige IK-motorreferentie [rad]
-static float motorOmegaPrevRad_s[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Vorige motor-snelheidsreferentie [rad/s]
-	
-static float omegaRef[N_MOTORS];		// Motor-snelheidsreferentie [rad/s]
-static float alphaRef[N_MOTORS];		// Motor-acceleratiereferentie [rad/s^2]
-
 ///////////////////////////////////////////////////////////////////////////////	
 bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 {
@@ -480,6 +625,7 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 		tcpRef_mm[axisI] = tcpStart_mm[axisI] + ref.pos;
 	}//end-AxisForloop
 
+	VoegTCPoffsetToe(tcpRef_mm);
 
 	// de TCP-referentie omzetten naar motorreferenties.
 	if (!DeltaKinematics_Inverse(tcpRef_mm, motorTargetRad))
@@ -527,6 +673,7 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 		setupMotionProfileDone = false;
 		float tcpActual_mm[3];
 
+		//Printen wat de actuele eind positie fout is
 		if (DeltaKinematics_Forward(motorPos_Rad, tcpActual_mm))
 		{
 			float ex = tcpActual_mm[0] - tcpTarget_mm[0];
@@ -643,39 +790,8 @@ bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 			calculatedHeight_mm = heightFromAccel_mm;
 		}
 
+		//begrenzen van hop hoogte en uitprinten
 		hopHeight_mm = constrain(calculatedHeight_mm, HOP_MIN_HEIGHT_MM, HOP_MAX_HEIGHT_MM);
-		/*
-		//Controleren of hopPath wel haalbaar is.
-		bool hopPathReachable = true;
-		float tcpCheck_mm[N_TCP_AXES];
-		float motorCheckRad[N_MOTORS];
-
-		for (uint8_t sampleI = 1; sampleI < HOP_PATH_CHECK_SAMPLES; sampleI++)
-		{
-			const float s = (float)sampleI / (float)HOP_PATH_CHECK_SAMPLES;
-			const float hopLift_mm = hopHeight_mm * 4.0f * s * (1.0f - s);
-
-			tcpCheck_mm[0] = tcpStart_mm[0] + tcpMax_inc_mm[0] * s;
-			tcpCheck_mm[1] = tcpStart_mm[1] + tcpMax_inc_mm[1] * s;
-			tcpCheck_mm[2] = tcpStart_mm[2] + tcpMax_inc_mm[2] * s + hopLift_mm;
-
-			if (!DeltaKinematics_Inverse(tcpCheck_mm, motorCheckRad))
-			{
-				hopPathReachable = false;
-				break;
-			}
-		}
-
-		if (!hopPathReachable)
-		{
-			verplaatsingKlaar = false;
-			vPrintString("FOUT: MoveHop padpunt ongeldig voor inverse kinematica.\n");
-			setupMotionProfileDone = false;
-
-			ToState(STATE_PAUSE);
-			return false;
-		}
-		*/
 		vPrintString("MoveHop hoogte: %.2f mm\n", hopHeight_mm);
 		setupMotionProfileDone = true;
 		
@@ -697,6 +813,8 @@ bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	tcpRef_mm[0] = tcpStart_mm[0] + tcpMax_inc_mm[0] * s;
 	tcpRef_mm[1] = tcpStart_mm[1] + tcpMax_inc_mm[1] * s;
 	tcpRef_mm[2] = tcpStart_mm[2] + tcpMax_inc_mm[2] * s + hopLift_mm;
+	
+	VoegTCPoffsetToe(tcpRef_mm);
 
 	// de TCP-referentie omzetten naar motorreferenties.
 	if (!DeltaKinematics_Inverse(tcpRef_mm, motorTargetRad))

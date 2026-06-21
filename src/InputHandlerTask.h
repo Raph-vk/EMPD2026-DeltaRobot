@@ -23,8 +23,8 @@
 // local type definitions
 typedef struct
 {
-	float xOffset;
-	float yOffset;
+	float x;
+	float y;
 } OffsetPos_t;
 
 void InputHandlerTask(void *pvParameters);

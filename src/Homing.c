@@ -414,17 +414,24 @@ static void NaarBackoffPositie(void)
 			if (!offsetZeroRequested)
 			{
 				vPrintString("> Backoff gestabiliseerd. Offset meting nullen.\n");
-				xSemaphoreTake(handle_OffsetZeroDone, 0);      // oude done wissen
-				xSemaphoreGive(handle_OffsetZeroRequest);      // zeroing starten
-				offsetZeroRequested = true;
+				if (handle_OffsetZeroDone != NULL && handle_OffsetZeroRequest != NULL)
+				{
+					xSemaphoreTake(handle_OffsetZeroDone, 0);      // oude done wissen
+					xSemaphoreGive(handle_OffsetZeroRequest);      // zeroing starten
+					offsetZeroRequested = true;
+				}
 			}
-
-			if (xSemaphoreTake(handle_OffsetZeroDone, 0) == pdTRUE)
+			
+			//Wachten tot offsetmeting gereed is
+			if (handle_OffsetZeroDone != NULL)
 			{
-				offsetZeroRequested = false;
-				stabilisatieTeller = 0;
-				vPrintString("> OffsetMeting genult. Start nauwkeurig zoeken.\n");
-				homingStatus = HOMING_NAUW_ZOEKEN;
+				if (xSemaphoreTake(handle_OffsetZeroDone, 0) == pdTRUE)
+				{
+					offsetZeroRequested = false;
+					stabilisatieTeller = 0;
+					vPrintString("> OffsetMeting genult. Start nauwkeurig zoeken.\n");
+					homingStatus = HOMING_NAUW_ZOEKEN;
+				}
 			}
 		}
 	}//end stabilisatie
