@@ -21,7 +21,6 @@ static void sCurveProfile(float distance, float Tm, float elapsedTime_s, MotionP
  */
 void motionProfile(float distance, float Tm, float elapsedTime_s, MotionProfileRef_t *ref)
 {
-	
 	// Pas onderstaand bewegingsprofielfunctie
 	fifthDegreeProfile(distance, Tm, elapsedTime_s, ref);
 }

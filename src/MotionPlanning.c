@@ -1,10 +1,9 @@
-
 /*
  * MotionPlanning.c
  *
  * Created: 03/06/2026 15:08:43
  *  Author: raphv
- */ 
+ */
 
 #include "MotionPlanning.h"
 
@@ -34,87 +33,166 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // const globals
-#define Ts							(0.001f)      // sample time, must match external clock
-#define N_TCP_AXES					(3U)
 #define DEG_TO_RAD					(0.01745329251994329576923690768489f) // PI / 180.0f
+
+#define Ts							(0.001f)      // sample time, moet gelijk zijn aan externe klok
+#define N_TCP_AXES					(3U)
+
+//hop vars
 #define HOP_DISTANCE_FACTOR			(0.20f)       // [mm lift / mm XY] gewenste hophoogte uit horizontale afstand
 #define HOP_MIN_HEIGHT_MM			(0.0f)        // geen geforceerde minimumhop; gebruik MoveL als hoppen niet nodig is
 #define HOP_MAX_HEIGHT_MM			(60.0f)       // absolute begrenzing van extra Z-lift
 #define HOP_MAX_Z_ACCEL_MM_S2		(10000.0f)    // effectieve Z-versnellingslimiet voor automatische hophoogte
-#define HOP_PATH_CHECK_SAMPLES		(12U)         // aantal tussenpunten voor IK-controle bij het instellen
-#define HOP_PROFILE_ACCEL_FACTOR	(5.8f)        // piekwaarde van vijfdegraads profielversnelling
-#define HOP_LIFT_ACCEL_FACTOR		(30.0f)       // conservatieve factor voor extra parabolische lift
+#define HOP_LIFT_ACCEL_FACTOR		(25.0f)       // factor voor extra parabolische lift
 
 ///////////////////////////////////////////////////////////////////////////////
-// globals vars
+// Interne timers en profieldata
 static float g_time = 0.0f;          // totale tijd sinds opstarten van de robot in seconden
-static float holdTargetPos[N_MOTORS] = {0.0f, 0.0f, 0.0f};
-	
-///////////////////////////////////////////////////////////////////////////////
-// position control global variables
-static float motorControlOutput[N_MOTORS];	// Berekende output
-static float uDac[N_MOTORS];	// Gelimiteerde uDac output [V] met uDac = Constraint(g,min,max)
-	
-static float Fout_motorRad[N_MOTORS] = {0.0f, 0.0f, 0.0f};	// Berekende fout in motor-rad
-static float motorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};	// Gemeten motor-as positie [rad]
-static bool setupMotionProfileDone = false;
+static float t0 = 0.0f;              // starttijd van huidige beweging
+static float tau = 0.0f;             // [s] tijd sinds start van beweging
 static bool verplaatsingKlaar = false;
 static bool setupDone = false;
-static float t0 = 0.0f;
-static float tau = 0.0f; // [s] tijd sinds start van beweging
-
-static float motorTargetRad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Berekende motor-eindpositie [rad]
-static float thetaStart[N_MOTORS];		// Motorpositie aan het begin van de beweging [rad]
-static float thetaMax_inc[N_MOTORS];	// Totale incrementele motorverplaatsing [rad]
-
-
-static float tcpStart_mm[N_TCP_AXES]		= {0.0f, 0.0f, 0.0f};	// TCP-startpositie [mm]
-static float tcpTarget_mm[N_TCP_AXES]		= {0.0f, 0.0f, 0.0f};	// TCP-eindpositie [mm]
-static float tcpMax_inc_mm[N_TCP_AXES]		= {0.0f, 0.0f, 0.0f};	// Totale incrementele TCP-verplaatsing [mm]
-
-static float tcpRef_mm[N_TCP_AXES]			= {0.0f, 0.0f, 0.0f};	// TCP-positiereferentie [mm]
-
-static float motorTargetPrevRad[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Vorige IK-motorreferentie [rad]
-static float motorOmegaPrevRad_s[N_MOTORS]	= {0.0f, 0.0f, 0.0f};	// Vorige motor-snelheidsreferentie [rad/s]
-
-static float omegaRef[N_MOTORS];		// Motor-snelheidsreferentie [rad/s]
-static float alphaRef[N_MOTORS];		// Motor-acceleratiereferentie [rad/s^2]
-
-static OffsetPos_t offset = {0.0f, 0.0f};
-static OffsetPos_t vorigeOffset = {0.0f, 0.0f};
-
 
 ///////////////////////////////////////////////////////////////////////////////
-// static void printAnalogVoltage(float analogvoltage)
+// Profieldata voor MoveJ-bewegingen
+static float thetaStart[N_MOTORS] = {0.0f, 0.0f, 0.0f};		// motorpositie bij start [rad]
+static float thetaMax_inc[N_MOTORS] = {0.0f, 0.0f, 0.0f};	// totale motorverplaatsing [rad]
+
+///////////////////////////////////////////////////////////////////////////////
+// Profieldata voor TCP-bewegingen
+static float tcpStart_mm[N_TCP_AXES] = {0.0f, 0.0f, 0.0f};			// TCP-startpositie [mm]
+static float tcpTarget_mm[N_TCP_AXES] = {0.0f, 0.0f, 0.0f};		// TCP-eindpositie [mm]
+static float tcpMax_inc_mm[N_TCP_AXES] = {0.0f, 0.0f, 0.0f};		// totale TCP-verplaatsing [mm]
+
+//static float motorRef_rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+static float vorigeMotorRef_rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};	// vorige IK-motorreferentie [rad]
+static float vorigeMotor_rad_s[N_MOTORS] = {0.0f, 0.0f, 0.0f};	// vorige motor-snelheidsreferentie [rad/s]
+
+///////////////////////////////////////////////////////////////////////////////
+// static void printAnalogVoltage(uint8_t m, float analogvoltage)
 /*
  * Print periodiek de gevraagde analoge motorspanning voor debugdoeleinden.
- * Invoer: analogvoltage is de laatst berekende motorspanning in volt.
+ * Invoer: motorindex en de laatst berekende motorspanning in volt.
  * Uitvoer: geen returnwaarde; schrijft alleen naar de debugconsole.
  */
-static void printAnalogVoltage(uint8_t m,  float analogvoltage)
+static void printAnalogVoltage(uint8_t m, float analogvoltage)
 {
 	static uint32_t analogPrintCounter = 0;
 	static float spikeVoltage[N_MOTORS] = {0.0f, 0.0f, 0.0f};
-		
-	// spike voltage
+
 	if (fabsf(analogvoltage) > fabsf(spikeVoltage[m]))
 	{
 		spikeVoltage[m] = analogvoltage;
 	}
 
-	// timer
-	if (analogPrintCounter >= 1500)
+	if (analogPrintCounter >= 1500) // T_in sec * 3 motoren
 	{
 		for (uint8_t i = 0; i < N_MOTORS; i++)
 		{
-			vPrintString("Motor %u voltage is: %.2f V\n",(unsigned int)i, spikeVoltage[i]);
+			vPrintString("Motor %u voltage is: %.2f V.\n", (unsigned int)i, spikeVoltage[i]);
 			spikeVoltage[i] = 0.0f;
 		}
 		analogPrintCounter = 0;
 	}
 	else
 	{
-		analogPrintCounter++;	
+		analogPrintCounter++;
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// static bool StopBewegingMetFout(const char *melding)
+/*
+ * Zet de lopende profielsetup uit en pauzeert de machine bij een ongeldige beweging.
+ */
+static bool StopBewegingMetFout(const char *melding)
+{
+	verplaatsingKlaar = false;
+	setupDone = false;
+
+	vPrintString("%s\n", melding);
+	ToState(STATE_PAUSE);
+
+	return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// static bool VoegTCPoffsetToe(float tcp_mm[N_TCP_AXES])
+/*
+ * Voegt de meest recente TCP-offset toe aan X/Y.
+ * Uitvoer: true wanneer de offset gewijzigd is, anders false.
+ */
+static bool VoegTCPoffsetToe(float tcp_mm[N_TCP_AXES])
+{
+	static OffsetPos_t laatsteOffset = {INFINITY, INFINITY};
+	static OffsetPos_t nieuweOffset = {0.0f, 0.0f};
+	bool offsetGewijzigd = false;
+
+	// peeken wat de offset waarde is
+	if (xQueuePeek(handle_OffsetQueue, &nieuweOffset, 0) == pdTRUE)
+	{
+		float offsetThreshold = 0.001;
+		
+		//bepalen of offset-waarde gewijzigd is
+		offsetGewijzigd =	fabsf(nieuweOffset.x - laatsteOffset.x) > offsetThreshold ||	fabsf(nieuweOffset.y - laatsteOffset.y) > offsetThreshold;
+		laatsteOffset = nieuweOffset;
+	}
+
+	tcp_mm[0] += nieuweOffset.x;
+	tcp_mm[1] += nieuweOffset.y;
+
+	return offsetGewijzigd;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+// static void RegelMotoren(...)
+/*
+ * Rekent voor alle motoren eerst de spanning uit en schrijft daarna alle DACs.
+ */
+static void RegelMotoren(const float motorRefRad[N_MOTORS], const float EncodedmotorRad[N_MOTORS], const float feedForwardAcc[N_MOTORS])
+{
+	float uDac[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+
+	// per motor de spanning bepalen
+	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+	{
+		const float fout_motorRad = motorRefRad[mI] - EncodedmotorRad[mI];
+		float motorControlOutput = PIDregelaar(mI, fout_motorRad);
+
+		if (feedForwardAcc != 0)
+		{
+			motorControlOutput += FeedForward(feedForwardAcc[mI]);
+		}
+
+		printAnalogVoltage(mI, motorControlOutput); // TEMP
+		uDac[mI] = constrain(motorControlOutput, DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE);
+	}
+
+	// alle motoren tegelijk van spanning voorzien
+	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+	{
+		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// static void PrintTcpEindFout(...)
+/*
+ * Print de TCP-eindfout na een MoveL/MoveHop beweging.
+ */
+static void PrintTcpEindFout(const char *bewegingsNaam, const float motorPos_Rad[N_MOTORS])
+{
+	float tcpActual_mm[N_TCP_AXES] = {0.0f, 0.0f, 0.0f};
+
+	//bepaald TCP positie en print actuele fout.
+	if (DeltaKinematics_Forward(motorPos_Rad, tcpActual_mm))
+	{
+		const float ex = tcpActual_mm[0] - tcpTarget_mm[0];
+		const float ey = tcpActual_mm[1] - tcpTarget_mm[1];
+		const float ez = tcpActual_mm[2] - tcpTarget_mm[2];
+		const float eAbs = sqrtf(ex*ex + ey*ey + ez*ez);
+		vPrintString("%s done. ERROR is: X=%.2f Y=%.2f Z=%.2f mm, abs = %.2f mm\n", bewegingsNaam, ex, ey, ez, eAbs);
 	}
 }
 
@@ -126,85 +204,15 @@ static void printAnalogVoltage(uint8_t m,  float analogvoltage)
 void MotionPlanning_RESET(void)
 {
 	g_time = 0.0f;
-	setupMotionProfileDone = false;
+	t0 = 0.0f;
+	tau = 0.0f;
 	verplaatsingKlaar = false;
 	setupDone = false;
 }
-	
-	
 
-///////////////////////////////////////////////////////////////////////////////
-// void ApplyTcpOffset(float *compensatedTCPref_mm[N_TCP_AXES])
-/*
- * Helper functie om tcpoffset toe te voegen aan
- * TCPref[X,Y,z] in mm.
- */
-static bool VoegTCPoffsetToe(float tcp_mm[N_TCP_AXES])
-{
-	static OffsetPos_t laatsteOffset = {INFINITY, INFINITY};
-	static OffsetPos_t nieuweOffset = {0.0f, 0.0f};
-	bool offsetGewijzigd = false;
-
-	//uitlezen of er een nieuwe waarde is.
-	if (xQueuePeek(handle_OffsetQueue, &nieuweOffset, 0) == pdTRUE)
-	{
-		offsetGewijzigd = nieuweOffset.x != laatsteOffset.x || nieuweOffset.y != laatsteOffset.y;
-
-		laatsteOffset = nieuweOffset;
-	}
-
-	//compensatie toevoegen
-	tcp_mm[0] += nieuweOffset.x;
-	tcp_mm[1] += nieuweOffset.y;
-
-
-	return offsetGewijzigd;
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// bool HoldPosition(const float holdArmPos_RAD[N_MOTORS])
-/*
- * Regelt alle motorassen naar een vaste armpositie.
- * Invoer: holdArmPos_RAD bevat per arm de gewenste positie in radialen.
- * Uitvoer: true wanneer alle motoren dicht bij de referentie zitten, anders false.
- */
-static void HoldPosition(const float holdArmPos_RAD[N_MOTORS])
-{	
-	static float holdMotorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};// Vast te houden motorpositie [rad]
-
-	// Lees motorposities uit.
-	LeesMotorPositiesRad(motorPos_Rad);
-
-	// Voor iedere motor
-	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
-	{
- 		// Gewenste armpositie omzetten naar radialen en rekening houden met reducties		
-		holdMotorPos_Rad[mI] = i_twk * holdArmPos_RAD[mI];
-
-		// Fout bepalen
-		Fout_motorRad[mI] = holdMotorPos_Rad[mI] - motorPos_Rad[mI];
-
-		// Voltage berekenen mbv PID_Controller
-		motorControlOutput[mI] = PIDregelaar(mI, Fout_motorRad[mI] );
-		
-		printAnalogVoltage(mI, motorControlOutput[mI]); //TEMP
-
-		// Zorg dat waarde niet groter is dan maximale DAC-waarde, en output.
-		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE); // min/max ongeveer +/-10V.
-		//dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
-	}
-	
-	//Iedere motor tegelijk bijregelen.
-	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
-	{
-		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
-	}
-}//End HoldPosition();
-
-
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// HOU VAST OP POSITIE FUNCTIES
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 // bool HoldCurrentPosition(bool grab, float waitTime_s)
 /*
@@ -214,31 +222,34 @@ static void HoldPosition(const float holdArmPos_RAD[N_MOTORS])
  */
 bool HoldCurrentPosition(bool grab, float waitTime_s)
 {
-	//eerste keer
+	static float motorHoldRefPos[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+	static float motorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+		
+	// grijper uitlezen en gewenste positie vastzetten
 	if (!setupDone)
 	{
 		port_SetBit(BIT_GRIPPER, grab);
-
-		//capture currect position
-		LeesArmPositiesRad(holdTargetPos);
-		
-		//check time
+		LeesMotorPositiesRad(motorHoldRefPos);
+		RegelMotoren(motorHoldRefPos, motorHoldRefPos, 0);
 		t0 = g_time;
 		setupDone = true;
 	}
-	
-	// Als tijd voorbij is
+	// als wachttijd verstreken is.
 	else if (g_time - t0 >= waitTime_s)
-	{
+	{		
+		LeesMotorPositiesRad(motorPos_Rad);
+		RegelMotoren(motorHoldRefPos, motorPos_Rad, 0);
 		setupDone = false;
 		g_time += Ts;
-		return true; // Hold positie voldaan
+		return true;
+	}
+	// tussentijd positieuitlezen en regelen
+	else
+	{
+		LeesMotorPositiesRad(motorPos_Rad);
+		RegelMotoren(motorHoldRefPos, motorPos_Rad, 0);
 	}
 
-	
-	HoldPosition(holdTargetPos);
-
-	//Tijd bijhouden
 	g_time += Ts;
 	return false;
 }
@@ -249,34 +260,26 @@ bool HoldCurrentPosition(bool grab, float waitTime_s)
  * Houdt de huidige TCP-positie vast en compenseert gemeten X/Y-frameverstoring.
  *
  * Bij de eerste aanroep wordt de actuele TCP-positie bepaald uit de gemeten
- * motorposities en opgeslagen als vaste holdpositie. Daarna wordt de nieuwste
- * offset uit de queue gelezen. Alleen wanneer de offset verandert,
- * wordt een nieuwe gecompenseerde TCP-positie berekend en via inverse kinematica
- * omgerekend naar armposities. De bestaande HoldPosition-functie houdt vervolgens
- * de armen in regeling.
- *
- * Invoer:
- * grab bepaalt de gripperstand.
- * waitTime_s is de tijd in seconden dat de positie vastgehouden moet worden.
- *
- * Uitvoer:
- * true wanneer de wachttijd verstreken is, anders false.
+ * motorposities. Daarna wordt alleen bij een gewijzigde offset een nieuwe
+ * gecompenseerde TCP-positie via inverse kinematica omgerekend.
  */
 bool HoldCurrentXYZPosition(bool grab, float waitTime_s)
 {
 	static bool holdTargetGeldig = false;
-
-	//grijper aan/uit zetten en positie uitlezen 
+	static float tcpHoldBasis_mm[N_TCP_AXES] = {0.0f, 0.0f, 0.0f};
+	static float motorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+	static float motorRef_rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+		
+	// grijper uitlezen en gewenste positie vastzetten
 	if (!setupDone)
 	{
-		//grijper instellen
 		port_SetBit(BIT_GRIPPER, grab);
-
-		//motorpositie uitlezen en XYZ-pos bepalen
 		LeesMotorPositiesRad(motorPos_Rad);
-		if (!DeltaKinematics_Forward(motorPos_Rad, tcpRef_mm)) 
+
+		// tcp positie bepalen tov motorposities
+		if (!DeltaKinematics_Forward(motorPos_Rad, tcpHoldBasis_mm))
 		{
-			//als FK niet lukt
+			vPrintString("FOUT: huidige motorpositie geeft geen geldige TCP-positie.\n");
 			ToState(STATE_PAUSE);
 			return false;
 		}
@@ -286,244 +289,253 @@ bool HoldCurrentXYZPosition(bool grab, float waitTime_s)
 		setupDone = true;
 		holdTargetGeldig = false;
 	}
-	// Als wachttijd verstreken is
+	//als tijd verstreken is
 	else if (g_time - t0 >= waitTime_s)
 	{
 		setupDone = false;
 		verplaatsingKlaar = true;
 	}
 
-	/*
-	// controleer of er een nieuwe waarde is
-	if (xQueuePeek(handle_OffsetQueue, &offset, 0) == pdTRUE)
-	{
-		if (offset.x != previousOffset.x || offset.y != previousOffset.y) //!previousDisturbanceValid ||
-		{
-			//nog dubbelchecken of +/- offset is
-			vPrintString("> Offset X=%.2fmm en Y=%.2fmm.\n", offset.x, offset.y);
-			
-			compensatedTCPref_mm[0] = tcpRef_mm[0] ; //- offset.x
-			compensatedTCPref_mm[1] = tcpRef_mm[1] ; //- offset.y
-			compensatedTCPref_mm[2] = tcpRef_mm[2];
-
-			// bepaal nieuwe motorposities
-			if (!DeltaKinematics_Inverse(compensatedTCPref_mm, motorTargetRad))
-			{
-				//als IK niet lukt
-				ToState(STATE_PAUSE);
-				return false;
-			}
-			
-			for (uint8_t mI = 0; mI < N_MOTORS; mI++)
-			{
-				holdTargetPos[mI] = motorTargetRad[mI] / i_twk; //terug in armRAD
-			}
-			previousOffset = offset;	
-		}
-	}
-	*/
-	
 	float tcpHoldRef_mm[N_TCP_AXES] = {
-		tcpRef_mm[0],
-		tcpRef_mm[1],
-		tcpRef_mm[2]
+		tcpHoldBasis_mm[0],
+		tcpHoldBasis_mm[1],
+		tcpHoldBasis_mm[2]
 	};
 
+	//offset aan tcp toevoegen en enkel nieuwe IK uitvoeren indien veranderd is.
 	bool offsetGewijzigd = VoegTCPoffsetToe(tcpHoldRef_mm);
-
 	if (offsetGewijzigd || !holdTargetGeldig)
 	{
-		if (!DeltaKinematics_Inverse(tcpHoldRef_mm, motorTargetRad))
+		// bepaal nieuwe motorpositie
+		if (!DeltaKinematics_Inverse(tcpHoldRef_mm, motorRef_rad))
 		{
+			vPrintString("FOUT: Hold XYZ positie ongeldig voor inverse kinematica.\n");
 			ToState(STATE_PAUSE);
 			return false;
 		}
 
-		for (uint8_t mI = 0; mI < N_MOTORS; mI++)
-		{
-			holdTargetPos[mI] = motorTargetRad[mI] / i_twk;
-		}
+		holdTargetGeldig = true;
 	}
 
-	HoldPosition(holdTargetPos);
+	// encoders uitlezen en regelen op positie
+	LeesMotorPositiesRad(motorPos_Rad);
+	RegelMotoren(motorRef_rad, motorPos_Rad, 0);
+
 	g_time += Ts;
 	return verplaatsingKlaar;
 }
 
-///////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// JOINTs GECONTROLEERDE BEWEGING
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 /*
- * Beweegt de TCP naar een gewenste positie met een rukbegrensd bewegingsprofiel.
+ * Beweegt de TCP naar een gewenste positie met een rukbegrensd motorprofiel.
  * Invoer: x_mm, y_mm en z_mm zijn de doelpositie; maxTime_s is de bewegingstijd.
  * Uitvoer: true wanneer de beweging klaar is, anders false.
  */
 bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 {
-	// Validatie van input parameters
+	float motorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+	float motorRefRad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+	float feedForwardAcc[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+
+	//controle of het een valide tijd heeft
 	if (maxTime_s <= 0.0f)
 	{
 		return false;
 	}
 
-	// Uitlezen van actuele positie
 	LeesMotorPositiesRad(motorPos_Rad);
 	verplaatsingKlaar = false;
-	
-	// Eenmalig nieuw bewegingsprofiel berekenen.
-	if(!setupMotionProfileDone)
-	{
-		vPrintString("start MoveL X=%.1mm, Y=%.1fmm, Z=%.1fmm.\n",x_mm, y_mm, z_mm);
-		t0 = g_time; // starttijd van de beweging
 
-		//float eindPos_M0, eindPos_M1, eindPos_M2 = NULL;
-		float tcpTarget[3] = { x_mm, y_mm, z_mm };
-	
-		// Bepalen van de gewenste motor-eindpositie in motor-radialen.
-		if (!DeltaKinematics_Inverse(tcpTarget, motorTargetRad)) // inverse kinematica
-		{	
-			//Indien positie buitenbereik is;
-			vPrintString("FOUT: ongeldige eindpositie voor inverse kinematica.\n");
-			verplaatsingKlaar = false;
-			setupMotionProfileDone = false;
-			
-			ToState(STATE_PAUSE);
-			return false;
+	//in setup incrementele verplaatsing bepalen -> thetaMax_inc[axis]
+	if (!setupDone)
+	{
+		tcpTarget_mm[0] = x_mm;
+		tcpTarget_mm[1] = y_mm;
+		tcpTarget_mm[2] = z_mm;
+		float motorRef_rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+
+		vPrintString("start MoveJ X=%.1fmm, Y=%.1fmm, Z=%.1fmm.\n", x_mm, y_mm, z_mm);
+		t0 = g_time;
+
+		if (!DeltaKinematics_Inverse(tcpTarget_mm, motorRef_rad))
+		{
+			return StopBewegingMetFout("FOUT: ongeldige eindpositie voor inverse kinematica.");
 		}
-		
-		// Bepalen van totaal incrementeel te verplaatsen motorhoek per motor
+
 		for (uint8_t mI = 0; mI < N_MOTORS; mI++)
 		{
-			// Totaal te verplaatsen motorhoek bepalen.
 			thetaStart[mI] = motorPos_Rad[mI];
-			thetaMax_inc[mI] = motorTargetRad[mI] - motorPos_Rad[mI];
+			thetaMax_inc[mI] = motorRef_rad[mI] - motorPos_Rad[mI];
 		}
+		setupDone = true;
+	}
 
-		setupMotionProfileDone = true;
-	}//end setup
-
-	
-	// output voltage voor iedere motor bepalen t.o.v. incrementele referentiebewegingsprofiel
 	tau = g_time - t0;
-	//Tijd bijhouden
 	g_time += Ts;
 	
-	
-	// Per motor beweging bepalen
+	// per motor actuele variabelen in bewegingsprofiel bepalen
 	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
 	{
-		//Bewegingsprofiel bepalen
 		MotionProfileRef_t ref;
 		motionProfile(thetaMax_inc[mI], maxTime_s, tau, &ref);
 
 		verplaatsingKlaar = ref.klaar;
-
-
-		// Bepalen van output voltage mbv Fout, PID_Controller + FeedForward
-		Fout_motorRad[mI] = (ref.pos + thetaStart[mI]) - motorPos_Rad[mI];
-		motorControlOutput[mI] = PIDregelaar(mI, Fout_motorRad[mI]) + FeedForward(ref.acc);
-		printAnalogVoltage(mI, motorControlOutput[mI]); //TEMP
-		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE);
+		motorRefRad[mI] = thetaStart[mI] + ref.pos;
+		feedForwardAcc[mI] = ref.acc;
 	}
-	
-	// Daadwerkelijk iedere motor outputvoltage zetten. (TEGELIJK REGELEN)
-	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+
+	// motoren regelen
+	RegelMotoren(motorRefRad, motorPos_Rad, feedForwardAcc);
+
+	if (verplaatsingKlaar)
 	{
-		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
-	}
-	
-	//Als verplaatsing voldaan is
-	if(verplaatsingKlaar)
-	{
-		setupMotionProfileDone = false;
-		vPrintString("MoveJ_XYZt voldaan!\n");
+		setupDone = false;
+		PrintTcpEindFout("MoveJ", motorPos_Rad);
 	}
 
-	// Return true als beweging klaar is, anders false.
 	return verplaatsingKlaar;
-
-}//END-function
+}
 
 ///////////////////////////////////////////////////////////////////////////////
-// bool MoveJ_ArmDEG123t(const float armRadians[N_MOTORS], float maxTime_s)
+// bool MoveJ_ArmDEG123t(float M1DEG, float M2DEG, float M3DEG, float maxTime_s)
 /*
- * Beweegt de armen naar een gewenste hoekpositie met een rukbegrensd bewegingsprofiel.
- * Invoer: armRadians bevat de gewenste armhoeken in radialen; maxTime_s is de bewegingstijd.
+ * Beweegt de armen naar een gewenste hoekpositie met een rukbegrensd motorprofiel.
+ * Invoer: M1DEG, M2DEG en M3DEG zijn armhoeken in graden; maxTime_s is de bewegingstijd.
  * Uitvoer: true wanneer de beweging klaar is, anders false.
  */
 bool MoveJ_ArmDEG123t(float M1DEG, float M2DEG, float M3DEG, float maxTime_s)
 {
-	// Validatie van input parameters
+	float motorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+	float motorRefRad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+	float feedForwardAcc[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+
+	//controle of het een valide tijd heeft
 	if (maxTime_s <= 0.0f)
 	{
 		return false;
 	}
 
-	// Uitlezen van actuele positie
 	LeesMotorPositiesRad(motorPos_Rad);
 	verplaatsingKlaar = false;
 
-	// Eenmalig nieuw bewegingsprofiel berekenen.
-	if(!setupMotionProfileDone)
+	//in setup incrementele verplaatsing bepalen -> thetaMax_inc[axis]
+	if (!setupDone)
 	{
-		vPrintString("start MoveJ M1=%.1fdeg, M2=%.1fdeg, M3=%.1fdeg.\n",M1DEG, M2DEG, M3DEG);
+		float motorRef_rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
 
-		t0 = g_time; // starttijd van de beweging
+		vPrintString("start MoveJ M1=%.1fdeg, M2=%.1fdeg, M3=%.1fdeg.\n", M1DEG, M2DEG, M3DEG);
+		t0 = g_time;
 
-		// Doelpositie direct overnemen in motor-radialen.
-		// Geen inverse kinematica meer.
-		motorTargetRad[0] = -M1DEG * DEG_TO_RAD * i_twk;
-		motorTargetRad[1] = -M2DEG * DEG_TO_RAD * i_twk;
-		motorTargetRad[2] = -M3DEG * DEG_TO_RAD * i_twk;
-		
-		// Bepalen van totaal incrementeel te verplaatsen motorhoek per motor
+		// Doelpositie omzetten naar motor-radialen.
+		motorRef_rad[0] = -M1DEG * DEG_TO_RAD * i_twk;
+		motorRef_rad[1] = -M2DEG * DEG_TO_RAD * i_twk;
+		motorRef_rad[2] = -M3DEG * DEG_TO_RAD * i_twk;
+
 		for (uint8_t mI = 0; mI < N_MOTORS; mI++)
 		{
-			// Totaal te verplaatsen motorhoek bepalen.
 			thetaStart[mI] = motorPos_Rad[mI];
-			thetaMax_inc[mI] = motorTargetRad[mI] - motorPos_Rad[mI];
+			thetaMax_inc[mI] = motorRef_rad[mI] - motorPos_Rad[mI];
 		}
-
-		setupMotionProfileDone = true;
+		setupDone = true;
 	}
-	
-	
-	//tijd bepalen in bewegingprofiel (per tick)
+
 	tau = g_time - t0;
-	//Tijd bijhouden
 	g_time += Ts;
-	
-	// output voltage voor iedere motor bepalen t.o.v. incrementele referentiebewegingsprofiel
+
+	// per motor actuele variabelen in bewegingsprofiel bepalen
 	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
 	{
 		MotionProfileRef_t ref;
-		motionProfile( thetaMax_inc[mI], maxTime_s, tau, &ref);
+		motionProfile(thetaMax_inc[mI], maxTime_s, tau, &ref);
+
 		verplaatsingKlaar = ref.klaar;
-
-		// Bepalen van output voltage mbv Fout, PID_Controller + FeedForward
-		Fout_motorRad[mI] = (ref.pos + thetaStart[mI]) - motorPos_Rad[mI];
-		motorControlOutput[mI] = PIDregelaar(mI, Fout_motorRad[mI]) + FeedForward(ref.acc);
-		printAnalogVoltage(mI, motorControlOutput[mI]); //TEMP
-		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE);
-	}
-	
-	// Daadwerkelijk iedere motor outputvoltage zetten.
-	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
-	{
-		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
+		motorRefRad[mI] = thetaStart[mI] + ref.pos;
+		feedForwardAcc[mI] = ref.acc;
 	}
 
-	if(verplaatsingKlaar)
+	// motoren regelen
+	RegelMotoren(motorRefRad, motorPos_Rad, feedForwardAcc);
+
+	if (verplaatsingKlaar)
 	{
-		setupMotionProfileDone = false;
+		setupDone = false;
 		vPrintString("MoveJ_ArmDEG123t voldaan!\n");
 	}
 
-	// Return true als beweging klaar is, anders false.
 	return verplaatsingKlaar;
+}
 
-}//END-function
 
 
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TCP GECONTROLEERDE BEWEGING
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// static bool InitialiseerTcpBeweging(...)
+/*
+ * Bepaalt startpunt, eindpunt en totale TCP-verplaatsing voor MoveL.
+ */
+static bool InitialiseerTcpBeweging(const float motorPos_Rad[N_MOTORS], float x_mm, float y_mm, float z_mm)
+{
+	// bepalen van of huidige TCP-positie
+	if (!DeltaKinematics_Forward(motorPos_Rad, tcpStart_mm))
+	{
+		return StopBewegingMetFout("FOUT: huidige motorpositie geeft geen geldige TCP-positie.");
+	}
+
+	// file-globals voor begin correct invullen
+	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+	{
+		vorigeMotorRef_rad[mI] = motorPos_Rad[mI];
+		vorigeMotor_rad_s[mI] = 0.0f;
+	}
+
+	//TCP target is file-globaal
+	tcpTarget_mm[0] = x_mm;
+	tcpTarget_mm[1] = y_mm;
+	tcpTarget_mm[2] = z_mm;
+	
+	// incrementeel te verplaatsen waarde bepalen
+	for (uint8_t axisI = 0; axisI < N_TCP_AXES; axisI++)
+	{
+		tcpMax_inc_mm[axisI] = tcpTarget_mm[axisI] - tcpStart_mm[axisI];
+	}
+
+	setupDone = true;
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// static float SchatMotorHoekacceleratie(bool bewegingKlaar)
+/*
+ * Zet een TCP-referentie om naar motorreferenties en regelt de motoren.
+ *
+ * Maakt gebruik van file-global -> motorRef_rad[mI] en vorigeMotorRef_rad/vorigeMotor_rad_s
+ */
+static void SchatMotorHoekacceleratie(const float motorRef_rad[N_MOTORS], bool bewegingKlaar, float alphaRefMotors[N_MOTORS] )
+{
+	// per motor de hoekacceleratie bepalen
+	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+	{
+		if (bewegingKlaar)
+		{
+			alphaRefMotors[mI] = 0.0f;
+		}
+		else
+		{
+			//acceleratie berekenen voor feedforward
+			float omegaRef = (motorRef_rad[mI] - vorigeMotorRef_rad[mI]) / Ts;
+			alphaRefMotors[mI] = (omegaRef - vorigeMotor_rad_s[mI]) / Ts;
+			
+			//vorige waarde vervangen
+			vorigeMotor_rad_s[mI] = omegaRef;
+		}
+		vorigeMotorRef_rad[mI] = motorRef_rad[mI];
+	}
+}
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -533,346 +545,186 @@ bool MoveJ_ArmDEG123t(float M1DEG, float M2DEG, float M3DEG, float maxTime_s)
  * Invoer: x_mm, y_mm en z_mm zijn de TCP-doelpositie; maxTime_s is de bewegingstijd.
  * Uitvoer: true wanneer de beweging klaar is, anders false.
  */
-///////////////////////////////////////////////////////////////////////////////	
 bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 {
-	// Validatie van input parameters
+	float motorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+	float motorRef_rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+	float alphaRefMotors[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+	float tcpRef_mm[N_TCP_AXES] = {0.0f, 0.0f, 0.0f};
+
+	//controle of het een valide tijd heeft
 	if (maxTime_s <= 0.0f)
 	{
 		vPrintString("maxMoveTime mag niet <=0.0 zijn!\n");
 		return false;
 	}
 
-	// Uitlezen van actuele positie
 	LeesMotorPositiesRad(motorPos_Rad);
 	verplaatsingKlaar = false;
 
-	// Eenmalig nieuw TCP-bewegingsprofiel berekenen.
-	if(!setupMotionProfileDone)
+	//in setup incrementele verplaatsing bepalen -> tcpMax_inc_mm[axis]
+	if (!setupDone)
 	{
-		vPrintString("start MoveL X=%.1fmm, Y=%.1fmm,Z=%.1fmm.\n",x_mm,y_mm,z_mm);
-		t0 = g_time; // starttijd van de beweging
+		vPrintString("start MoveL X=%.1fmm, Y=%.1fmm, Z=%.1fmm.\n", x_mm, y_mm, z_mm);
+		t0 = g_time;
 
-		// Huidige TCP-positie bepalen uit de actuele motorhoeken.
-		if (!DeltaKinematics_Forward(motorPos_Rad, tcpStart_mm))
+		if (!InitialiseerTcpBeweging(motorPos_Rad, x_mm, y_mm, z_mm))
 		{
-			verplaatsingKlaar = false;
-			vPrintString("FOUT: huidige motorpositie geeft geen geldige TCP-positie.\n");
-			setupMotionProfileDone = false;
-
-			ToState(STATE_PAUSE);
 			return false;
 		}
+	}
 
-		// Startpunt vooraf controleren met inverse kinematica.
-		if (!DeltaKinematics_Inverse(tcpStart_mm, motorTargetRad))
-		{
-			verplaatsingKlaar = false;
-			vPrintString("FOUT: huidige TCP-positie ongeldig voor inverse kinematica.\n");
-			setupMotionProfileDone = false;
-
-			ToState(STATE_PAUSE);
-			return false;
-		}
-
-		//
-		for (uint8_t mI = 0; mI < N_MOTORS; mI++)
-		{
-			motorTargetPrevRad[mI] = motorTargetRad[mI];
-			motorOmegaPrevRad_s[mI] = 0.0f;
-		}
-
-		//ingegeven posities in array voegen.
-		tcpTarget_mm[0] = x_mm;
-		tcpTarget_mm[1] = y_mm;
-		tcpTarget_mm[2] = z_mm;
-		
-		//Eindbepalen en controleren of geldig is.
-		if (!DeltaKinematics_Inverse(tcpTarget_mm, motorTargetRad))
-		{
-			verplaatsingKlaar = false;
-			vPrintString("FOUT: ongeldige eindpositie voor inverse kinematica.\n");
-			setupMotionProfileDone = false;
-
-			ToState(STATE_PAUSE);
-			return false;
-		}
-
-		// Bepalen van totaal incrementeel te verplaatsen TCP-afstand per as.
-		for (uint8_t axisI = 0; axisI < N_TCP_AXES; axisI++)
-		{
-			tcpMax_inc_mm[axisI] = tcpTarget_mm[axisI] - tcpStart_mm[axisI];
-		}
-
-		setupMotionProfileDone = true;
-		
-	}//eind-setupMotionProfile
-
-
-
-	
-	//Tijd bepalen in bewegingprofiel (per tick)
+	//tijd bijhouden
 	tau = g_time - t0;
-	//Tijd bijhouden
-	g_time += Ts; 
+	g_time += Ts;
 
-	// TCP-gewenste/referentie positie bepalen
+	// in &ref de actuele referentie positie,snelheid en acceleratie voor tcp en assen (XYZ) bepalen.
 	for (uint8_t axisI = 0; axisI < N_TCP_AXES; axisI++)
 	{
 		MotionProfileRef_t ref;
 		motionProfile(tcpMax_inc_mm[axisI], maxTime_s, tau, &ref);
+
 		verplaatsingKlaar = ref.klaar;
 		tcpRef_mm[axisI] = tcpStart_mm[axisI] + ref.pos;
-	}//end-AxisForloop
-
-	VoegTCPoffsetToe(tcpRef_mm);
-
-	// de TCP-referentie omzetten naar motorreferenties.
-	if (!DeltaKinematics_Inverse(tcpRef_mm, motorTargetRad))
-	{
-		verplaatsingKlaar = false;
-		vPrintString("FOUT: MoveL padpunt ongeldig voor inverse kinematica.\n");
-		setupMotionProfileDone = false;
-
-		ToState(STATE_PAUSE);
-		return false;
 	}
 
-	// Bepalen van output voltage mbv Fout, PID_Controller + FeedForward
-	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
-	{
-		// Het profiel is in TCP-ruimte; motor-acceleratie wordt uit opeenvolgende IK-referenties geschat.
-		if (verplaatsingKlaar)
-		{
-			omegaRef[mI] = 0.0f;
-			alphaRef[mI] = 0.0f;
-		}
-		else
-		{
-			omegaRef[mI] = (motorTargetRad[mI] - motorTargetPrevRad[mI]) / Ts;
-			alphaRef[mI] = (omegaRef[mI] - motorOmegaPrevRad_s[mI]) / Ts;
-		}
+	//Actieve demping toevoegen
+	//VoegTCPoffsetToe(tcpRef_mm);
 
-		Fout_motorRad[mI] = motorTargetRad[mI] - motorPos_Rad[mI];
-		motorControlOutput[mI] = PIDregelaar(mI, Fout_motorRad[mI]) + FeedForward(alphaRef[mI]);
-		printAnalogVoltage(mI, motorControlOutput[mI]); //TEMP
-		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE);
+	// motorpositie bij tcpRef punt bepalen (XYZ->M123
+	if (!DeltaKinematics_Inverse(tcpRef_mm, motorRef_rad))
+	{
+		return StopBewegingMetFout("FOUT: MoveL padpunt ongeldig voor inverse kinematica.");
 	}
 
-	// Daadwerkelijk iedere motor outputvoltage zetten.
-	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
+	SchatMotorHoekacceleratie(motorRef_rad, verplaatsingKlaar, alphaRefMotors);
+	RegelMotoren(motorRef_rad, motorPos_Rad, alphaRefMotors);
+	
+	//if (!RegelTcpReferentie(tcpRef_mm, motorPos_Rad, "FOUT: MoveL padpunt ongeldig voor inverse kinematica."))
+	//{
+	//	return false;
+	//}
+
+	if (verplaatsingKlaar)
 	{
-		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
-		
-		motorTargetPrevRad[mI] = motorTargetRad[mI];
-		motorOmegaPrevRad_s[mI] = omegaRef[mI];
+		setupDone = false;
+		PrintTcpEindFout("MoveL", motorPos_Rad);
 	}
 
-	if(verplaatsingKlaar)
-	{
-		setupMotionProfileDone = false;
-		float tcpActual_mm[3];
-
-		//Printen wat de actuele eind positie fout is
-		if (DeltaKinematics_Forward(motorPos_Rad, tcpActual_mm))
-		{
-			float ex = tcpActual_mm[0] - tcpTarget_mm[0];
-			float ey = tcpActual_mm[1] - tcpTarget_mm[1];
-			float ez = tcpActual_mm[2] - tcpTarget_mm[2];
-			float eAbs = sqrtf(ex*ex + ey*ey + ez*ez);
-
-			vPrintString("MoveL done. ERROR is: X=%.2f Y=%.2f Z=%.2f mm, abs = %.2f mm\n",
-			ex, ey, ez, eAbs);
-		}
-	}
-	// Return true als beweging klaar is, anders false.
 	return verplaatsingKlaar;
+}
 
-}//END-function
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// HOP/efficient GECONTROLEERDE BEWEGING
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// static float BerekenHopHoogte(float maxTime_s)
+/*
+ * Bepaalt een automatische hophoogte uit XY-afstand en beschikbare Z-versnelling.
+ */
+static float BerekenHopHoogte(float maxTime_s)
+{
+	// Hop afstand bepalen tov incrementele verplaatsing in XYvlak.
+	const float xyDistance_mm = sqrtf(tcpMax_inc_mm[0]*tcpMax_inc_mm[0] + tcpMax_inc_mm[1]*tcpMax_inc_mm[1]);
+	const float heightFromDistance_mm = HOP_DISTANCE_FACTOR * xyDistance_mm;
+	
+	// hop hoogte bij een grote benodigde acceleratie begrenzen
+	const float heightFromAccel_mm = (HOP_MAX_Z_ACCEL_MM_S2 * maxTime_s * maxTime_s) / HOP_LIFT_ACCEL_FACTOR;
+
+	// de laagste waarden kiezen.
+	float calculatedHeight_mm = heightFromDistance_mm;
+	if (heightFromAccel_mm < heightFromDistance_mm)
+	{
+		calculatedHeight_mm = heightFromAccel_mm;
+	}
+
+	return constrain(calculatedHeight_mm, HOP_MIN_HEIGHT_MM, HOP_MAX_HEIGHT_MM);
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 /*
  * Beweegt de TCP via een automatisch geschaalde parabolische hop naar de doelpositie.
- * De hophoogte wordt bepaald uit XY-afstand en beschikbare Z-versnelling.
  * Invoer: x_mm, y_mm en z_mm zijn de TCP-doelpositie; maxTime_s is de bewegingstijd.
  * Uitvoer: true wanneer de beweging klaar is, anders false.
  */
 bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 {
-	static float hopHeight_mm = 0.0f;		// Automatisch berekende extra Z-lift [mm]
+	static float hopHeight_mm = 0.0f;	// berekende extra Z-lift [mm]
+	float motorPos_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};	//gemeten motorpositie
+	float motorRef_rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};	//referentie motorpostie
+	float alphaRefMotors[N_MOTORS] = {0.0f, 0.0f, 0.0f};//referentie motor hoekacceleratie (voor feedforward)
+	float tcpRef_mm[N_TCP_AXES] = {0.0f, 0.0f, 0.0f};	// XYZ referentie
 
-	// Validatie van input parameters
+	// oneindig snel mag/kan niet
 	if (maxTime_s <= 0.0f)
 	{
 		vPrintString("maxMoveTime kan niet nul zijn!\n");
 		return false;
 	}
 
-	// Uitlezen van actuele positie
 	LeesMotorPositiesRad(motorPos_Rad);
 	verplaatsingKlaar = false;
 
-	// Eenmalig nieuw TCP-hopprofiel berekenen.
-	if(!setupMotionProfileDone)
+	// bewegingsprofiel bepalen
+	if (!setupDone)
 	{
-		vPrintString("start MoveHop X=%.1fmm, Y=%.1fmm,Z=%.1fmm.\n",x_mm,y_mm,z_mm);
-		t0 = g_time; // starttijd van de beweging
+		vPrintString("start MoveHop X=%.1fmm, Y=%.1fmm, Z=%.1fmm.\n", x_mm, y_mm, z_mm);
+		t0 = g_time;
 
-		// Huidige TCP-positie bepalen uit de actuele motorhoeken.
-		if (!DeltaKinematics_Forward(motorPos_Rad, tcpStart_mm))
+		if (!InitialiseerTcpBeweging(motorPos_Rad, x_mm, y_mm, z_mm))
 		{
-			verplaatsingKlaar = false;
-			vPrintString("FOUT: huidige motorpositie geeft geen geldige TCP-positie.\n");
-			setupMotionProfileDone = false;
-
-			ToState(STATE_PAUSE);
 			return false;
 		}
 
-		// Startpunt vooraf controleren met inverse kinematica.
-		if (!DeltaKinematics_Inverse(tcpStart_mm, motorTargetRad))
-		{
-			verplaatsingKlaar = false;
-			vPrintString("FOUT: huidige TCP-positie ongeldig voor inverse kinematica.\n");
-			setupMotionProfileDone = false;
-
-			ToState(STATE_PAUSE);
-			return false;
-		}
-
-		for (uint8_t mI = 0; mI < N_MOTORS; mI++)
-		{
-			motorTargetPrevRad[mI] = motorTargetRad[mI];
-			motorOmegaPrevRad_s[mI] = 0.0f;
-		}
-
-		// ingegeven posities in array voegen.
-		tcpTarget_mm[0] = x_mm;
-		tcpTarget_mm[1] = y_mm;
-		tcpTarget_mm[2] = z_mm;
-		
-		// Eindpunt bepalen en controleren of geldig is.
-		if (!DeltaKinematics_Inverse(tcpTarget_mm, motorTargetRad))
-		{
-			verplaatsingKlaar = false;
-			vPrintString("FOUT: ongeldige eindpositie voor inverse kinematica.\n");
-			setupMotionProfileDone = false;
-
-			ToState(STATE_PAUSE);
-			return false;
-		}
-
-		// Bepalen van totaal incrementeel te verplaatsen TCP-afstand per as (XYZ).
-		for (uint8_t axisI = 0; axisI < N_TCP_AXES; axisI++)
-		{
-			// X=[0], Y=[1], Z=[2]
-			tcpMax_inc_mm[axisI] = tcpTarget_mm[axisI] - tcpStart_mm[axisI];
-		}
-
-		const float xyDistance_mm = sqrtf(tcpMax_inc_mm[0]*tcpMax_inc_mm[0] + tcpMax_inc_mm[1]*tcpMax_inc_mm[1]);
-		const float heightFromDistance_mm = HOP_DISTANCE_FACTOR * xyDistance_mm;
-
-		// bepalen of met acceleratie wel Z-hop verstandig is.
-		const float zMoveAccel_mm_s2 = (HOP_PROFILE_ACCEL_FACTOR * fabsf( tcpMax_inc_mm[2])) / (maxTime_s * maxTime_s);
-		float availableLiftAccel_mm_s2 = HOP_MAX_Z_ACCEL_MM_S2 - zMoveAccel_mm_s2;
-		if (availableLiftAccel_mm_s2 < 0.0f)
-		{
-			availableLiftAccel_mm_s2 = 0.0f;
-		}
-
-		// kleinste hoogte verplaatsing bepalen t.o.v. de acceleratie
-		const float heightFromAccel_mm = (availableLiftAccel_mm_s2 * maxTime_s * maxTime_s) / HOP_LIFT_ACCEL_FACTOR;
-		float calculatedHeight_mm = heightFromDistance_mm;
-		
-		if (heightFromAccel_mm < heightFromDistance_mm)
-		{
-			calculatedHeight_mm = heightFromAccel_mm;
-		}
-
-		//begrenzen van hop hoogte en uitprinten
-		hopHeight_mm = constrain(calculatedHeight_mm, HOP_MIN_HEIGHT_MM, HOP_MAX_HEIGHT_MM);
+		//berekenen van hopHoogte
+		hopHeight_mm = BerekenHopHoogte(maxTime_s);
 		vPrintString("MoveHop hoogte: %.2f mm\n", hopHeight_mm);
-		setupMotionProfileDone = true;
-		
-	}//eind-setupMotionProfile
+	}
 
-	//Tijd bepalen in bewegingprofiel (per tick)
+	//tijd bijhouden
 	tau = g_time - t0;
-	//Tijd bijhouden
-	g_time += Ts; 
+	g_time += Ts;
 
-	// TCP-gewenste/referentie positie bepalen met een scalar padprofiel.
+	// Referentiepositie bepalen via een genormaliseerde padvoortgang.
+	// motionProfile(1.0f, ...) geeft geen echte mm-verplaatsing terug,
+	// maar een factor s van 0.0 tot 1.0 over de volledige bewegingstijd.
 	MotionProfileRef_t pathRef;
 	motionProfile(1.0f, maxTime_s, tau, &pathRef);
 	verplaatsingKlaar = pathRef.klaar;
 
+	// s is de procentuele voortgang van het pad per tick:
 	const float s = pathRef.pos;
-	const float hopLift_mm = hopHeight_mm * 4.0f * s * (1.0f - s);
+	
+	// Extra Z-lift voor de hop.
+	// De term 4*s*(1-s) vormt een parabool:
+	const float hopLift_mm = hopHeight_mm * 4.0f * s * (1.0f - s); // - bij s = 0.0 is de lift 0, bij s = 0.5 is de lift maximaal, bij s = 1.0 is de lift weer 0
 
+	// X, Y en Z schalen in zijn eigen verplaatsing procentueel mee met padvoortgang s.
 	tcpRef_mm[0] = tcpStart_mm[0] + tcpMax_inc_mm[0] * s;
 	tcpRef_mm[1] = tcpStart_mm[1] + tcpMax_inc_mm[1] * s;
-	tcpRef_mm[2] = tcpStart_mm[2] + tcpMax_inc_mm[2] * s + hopLift_mm;
-	
-	VoegTCPoffsetToe(tcpRef_mm);
+	tcpRef_mm[2] = tcpStart_mm[2] + tcpMax_inc_mm[2] * s + hopLift_mm; //additioneel de hopLift
 
-	// de TCP-referentie omzetten naar motorreferenties.
-	if (!DeltaKinematics_Inverse(tcpRef_mm, motorTargetRad))
+	//Actieve demping toevoegen
+	//VoegTCPoffsetToe(tcpRef_mm);
+
+	// motorpositie bij tcpRef punt bepalen (XYZ->M123
+	if (!DeltaKinematics_Inverse(tcpRef_mm, motorRef_rad))
 	{
-		verplaatsingKlaar = false;
-		vPrintString("FOUT: MoveHop padpunt ongeldig voor inverse kinematica.\n");
-		setupMotionProfileDone = false;
-
-		ToState(STATE_PAUSE);
-		return false;
+		return StopBewegingMetFout("FOUT: MoveL padpunt ongeldig voor inverse kinematica.");
 	}
 
-	// Bepalen van output voltage mbv Fout, PID_Controller + FeedForward
-	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
-	{
-		// Het profiel is in TCP-ruimte; motor-acceleratie wordt uit opeenvolgende IK-referenties geschat.
-		if (verplaatsingKlaar)
-		{
-			omegaRef[mI] = 0.0f;
-			alphaRef[mI] = 0.0f;
-		}
-		else
-		{
-			omegaRef[mI] = (motorTargetRad[mI] - motorTargetPrevRad[mI]) / Ts;
-			alphaRef[mI] = (omegaRef[mI] - motorOmegaPrevRad_s[mI]) / Ts;
-		}
+	//aansturen van de motoren
+	SchatMotorHoekacceleratie(motorRef_rad, verplaatsingKlaar, alphaRefMotors);
+	RegelMotoren(motorRef_rad, motorPos_Rad, alphaRefMotors);
 
-		Fout_motorRad[mI] = motorTargetRad[mI] - motorPos_Rad[mI];
-		motorControlOutput[mI] = PIDregelaar(mI, Fout_motorRad[mI]) + FeedForward(alphaRef[mI]);
-		printAnalogVoltage(mI, motorControlOutput[mI]); //TEMP
-		uDac[mI] = constrain(motorControlOutput[mI], DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE);
+	//als 
+	if (verplaatsingKlaar)
+	{
+		setupDone = false;
+		PrintTcpEindFout("MoveHop", motorPos_Rad);
 	}
 
-	// Daadwerkelijk iedere motor outputvoltage zetten.
-	for (uint8_t mI = 0; mI < N_MOTORS; mI++)
-	{
-		dac_SetOutputVoltage(MotorDacChannel[mI], uDac[mI]);
-		
-		motorTargetPrevRad[mI] = motorTargetRad[mI];
-		motorOmegaPrevRad_s[mI] = omegaRef[mI];
-	}
-
-	if(verplaatsingKlaar)
-	{
-		setupMotionProfileDone = false;
-		float tcpActual_mm[3];
-
-		if (DeltaKinematics_Forward(motorPos_Rad, tcpActual_mm))
-		{
-			float ex = tcpActual_mm[0] - tcpTarget_mm[0];
-			float ey = tcpActual_mm[1] - tcpTarget_mm[1];
-			float ez = tcpActual_mm[2] - tcpTarget_mm[2];
-			float eAbs = sqrtf(ex*ex + ey*ey + ez*ez);
-
-			vPrintString("MoveHop done. ERROR is: X=%.2f Y=%.2f Z=%.2f mm, abs = %.2f mm\n",ex, ey, ez, eAbs);
-		}
-	}
-	// Return true als beweging klaar is, anders false.
 	return verplaatsingKlaar;
-
-}//END-function
+}

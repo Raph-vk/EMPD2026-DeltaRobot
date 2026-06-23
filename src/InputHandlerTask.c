@@ -201,8 +201,13 @@ static void ProcessCurrentSensorData(uint32_t stroomData)
 	xQueueOverwrite(handle_stroomQueue, &stroom);
 }*/
 
-
+///////////////////////////////////////////////////////////////////////////////
 // static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
+/*
+ * 
+ *
+ *
+*/
 static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
 {
 	//static wordt eenmalig aangemaakt

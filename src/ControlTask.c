@@ -406,6 +406,7 @@ void ControlTask(void *pvParameters)
 				if (buttonBits & EVT_RESET_BUTTON)
 				{
 					vPrintString("> RESET -> READY (Startknop ontvangen.)\n");
+					MotionPlanning_RESET();
 					goToRust = true;
 				}
 				break;
