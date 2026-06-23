@@ -24,6 +24,7 @@ static bool sequenceOverflow = false;
 ///////////////////////////////////////////////////////////////////////////////
 //wrappers om snel een sequentie te bouwen en aantepassen.
 static inline void Hold(bool gripper, float time_s);
+static inline void HoldXYZ(bool gripper, float time_s);
 static inline void MoveJXYZ(float x_mm, float y_mm, float z_mm, float time_s);
 static inline void MoveJDEG(float m1_deg, float m2_deg, float m3_deg, float time_s);
 static inline void MoveLXYZ(float x_mm, float y_mm, float z_mm, float time_s);
@@ -85,7 +86,7 @@ void BuildSequence(void)
 ///////////////////////////////////////////////////////////////////////////////
 // bool RunSequence(void)
 static uint16_t currentStep = 0;
-typedef enum {STEP_HOLD_CURRENT,  STEP_MOVEJ_XYZ,  STEP_MOVEJ_DEG,  STEP_MOVEL_XYZ, STEP_MOVEHOP_XYZ  } StepType_t;
+typedef enum {STEP_HOLD_CURRENT,  STEP_HOLDXYZ_CURRENT, STEP_MOVEJ_XYZ,  STEP_MOVEJ_DEG,  STEP_MOVEL_XYZ, STEP_MOVEHOP_XYZ  } StepType_t;
 typedef struct{ StepType_t type;   bool gripper;   float p1;   float p2;  float p3;  float time_s;  } SequenceStep_t;
 static SequenceStep_t sequence[MAX_SEQUENCE_STEPS]; // De sequencielijst!
 /*
@@ -110,6 +111,10 @@ bool RunSequence(void)
 	{
 		case STEP_HOLD_CURRENT:
 		stepDone = HoldCurrentPosition(step->gripper, step->time_s);
+		break;
+		
+		case STEP_HOLDXYZ_CURRENT:
+		stepDone = HoldCurrentXYZPosition(step->gripper, step->time_s);
 		break;
 
 		case STEP_MOVEJ_XYZ:
@@ -183,6 +188,11 @@ static void StoreStep(StepType_t type, bool gripper, float p1, float p2, float p
 static inline void Hold(bool gripper, float time_s)
 {
 	StoreStep(STEP_HOLD_CURRENT, gripper, 0.0f, 0.0f, 0.0f, time_s);
+}
+
+static inline void HoldXYZ(bool gripper, float time_s)
+{
+	StoreStep(STEP_HOLDXYZ_CURRENT, gripper, 0.0f, 0.0f, 0.0f, time_s);
 }
 
 static inline void MoveJXYZ(float x_mm, float y_mm, float z_mm, float time_s)
