@@ -11,11 +11,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 #include <stdint.h>
+#include "Coordinates.h"
 #include "MotionPlanning.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // sequence settings
-#define MAX_SEQUENCE_STEPS		(128U)  //voor vaste memory grootte
+#define MAX_SEQUENCE_STEPS		(360U)  //voor vaste memory grootte
 ///////////////////////////////////////////////////////////////////////////////
 // globals vars
 static uint16_t sequenceLength = 0;
@@ -37,9 +38,15 @@ static inline void MoveHopXYZ(float x_mm, float y_mm, float z_mm, float time_s);
  */
 void BuildSequence(void)
 {
+	/*
+	 * Voorbeeld met een vaste positie uit Coordinates.c:
+	 * MoveHopXYZ(M01.x, M01.y, zHeight, moveHop);
+	 */
+	float waitinfinite = 6000.0f; // s
 	float wait = 0.5f; // s
-	float move = 0.50f; // s
-	float zHeight = -420.0f; //mm
+	float move = 0.20f; // s
+	float moveHop = 0.30f; // s
+	float zHeight = -425.0f; //mm
 	
 	//setup
 	sequenceLength = 0;
@@ -66,15 +73,23 @@ void BuildSequence(void)
 	Hold(false, 0.1f);
 	MoveJXYZ(0.0f, 0.0f, zHeight, move);
 	
-	for (uint8_t i = 0; i < 5; i++)
+	for (uint8_t i = 0; i < 8; i++)
 	{
-		MoveJXYZ(80.0f,80.0f,zHeight, move);
+		MoveHopXYZ(0.0f,0.0f,zHeight, moveHop);
 		Hold(false, wait);
-		MoveJXYZ(80.0f,-80.0f,zHeight, move);
+		MoveHopXYZ(80.0f,-80.0f,zHeight, moveHop);
 		Hold(false, wait);
-		MoveJXYZ(-80.0f,-80.0f,zHeight, move);
+		MoveLXYZ(-80.0f,-80.0f,zHeight, move);
 		Hold(false, wait);
-		MoveJXYZ(-80.0f,80.0f,zHeight, move);
+		MoveLXYZ(-80.0f,80.0f,zHeight, move);
+		MoveLXYZ(80.0f,80.0f,zHeight, move);
+		MoveHopXYZ(-80.0f,-80.0f,zHeight, moveHop);
+		MoveHopXYZ(80.0f,-80.0f,zHeight, moveHop);
+		MoveHopXYZ(80.0f,80.0f,zHeight, moveHop);
+		MoveHopXYZ(-80.0f,-80.0f,zHeight, moveHop);
+		MoveHopXYZ(150.0f,0.0f,zHeight, 0.5f);
+		MoveHopXYZ(-130.0f,0.0f,zHeight, 0.5f);
+		MoveHopXYZ(-130.0f,50.0f,zHeight, 0.5f);
 		Hold(false, wait);
 	}
 	
