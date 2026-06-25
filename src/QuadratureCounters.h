@@ -22,5 +22,6 @@ void EncoderClearCount(uint8_t qcChannel);
 void LeesMotorPositiesRad(float motorPos_Rad[N_MOTORS]);
 void LeesArmPositiesRad(float armPos_Rad[N_MOTORS]);
 void LeesArmPositieRad(uint8_t motorIndex, float armPos_Rad[N_MOTORS]);
+void printAnalogVoltage(uint8_t m, float analogvoltage);
 
 #endif /* QUADRATURECOUNTERS_H_ */

@@ -11,13 +11,13 @@
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 #include <stdint.h>
-//#include "Coordinates.h"
 #include "MotionPlanning.h"
+#include "UserFrame.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // sequence settings
 #define WORK_OFFSET_X_MM	(0.0f)
-#define WORK_OFFSET_Y_MM	(3.0f)
+#define WORK_OFFSET_Y_MM	(0.0f)
 
 #define MAX_SEQUENCE_STEPS		(360U)  //voor vaste memory grootte
 ///////////////////////////////////////////////////////////////////////////////
@@ -147,6 +147,20 @@ static uint16_t currentStep = 0;
 typedef enum {STEP_HOLD_CURRENT,  STEP_HOLDXYZ_CURRENT, STEP_MOVEJ_XYZ,  STEP_MOVEJ_DEG,  STEP_MOVEL_XYZ, STEP_MOVEHOP_XYZ  } StepType_t;
 typedef struct{ StepType_t type;   bool gripper;   float p1;   float p2;  float p3;  float time_s;  } SequenceStep_t;
 static SequenceStep_t sequence[MAX_SEQUENCE_STEPS]; // De sequencielijst!
+
+///////////////////////////////////////////////////////////////////////////////
+// static bool UserTargetToBase(...)
+static bool UserTargetToBase(float userX_mm,
+							 float userY_mm,
+							 float baseZ_mm,
+							 float baseXYZ_mm[3])
+{
+	return UserFrame_ToBaseXY(userX_mm,
+							  userY_mm,
+							  baseZ_mm,
+							  baseXYZ_mm);
+}
+
 /*
  * Voert de ingestelde bewegingssequentie stap voor stap uit.
  * Invoer: GEEN, wordt eenmaal per 1 ms clocktick aangeroepen.
@@ -164,6 +178,7 @@ bool RunSequence(void)
 	//Controle voor bij welke stap we nu zijn
 	SequenceStep_t *step = &sequence[currentStep];
 	bool stepDone = false;
+	float baseXYZ_mm[3] = {0.0f, 0.0f, 0.0f};
 
 	switch (step->type)
 	{
@@ -176,19 +191,52 @@ bool RunSequence(void)
 		break;
 
 		case STEP_MOVEJ_XYZ:
-		stepDone = MoveJ_XYZt( (step->p1 + WORK_OFFSET_X_MM), (step->p2 + WORK_OFFSET_Y_MM), step->p3, step->time_s);
+		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM,
+							  step->p2 + WORK_OFFSET_Y_MM,
+							  step->p3,
+							  baseXYZ_mm))
+		{
+			return false;
+		}
+
+		stepDone = MoveJ_XYZt(baseXYZ_mm[0],
+							  baseXYZ_mm[1],
+							  baseXYZ_mm[2],
+							  step->time_s);
 		break;
 
 		case STEP_MOVEJ_DEG:
-		stepDone = MoveJ_ArmDEG123t( step->p1, step->p2, step->p3, step->time_s);
+		stepDone = MoveJ_ArmDEG123t(step->p1, step->p2, step->p3, step->time_s);
 		break;
 
 		case STEP_MOVEL_XYZ:
-		stepDone = MoveL_XYZt( (step->p1 + WORK_OFFSET_X_MM), (step->p2 + WORK_OFFSET_Y_MM), step->p3, step->time_s);
+		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM,
+							  step->p2 + WORK_OFFSET_Y_MM,
+							  step->p3,
+							  baseXYZ_mm))
+		{
+			return false;
+		}
+
+		stepDone = MoveL_XYZt(baseXYZ_mm[0],
+							  baseXYZ_mm[1],
+							  baseXYZ_mm[2],
+							  step->time_s);
 		break;
 
 		case STEP_MOVEHOP_XYZ:
-		stepDone = MoveHop_XYZt( (step->p1 + WORK_OFFSET_X_MM), (step->p2 + WORK_OFFSET_Y_MM), step->p3, step->time_s);
+		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM,
+							  step->p2 + WORK_OFFSET_Y_MM,
+							  step->p3,
+							  baseXYZ_mm))
+		{
+			return false;
+		}
+
+		stepDone = MoveHop_XYZt(baseXYZ_mm[0],
+								baseXYZ_mm[1],
+								baseXYZ_mm[2],
+								step->time_s);
 		break;
 
 		default:
@@ -203,6 +251,7 @@ bool RunSequence(void)
 
 	return false;
 }
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // void SequenceRESET(void)

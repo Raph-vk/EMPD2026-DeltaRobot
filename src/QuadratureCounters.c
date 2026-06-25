@@ -12,6 +12,7 @@
 // system includes
 #include <asf.h>
 #include <stdint.h>
+#include <math.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // FreeRTOS includes
@@ -172,4 +173,36 @@ void LeesArmPositieRad(uint8_t motorIndex, float armPos_Rad[N_MOTORS])
 	}
 	//Bereken Count naar arm-radialen
 	armPos_Rad[motorIndex] = ((float)qc_ReadCountRegister(MotorQcChannel[motorIndex]) * countsToRad) / i_twk;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// void printAnalogVoltage(uint8_t m, float analogvoltage)
+/*
+ * Print periodiek de gevraagde analoge motorspanning voor debugdoeleinden.
+ * Invoer: motorindex en de laatst berekende motorspanning in volt.
+ * Uitvoer: geen returnwaarde; schrijft alleen naar de debugconsole.
+ */
+void printAnalogVoltage(uint8_t m, float analogvoltage)
+{
+	static uint32_t analogPrintCounter = 0;
+	static float spikeVoltage[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+
+	if (fabsf(analogvoltage) > fabsf(spikeVoltage[m]))
+	{
+		spikeVoltage[m] = analogvoltage;
+	}
+
+	if (analogPrintCounter >= 1500) // T_in sec * 3 motoren
+	{
+		for (uint8_t i = 0; i < N_MOTORS; i++)
+		{
+			//vPrintString("Motor %u voltage is: %.2f V.\n", (unsigned int)i, spikeVoltage[i]);
+			spikeVoltage[i] = 0.0f;
+		}
+		analogPrintCounter = 0;
+	}
+	else
+	{
+		analogPrintCounter++;
+	}
 }
