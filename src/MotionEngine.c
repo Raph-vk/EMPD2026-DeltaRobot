@@ -11,16 +11,70 @@
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 #include <stdint.h>
-#include "Coordinates.h"
+//#include "Coordinates.h"
 #include "MotionPlanning.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // sequence settings
+#define WORK_OFFSET_X_MM	(0.0f)
+#define WORK_OFFSET_Y_MM	(3.0f)
+
 #define MAX_SEQUENCE_STEPS		(360U)  //voor vaste memory grootte
 ///////////////////////////////////////////////////////////////////////////////
 // globals vars
 static uint16_t sequenceLength = 0;
 static bool sequenceOverflow = false;
+
+///////////////////////////////////////////////////////////////////////////////
+// struct voor XY-positie
+typedef struct
+{
+	float x;
+	float y;
+} Coordinate_t;
+
+/* Middenplaat (bouten). */
+const Coordinate_t M00 = {-80.00f,  80.00f};
+const Coordinate_t M01 = {-40.00f,  80.00f};
+const Coordinate_t M02 = {  0.00f,  80.00f};
+const Coordinate_t M03 = { 40.00f,  80.00f};
+const Coordinate_t M04 = { 80.00f,  80.00f};
+const Coordinate_t M05 = {  0.00f,  50.00f};
+const Coordinate_t M06 = {-43.30f,  25.00f};
+const Coordinate_t M07 = { 43.30f,  25.00f};
+const Coordinate_t M08 = {-43.30f, -25.00f};
+const Coordinate_t M09 = { 43.30f, -25.00f};
+const Coordinate_t M10 = {  0.00f, -50.00f};
+const Coordinate_t M11 = {-80.00f, -80.00f};
+const Coordinate_t M12 = {-40.00f, -80.00f};
+const Coordinate_t M13 = {  0.00f, -80.00f};
+const Coordinate_t M14 = { 40.00f, -80.00f};
+const Coordinate_t M15 = { 80.00f, -80.00f};
+
+/* Hoekplaat linksboven (moeren). */
+const Coordinate_t LB00 = { -70.5f, 202.10f};
+const Coordinate_t LB01 = {-110.21f, 190.90f};
+const Coordinate_t LB02 = { -35.85f, 182.10f};
+const Coordinate_t LB03 = {-139.78f, 162.10f};
+const Coordinate_t LB04 = { -91.93f, 159.23f};
+const Coordinate_t LB05 = {-139.78f, 122.10f};
+
+/* Rechtsmidden (Moeren). */
+const Coordinate_t RM00 = {175.63f,  60.0f};
+const Coordinate_t RM01 = {210.27f,  40.0f};
+const Coordinate_t RM02 = {183.86f,  0.00f};
+const Coordinate_t RM03 = {220.43f,   0.00f};
+const Coordinate_t RM04 = {175.63f, -60.0f};
+const Coordinate_t RM05 = {210.27f, -40.0f};
+
+/* Hoekplaat linksonder (moeren). */
+const Coordinate_t LO00 = {-139.78f, -122.10f};
+const Coordinate_t LO01 = {-162.1f, -139.78f};
+const Coordinate_t LO02 = {-91.93f, -159.23f};
+const Coordinate_t LO03 = {-110.21f, -190.90f};
+const Coordinate_t LO04 = { -35.85f, -182.1f};
+const Coordinate_t LO05 = { -70.5f, -202.1f};
+
 
 ///////////////////////////////////////////////////////////////////////////////
 //wrappers om snel een sequentie te bouwen en aantepassen.
@@ -38,41 +92,29 @@ static inline void MoveHopXYZ(float x_mm, float y_mm, float z_mm, float time_s);
  */
 void BuildSequence(void)
 {
-	/*
-	 * Voorbeeld met een vaste positie uit Coordinates.c:
-	 * MoveHopXYZ(M01.x, M01.y, zHeight, moveHop);
-	 */
-	float waitinfinite = 6000.0f; // s
-	float wait = 0.5f; // s
-	float move = 0.20f; // s
-	float moveHop = 0.30f; // s
-	float zHeight = -425.0f; //mm
+	float wait = 5.0f; // s
+	float move = 0.5f; // s
+	float zHeight = -427.5f; //mm
+	//float moveHop = 0.3f;
 	
 	//setup
 	sequenceLength = 0;
 	sequenceOverflow = false;
 
-	/*
-	for (uint8_t i = 0; i < 5; i++)
-	{
-		MoveLXYZ(80.0f, 80.0f, zHeight, move);
-		Hold(true, wait);
-		MoveLXYZ(-80.0f, 80.0f, zHeight, move);
-		Hold(true, wait);
-		MoveLXYZ(-80.0f, -80.0f, zHeight, move);
-		Hold(true, wait);
-		MoveLXYZ(80.0f, -80.0f, zHeight, move);
-		Hold(true, wait);
-		MoveLXYZ(80.0f, 80.0f, zHeight, move);
-		Hold(true, wait);
-		MoveLXYZ(0.0f, 0.0f, zHeight, move);
-		Hold(false, move);
-	}
-	*/
-	
+
 	Hold(false, 0.1f);
 	MoveJXYZ(0.0f, 0.0f, zHeight, move);
-	
+	HoldXYZ(false, wait);
+	MoveLXYZ(80.0f, 80.0f, zHeight, move);
+	HoldXYZ(false, wait);
+	MoveLXYZ(80.0f, -80.0f, zHeight, move);
+	HoldXYZ(false, wait);
+	MoveLXYZ(-80.0f, -80.0f, zHeight, move);
+	HoldXYZ(false, wait);
+	MoveLXYZ(-80.0f, 80.0f, zHeight, move);
+	HoldXYZ(false, wait);
+
+	/*
 	for (uint8_t i = 0; i < 8; i++)
 	{
 		MoveHopXYZ(0.0f,0.0f,zHeight, moveHop);
@@ -92,6 +134,7 @@ void BuildSequence(void)
 		MoveHopXYZ(-130.0f,50.0f,zHeight, 0.5f);
 		Hold(false, wait);
 	}
+	*/
 	
 	MoveJDEG(25.0f, 25.0f, 25.0f, 1.0f);
 	Hold(false, 0.1f);
@@ -133,19 +176,19 @@ bool RunSequence(void)
 		break;
 
 		case STEP_MOVEJ_XYZ:
-		stepDone = MoveJ_XYZt(step->p1, step->p2, step->p3, step->time_s);
+		stepDone = MoveJ_XYZt( (step->p1 + WORK_OFFSET_X_MM), (step->p2 + WORK_OFFSET_Y_MM), step->p3, step->time_s);
 		break;
 
 		case STEP_MOVEJ_DEG:
-		stepDone = MoveJ_ArmDEG123t(step->p1, step->p2, step->p3, step->time_s);
+		stepDone = MoveJ_ArmDEG123t( step->p1, step->p2, step->p3, step->time_s);
 		break;
 
 		case STEP_MOVEL_XYZ:
-		stepDone = MoveL_XYZt(step->p1, step->p2, step->p3, step->time_s);
+		stepDone = MoveL_XYZt( (step->p1 + WORK_OFFSET_X_MM), (step->p2 + WORK_OFFSET_Y_MM), step->p3, step->time_s);
 		break;
 
 		case STEP_MOVEHOP_XYZ:
-		stepDone = MoveHop_XYZt(step->p1, step->p2, step->p3, step->time_s);
+		stepDone = MoveHop_XYZt( (step->p1 + WORK_OFFSET_X_MM), (step->p2 + WORK_OFFSET_Y_MM), step->p3, step->time_s);
 		break;
 
 		default:
@@ -197,6 +240,9 @@ static void StoreStep(StepType_t type, bool gripper, float p1, float p2, float p
 	sequence[sequenceLength].time_s = time_s;
 	sequenceLength++;
 }
+
+
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // sequence step helpers

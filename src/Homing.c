@@ -68,7 +68,7 @@
  *
  * Omdat homeAllMotors() op 1 kHz wordt aangeroepen: 1000 ticks = 1000 ms = 1 seconde.
  */
-#define STABILISATIE_TIJD_MS         (1000U)
+#define STABILISATIE_TIJD_MS         (5000U)
 
 ///////////////////////////////////////////////////////////////////////////////
 // TYPEDEFINITIES
@@ -334,7 +334,6 @@ static void GrofZoeken(void)
 	//voor iedere arm
     for (uint8_t motor = 0; motor < N_MOTORS; motor++)
     {
-		
 		//Als homeSwitch al gevonden is, rustig naar BACKOFF Positie bewegen.
 		if (grofGevonden[motor])
 		{
@@ -421,7 +420,6 @@ static void NaarBackoffPositie(void)
 					offsetZeroRequested = true;
 				}
 			}
-			
 			//Wachten tot offsetmeting gereed is
 			if (handle_OffsetZeroDone != NULL)
 			{
@@ -433,6 +431,9 @@ static void NaarBackoffPositie(void)
 					homingStatus = HOMING_NAUW_ZOEKEN;
 				}
 			}
+			stabilisatieTeller = 0;
+			vPrintString("> OffsetMeting genult. Start nauwkeurig zoeken.\n");
+			homingStatus = HOMING_NAUW_ZOEKEN;
 		}
 	}//end stabilisatie
 

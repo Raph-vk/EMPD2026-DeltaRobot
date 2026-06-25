@@ -118,7 +118,7 @@ void EncoderClearCount(uint8_t qcChannel)
 	    return;
     }
 	
-
+	vPrintString("> Encoder count voordat het op nul gezet wordt: %d!\n", qcChannel);
 	//Zet specifieke QC op nul.
     qc_ClearCountRegister(MotorQcChannel[qcChannel]);
 	removeRegelaarHistory(qcChannel);

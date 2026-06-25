@@ -40,7 +40,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // REGELAAR constants 
 ///////////////////////////////////////////////////////////////////////////////
-#define wb_factor (0.3f) //bandbreedte factor van de resonantiefrequentie
+#define wb_factor (0.35f) //bandbreedte factor van de resonantiefrequentie
 #define Tsample (0.001f)
 
 #define Je1M (1.0308e-5f) // kgm^2, op de motor
@@ -162,7 +162,8 @@ float PIDregelaar(uint8_t motorIndex, float error)
 	
 	float u_0 = ( (Kp * (b0 * error + b1 * hist->e_1 + b2 * hist->e_2)) - (a1 * hist->u_1) - (a2 * hist->u_2) ) / a0;
 	
-	// spike voltage
+	/*
+	// printing spike error
 	if (fabsf(error) > fabsf(spikeError[motorIndex]))
 	{
 		spikeError[motorIndex] = error;
@@ -173,12 +174,12 @@ float PIDregelaar(uint8_t motorIndex, float error)
 	{
 		for (uint8_t i = 0; i < N_MOTORS; i++)
 		{
-			vPrintString("Motor %u error peak: %.6f deg\n",(unsigned int)i, ( (spikeError[motorIndex] * RAD_TO_DEG)/i_twk ));
+			vPrintString("Arm %u error peak: %.6f deg\n",(unsigned int)i, ( (spikeError[motorIndex] * RAD_TO_DEG)/i_twk ));
 			spikeError[i] = 0.0f;
 		}
 		printCount = 0;
 	}
-		
+	*/
 
 
 	 // Historie doorschuiven

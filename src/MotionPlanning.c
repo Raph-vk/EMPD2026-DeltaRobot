@@ -89,7 +89,7 @@ static void printAnalogVoltage(uint8_t m, float analogvoltage)
 	{
 		for (uint8_t i = 0; i < N_MOTORS; i++)
 		{
-			vPrintString("Motor %u voltage is: %.2f V.\n", (unsigned int)i, spikeVoltage[i]);
+			//vPrintString("Motor %u voltage is: %.2f V.\n", (unsigned int)i, spikeVoltage[i]);
 			spikeVoltage[i] = 0.0f;
 		}
 		analogPrintCounter = 0;
@@ -129,7 +129,7 @@ static bool VoegTCPoffsetToe(float tcp_mm[N_TCP_AXES])
 	bool offsetGewijzigd = false;
 
 	// peeken wat de offset waarde is
-	if (xQueuePeek(handle_OffsetQueue, &nieuweOffset, 0) == pdTRUE)
+	if (xQueuePeek(handle_OffsetQueue, &nieuweOffset, 0) == pdTRUE && TCP_COMP == 1)
 	{
 		float offsetThreshold = 0.001;
 		
@@ -589,7 +589,7 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	}
 
 	//Actieve demping toevoegen
-	//VoegTCPoffsetToe(tcpRef_mm);
+	VoegTCPoffsetToe(tcpRef_mm);
 
 	// motorpositie bij tcpRef punt bepalen (XYZ->M123
 	if (!DeltaKinematics_Inverse(tcpRef_mm, motorRef_rad))
@@ -707,7 +707,7 @@ bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	tcpRef_mm[2] = tcpStart_mm[2] + tcpMax_inc_mm[2] * s + hopLift_mm; //additioneel de hopLift
 
 	//Actieve demping toevoegen
-	//VoegTCPoffsetToe(tcpRef_mm);
+	VoegTCPoffsetToe(tcpRef_mm);
 
 	// motorpositie bij tcpRef punt bepalen (XYZ->M123
 	if (!DeltaKinematics_Inverse(tcpRef_mm, motorRef_rad))

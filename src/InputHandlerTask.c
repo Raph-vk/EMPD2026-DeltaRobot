@@ -32,20 +32,24 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // defines
-#define ADC_REFERENCE_VOLTAGE         (3.3f)
-#define CURRENT_SENSOR_VOLTS_PER_AMP  (0.1f)
+//#define ADC_REFERENCE_VOLTAGE         (3.3f)
+//#define CURRENT_SENSOR_VOLTS_PER_AMP  (0.1f)
 
 #define adcMaxValue					  (4095.0f)
-#define mmStroke					(30.0f)
+#define mmStroke					(30.43f)
 #define mmThreshold					(0.01f)
 
+#define stroomChannel (2U)
 #define xDisturbanceChannel (3U)
 #define yDisturbanceChannel (4U)
 
 #define calibrationSamples (100U)
-#define MOVING_AVERAGE_SAMPLES (9U)
+#define MOVING_AVERAGE_SAMPLES (12U)
+
 ///////////////////////////////////////////////////////////////////////////////
-//file globals
+//static bool hasCurrentSample = false;
+//static uint32_t vorigeStroomData = 0;
+//static float zeroCurrentVoltage = 2.5f;        // Better: measure this during startup
 
 ///////////////////////////////////////////////////////////////////////////////
 // static bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit)
@@ -203,11 +207,7 @@ static void ProcessCurrentSensorData(uint32_t stroomData)
 
 ///////////////////////////////////////////////////////////////////////////////
 // static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
-/*
- * 
- *
- *
-*/
+//static uint32_t printTEL = 0;
 static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
 {
 	//static wordt eenmalig aangemaakt
@@ -292,17 +292,27 @@ static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
 	}
 	else if (offsetGehomed)
 	{
-		ADCfiltered = (OffsetPos_t){0.0f, 0.0f};
-		MovingAverageFilter(xAdcRaw, yAdcRaw, &ADCfiltered, resetFilter);
-
-		measurement.x = ((ADCfiltered.x - ZeroPos.x) / adcMaxValue) * mmStroke;
-		measurement.y = ((ADCfiltered.y - ZeroPos.y) / adcMaxValue) * mmStroke;
+		//ADCfiltered = (OffsetPos_t){0.0f, 0.0f};
+		//MovingAverageFilter(xAdcRaw, yAdcRaw, &ADCfiltered, resetFilter);
+		//measurement.x = ((ADCfiltered.x - ZeroPos.x) / adcMaxValue) * mmStroke;
+		//measurement.y = ((ADCfiltered.y - ZeroPos.y) / adcMaxValue) * mmStroke;
+		
+		measurement.x = ((xAdcRaw - ZeroPos.x) / adcMaxValue) * mmStroke;
+		measurement.y = ((yAdcRaw - ZeroPos.y) / adcMaxValue) * mmStroke;
 	
 		// Bepaal het verschil met de vorige meting die naar de queue is geschreven.
 		// Als X of Y genoeg veranderd is, naar de queue schrijven.
 		if ( (fabsf(measurement.x - previousMeasurement.x) > mmThreshold) ||
 		(fabsf(measurement.y - previousMeasurement.y) > mmThreshold) )
 		{
+			/*
+			printTEL++;
+			if (printTEL > 100)
+			{
+				vPrintString("xOffset is:%.3f, yOffset is:%.3f.\n", measurement.x, measurement.y);
+				printTEL = 0;
+			}*/
+			
 			if (handle_OffsetQueue != NULL)
 			{
 				if (xQueueOverwrite(handle_OffsetQueue, &measurement) == pdPASS)
@@ -327,6 +337,7 @@ void InputHandlerTask(void *pvParameters)
 {
 	vPrintString("> starting InputHandlerTask\n");
 
+	//adc_EnableChannel(stroomChannel);
 	adc_EnableChannel(xDisturbanceChannel);
 	adc_EnableChannel(yDisturbanceChannel);
 	uint16_t xAdcRaw = 0, yAdcRaw = 0;
@@ -357,20 +368,23 @@ void InputHandlerTask(void *pvParameters)
 		}
 
 
-
-		// Analoge kanalen uitlezen
-		adc_StartConversion();
-		while ((adc_IsConversionReady(xDisturbanceChannel) == false) ||
-		(adc_IsConversionReady(yDisturbanceChannel) == false))
+		if (TCP_COMP == 1)
 		{
-			taskSleep(0);
+			// Analoge kanalen uitlezen
+			adc_StartConversion();
+			while ( (adc_IsConversionReady(xDisturbanceChannel) == false) || (adc_IsConversionReady(yDisturbanceChannel) == false))
+			{
+				taskSleep(0);
+			}
+		
+			//ProcessCurrentSensorData( adc_ReadData(stroomChannel));
+
+			xAdcRaw = (uint16_t)adc_ReadData(xDisturbanceChannel);
+			yAdcRaw = (uint16_t)adc_ReadData(yDisturbanceChannel);
+		
+			ProcessOffsetPositionData(xAdcRaw, yAdcRaw);
 		}
-		xAdcRaw = (uint16_t)adc_ReadData(xDisturbanceChannel);
-		yAdcRaw = (uint16_t)adc_ReadData(yDisturbanceChannel);
-		
-		ProcessOffsetPositionData(xAdcRaw, yAdcRaw);
-		
-		taskSleep(10);
+		taskSleep(1);
 	}
 /*Should never get Here*/
 }

@@ -175,7 +175,7 @@ void ControlTask(void *pvParameters)
 		dac_SetOutputVoltage(qc_channel, 0.0f);
 	}
 
-	RunningLoopTimer_Init();
+	//RunningLoopTimer_Init();
 	Regelaar_INIT();
 	BuildSequence();
 
@@ -207,6 +207,7 @@ void ControlTask(void *pvParameters)
 		vPrintString("> Systeem prima.\n");
 		ToState(STATE_WAIT);
 	}
+	//uint16_t encoderPrintTick = 0;
 
 	///////////////////////////////////////////////////////////////////////////
 	// oneindige loop
@@ -214,7 +215,22 @@ void ControlTask(void *pvParameters)
 	{
 		//1kHz externe clockTake
 		ulTaskNotifyTake(pdTRUE, ticksToWait);
-		RunningLoopTimer_Begin();
+		//RunningLoopTimer_Begin();
+
+		/*
+		encoderPrintTick++;
+		if (encoderPrintTick >= 100U)
+		{
+			encoderPrintTick = 0U;
+
+			int32_t c0 = qc_ReadCountRegister(MotorQcChannel[0]);
+			int32_t c1 = qc_ReadCountRegister(MotorQcChannel[1]);
+			int32_t c2 = qc_ReadCountRegister(MotorQcChannel[2]);
+
+			vPrintString("> ENC M0=%ld M1=%ld M2=%ld\n",
+			(long)c0, (long)c1, (long)c2);
+		}
+		*/
 
 		// Lees uit of er een knop ingedrukt is.
 		buttonBits = xEventGroupWaitBits(handle_ButtonEventGroup,
@@ -236,11 +252,11 @@ void ControlTask(void *pvParameters)
 		else if (TakenNood && InNoodsituatie() )
 		{
 			noodCount++;
-			vPrintString("> noodCount + 1!\n");
+			//vPrintString("> noodCount + 1!\n");
 
 			if (noodCount > 25)
 			{
-				//vPrintString("> Systeem in fout gezet na noodSemaphore.\n");
+				vPrintString("> Systeem in fout gezet na noodSemaphore.\n");
 				ToState(STATE_FAULT);
 				noodCount = 0;
 				TakenNood = false;
@@ -260,9 +276,8 @@ void ControlTask(void *pvParameters)
 		{
 			vPrintString("> NOOD: Gemeten stroom te hoog, %.2f!\n", gemetenStroom);
 			ToState(STATE_FAULT);
-		}
-		*/
-
+		}*/
+		
 		switch (state)
 		{
 			/////////////////////////////////////////////////////////////////////
@@ -312,12 +327,10 @@ void ControlTask(void *pvParameters)
 				else
 				{
 					atRust = MoveJ_ArmDEG123t(25.0f, 25.0f, 25.0f, 2.5f);
-
+					
 					if (atRust)
 					{
 						vPrintString("> HOMING complete, at +25deg -> READY\n");
-						//DisturbanceCompensation_Init(handle_DisturbanceQueue);
-						//DisturbanceCompensation_UpdateQueue();
 						MotionPlanning_RESET();
 						atRust = false;
 						homingWaitDone = false;
@@ -334,7 +347,7 @@ void ControlTask(void *pvParameters)
 				// Startknop -> runnen
 				if (buttonBits & EVT_START_BUTTON)
 				{
-					RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check
+					//RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check
 
 					SequenceRESET();
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
@@ -390,7 +403,7 @@ void ControlTask(void *pvParameters)
 				else
 				{
 					// Op vaste positie regelen op iedere control tick
-					HoldCurrentPosition(false, INFINITY);					
+					HoldCurrentXYZPosition(false, INFINITY);					
 				}
 
 
@@ -478,7 +491,7 @@ void ControlTask(void *pvParameters)
 			}
 		}//End-SwitchCase
 
-		RunningLoopTimer_End();
+		//RunningLoopTimer_End();
 
 	}//End-WhileLoop
 

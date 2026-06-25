@@ -65,7 +65,7 @@ bool Screen_Init(void)
  * Invoer: tekstregels voor status, operatorinformatie, stroom en potmeter.
  * Uitvoer: true wanneer de transfer gelukt is, anders false.
  */
-bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2 )
+bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2 ) //, const char *stroomTxt 
 {
 	if (g_oledReady == false)
 	{
@@ -90,7 +90,6 @@ bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opT
 		// Onderste data regel
 		//u8g2_SetFont(&g_u8g2, u8g2_font_5x7_tr);
 		//u8g2_DrawStr(&g_u8g2, 0, 62,  stroomTxt);
-		//u8g2_DrawStr(&g_u8g2, 80, 62, potTxt);
 	} while (u8g2_NextPage(&g_u8g2));
 
 	if (g_oledTransferError)
@@ -117,14 +116,14 @@ bool Screen_Recover(void)
 	g_oledI2c = i2c_GetChannelHandle(OLED_I2C_CHANNEL);
 	if (g_oledI2c == NULL || g_oledI2c->twi == NULL)
 	{
-		vPrintString("> OLED recover failed: invalid I2C handle.\n");
+		//vPrintString("> OLED recover failed: invalid I2C handle.\n");
 		return false;
 	}
 
 	clearResult = i2c_ClearBus(OLED_I2C_CHANNEL);
 	if ((clearResult != I2C_BUS_OK) && (clearResult != I2C_BUS_REPAIRED))
 	{
-		vPrintString("> OLED recover failed: %s\n", i2c_GetErrorMessage(clearResult));
+		//vPrintString("> OLED recover failed: %s\n", i2c_GetErrorMessage(clearResult));
 		return false;
 	}
 

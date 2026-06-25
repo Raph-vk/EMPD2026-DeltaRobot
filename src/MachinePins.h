@@ -16,6 +16,7 @@
 // Hoeveelheid motoren
 #define N_MOTORS		(3U)
 #define i_twk			(111375.0f / 2366.0f) // 47:1 reductie tandwielkast
+#define TCP_COMP		(0) // 1=on 0=off
 
 ///////////////////////////////////////////////////////////////////////////////
 // 8-bit input port layout on the RTSW board (handeld by PortIOLib.h)
@@ -48,19 +49,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 // I2C ports
 // ch0 - Scherm1
-// ch1 - Optical Flow Sensor 1 & 2
 
 ///////////////////////////////////////////////////////////////////////////////
 // analoge inputs
-// ch3 - currentsensor
-#define maxStroom 12.0f
-// ch4 - potmeter
+// ch3 - x-offsetmeting Channel
+// ch4 - y-offsetmeting Channel
 
 ///////////////////////////////////////////////////////////////////////////////
 // motor configuratie DAC en QC
 extern const uint8_t MotorDacChannel[N_MOTORS]; //0,1,2
 extern const uint8_t MotorQcChannel[N_MOTORS]; // 0,1,2
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // PCB push buttons (handled by SwitchLib)

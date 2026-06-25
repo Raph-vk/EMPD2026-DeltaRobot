@@ -40,8 +40,7 @@ SemaphoreHandle_t	handle_OffsetZeroRequest = NULL;
 SemaphoreHandle_t	handle_OffsetZeroDone = NULL;
 
 QueueHandle_t		handle_StateQueue = NULL;
-//QueueHandle_t		handle_potQueue = NULL;
-//QueueHandle_t		handle_stroomQueue = NULL;
+QueueHandle_t		handle_stroomQueue = NULL;
 QueueHandle_t		handle_OffsetQueue = NULL;
 //QueueHandle_t		handle_DisturbanceQueue = NULL;
 
@@ -113,16 +112,8 @@ void StartApplicationTasks(void)
 	{
 		vPrintString("handle_OffsetQueue create failed.\n");
 	}
-	
-	/*
-	// Aanmaken van "potQueue"
-	// Geeft de actuele procentuele stap-waarde van de potmeter door.
-	handle_potQueue = xQueueCreate(QueueSize, sizeof(uint32_t));
-	if (handle_potQueue == NULL)
-	{
-		vPrintString("handle_potQueue create failed.\n");
-	}
 
+	/*
 	// Aanmaken van "stroom queue"
 	// Geeft de actuele stroomwaarde door.
 	handle_stroomQueue = xQueueCreate(QueueSize, sizeof(float));
@@ -130,15 +121,6 @@ void StartApplicationTasks(void)
 	{
 		vPrintString("handle_stroomQueue create failed.\n");
 	}
-	
-	// Aanmaken van "Disturbance queue"
-	// Geeft de actuele X- en Y-verstoring van het frame door.
-	handle_DisturbanceQueue = xQueueCreate(QueueSize, sizeof(DisturbanceMeasurement_t));
-	if (handle_DisturbanceQueue == NULL)
-	{
-		vPrintString("handle_DisturbanceQueue create failed.\n");
-	}
-	
 	*/
 	
 	/**************************************************** Taken aanmaken ****************************************************/

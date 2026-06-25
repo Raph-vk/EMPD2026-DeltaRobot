@@ -83,7 +83,6 @@ void VisualisationTask(void *pvParameters)
 	SystemState_t vorigeStatus = (SystemState_t)-1;
 	uint32_t i = 0;
 
-	//char potLine[24];
 	//char stroomLine[24];
 	char stateLine[24];
 	const char *stateString = ""; // Moeten const en pointer zijn!
@@ -208,23 +207,13 @@ void VisualisationTask(void *pvParameters)
 			// Scherm schrijven
 			//uint32_t procent;
 			//float stroom;
-
-			// Potmeterwaarde niet-destructief uit de queue lezen
+			
 			/*
-			if (xQueuePeek(handle_potQueue, &procent, 0) == pdTRUE)
-			{
-				snprintf(potLine, sizeof(potLine), "vMax:%0u%%", (unsigned int)procent);
-			}
-			else
-			{
-				snprintf(potLine, sizeof(potLine), "vMax:---");
-			}
-
 			// Stroomwaarde niet-destructief uit de queue lezen
 			if (xQueuePeek(handle_stroomQueue, &stroom, 0) == pdTRUE)
 			{
 				snprintf(stroomLine, sizeof(stroomLine), "Stroom:%.1fA", stroom); // 1 decimaal
-				vPrintString("Gemeten stroom: %.1fA\n", stroom);
+				//vPrintString("Gemeten stroom: %.1fA\n", stroom);
 			}
 			else
 			{
@@ -234,13 +223,14 @@ void VisualisationTask(void *pvParameters)
 
 			// Infolijn toevoegen.
 			snprintf(stateLine, sizeof(stateLine), "Status: %s", stateString);
-			if (Screen_DrawStatus(stateLine, operatorLine1, operatorLine2))
+			
+			if (Screen_DrawStatus(stateLine, operatorLine1, operatorLine2)) //, stroomLine
 			{
 				updateDisplay = false;
 			}
 			else
 			{
-				vPrintString("> OLED transfer failed (%ld), trying recovery.\n", (long)Screen_GetLastTransferStatus());
+				//vPrintString("> OLED transfer failed (%ld), trying recovery.\n", (long)Screen_GetLastTransferStatus());
 				(void)Screen_Recover();
 				updateDisplay = true;
 			}

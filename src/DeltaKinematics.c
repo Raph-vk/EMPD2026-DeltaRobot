@@ -5,8 +5,11 @@
  * Only this file knows the robot geometry, so geometry changes stay local.
  *
  * Created on: 10/04/2026
- * Author: Raph van Koeveringe
+ * Code Auteur: Raph van Koeveringe
+ * Inverse Kinematics math door: Tessa van Lankveld
+ * Forward Kinematics math door: Robbe van Eekelen
  */
+
 #include "DeltaKinematics.h"
 //////////////////////////////////////////////////////////////////////////////
 // system includes
@@ -28,8 +31,8 @@ static float rBase = 200.0f;	// basisradius,schouderpunt [mm]
 static float rPols = 40.0f;	// polsRadius [mm]				// platformradius [mm]
 static float LengteBovenarm = 210.0f;	// bovenarm lengte [mm]
 static float LengteOnderarm = 550.0f; // onderarm [mm]
-static const float Bovenarm_thetaMax = 30.0 * DEG_TO_RAD; // bovenste limiet
-static const float Bovenarm_thetaMin = -80.0 * DEG_TO_RAD; // onderste limiet
+static const float Bovenarm_thetaMax = 35.0 * DEG_TO_RAD; // bovenste limiet
+static const float Bovenarm_thetaMin = -90.0 * DEG_TO_RAD; // onderste limiet
 
 // constantes
 //Mechanische hoeklimieten van de bovenarm.
@@ -147,11 +150,7 @@ bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 	}//eind motor loop
 
 
-	vPrintString(
-	"IK result: armDeg M1=%.3f, M2=%.3f, M3=%.3f graden\n",
-	(motorRad[0] / i_twk) * RAD_TO_DEG,
-	(motorRad[1] / i_twk) * RAD_TO_DEG,
-	(motorRad[2] / i_twk) * RAD_TO_DEG );
+	//vPrintString("IK result: armDeg M1=%.3f, M2=%.3f, M3=%.3f graden\n", (motorRad[0] / i_twk) * RAD_TO_DEG,(motorRad[1] / i_twk) * RAD_TO_DEG, (motorRad[2] / i_twk) * RAD_TO_DEG );
 
 
 	// Alle motorhoeken zijn berekend en geldig
