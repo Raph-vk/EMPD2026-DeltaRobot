@@ -62,6 +62,8 @@ src\u8g2\csrc\u8x8_gpio.c
 
 src\u8g2\csrc\u8x8_setup.c
 
+src\UserFrame.c
+
 src\VisualisationTask.c
 
 src\MotionEngine.c

@@ -12,6 +12,7 @@
 #include <asf.h>
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // HAL includes for RTSW board
@@ -34,6 +35,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // const globals
 #define DEG_TO_RAD					(0.01745329251994329576923690768489f) // PI / 180.0f
+#define RAD_TO_DEG					(57.295779513082320876798154814105f) // 180.0f / PI
 
 #define Ts							(0.001f)      // sample time, moet gelijk zijn aan externe klok
 #define N_TCP_AXES					(3U)
@@ -68,37 +70,123 @@ static float tcpMax_inc_mm[N_TCP_AXES] = {0.0f, 0.0f, 0.0f};		// totale TCP-verp
 static float vorigeMotorRef_rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};	// vorige IK-motorreferentie [rad]
 static float vorigeMotor_rad_s[N_MOTORS] = {0.0f, 0.0f, 0.0f};	// vorige motor-snelheidsreferentie [rad/s]
 
+static float ErrorSpike_deg[N_MOTORS] = {0.0f, 0.0f, 0.0f};
+
 ///////////////////////////////////////////////////////////////////////////////
-// static void printAnalogVoltage(uint8_t m, float analogvoltage)
+// static void ResetErrorSpike(void)
 /*
- * Print periodiek de gevraagde analoge motorspanning voor debugdoeleinden.
- * Invoer: motorindex en de laatst berekende motorspanning in volt.
- * Uitvoer: geen returnwaarde; schrijft alleen naar de debugconsole.
+ * Reset de piekfout voor een nieuwe beweging.
  */
-static void printAnalogVoltage(uint8_t m, float analogvoltage)
+static void ResetErrorSpike(void)
 {
-	static uint32_t analogPrintCounter = 0;
-	static float spikeVoltage[N_MOTORS] = {0.0f, 0.0f, 0.0f};
-
-	if (fabsf(analogvoltage) > fabsf(spikeVoltage[m]))
+	for (uint8_t i = 0; i < N_MOTORS; i++)
 	{
-		spikeVoltage[m] = analogvoltage;
-	}
-
-	if (analogPrintCounter >= 1500) // T_in sec * 3 motoren
-	{
-		for (uint8_t i = 0; i < N_MOTORS; i++)
-		{
-			//vPrintString("Motor %u voltage is: %.2f V.\n", (unsigned int)i, spikeVoltage[i]);
-			spikeVoltage[i] = 0.0f;
-		}
-		analogPrintCounter = 0;
-	}
-	else
-	{
-		analogPrintCounter++;
+		ErrorSpike_deg[i] = 0.0f;
 	}
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// static void UpdateArmErrorSpike(...)
+/*
+ * Update de piekfout in armgraden.
+ */
+static void UpdateArmErrorSpike(const float motorRef_rad[N_MOTORS], const float motorPos_Rad[N_MOTORS])
+{
+	for (uint8_t i = 0; i < N_MOTORS; i++)
+	{
+		float errorNow_deg = -(motorRef_rad[i] - motorPos_Rad[i]) * RAD_TO_DEG / i_twk;
+
+		if (fabsf(errorNow_deg) > fabsf(ErrorSpike_deg[i]))
+		{
+			ErrorSpike_deg[i] = errorNow_deg;
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// static void FormatErrorSpikeLine(...)
+/*
+ * Maakt een korte schermregel van de actuele piekfout.
+ */
+static void FormatErrorSpikeLine(char *line, size_t lineSize)
+{
+	snprintf(line, lineSize, "eMax %.2f %.2f %.2fdeg",
+			 ErrorSpike_deg[0], ErrorSpike_deg[1], ErrorSpike_deg[2]);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// static void PubliceerDisplayInfo(...)
+/*
+ * Stuurt twee algemene displayregels naar het scherm.
+ */
+static void PubliceerDisplayInfo(const char *regel1, const char *regel2)
+{
+	if (handle_DisplayInfoQueue != NULL)
+	{
+		DisplayInfo_t displayInfo;
+
+		snprintf(displayInfo.regel1, sizeof(displayInfo.regel1), "%s", regel1);
+		snprintf(displayInfo.regel2, sizeof(displayInfo.regel2), "%s", regel2);
+
+		xQueueOverwrite(handle_DisplayInfoQueue, &displayInfo);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// static void PubliceerErrorSpikeInfo(const char *regel1)
+/*
+ * Stuurt regel1 met de actuele piekfout als tweede displayregel naar het scherm.
+ */
+static void PubliceerErrorSpikeInfo(const char *regel1)
+{
+	char errorLine[DISPLAY_INFO_LINE_LENGTH];
+
+	FormatErrorSpikeLine(errorLine, sizeof(errorLine));
+	PubliceerDisplayInfo(regel1, errorLine);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// static void PubliceerBewegingKlaarInfo(...)
+/*
+ * Print en publiceert de gekozen foutinformatie na een MoveJ/MoveL/MoveHop beweging.
+ */
+static void PubliceerBewegingKlaarInfo(const char *bewegingsNaam, const float motorPos_Rad[N_MOTORS])
+{
+	char regel1[DISPLAY_INFO_LINE_LENGTH];
+	char regel2[DISPLAY_INFO_LINE_LENGTH];
+
+	(void)motorPos_Rad;
+
+	snprintf(regel1, sizeof(regel1), "%s %.0f,%.0f,%.0f Done",
+			 bewegingsNaam,
+			 tcpTarget_mm[0],
+			 tcpTarget_mm[1],
+			 tcpTarget_mm[2]);
+
+	// Actieve keuze: piekfout op de armen in graden.
+	FormatErrorSpikeLine(regel2, sizeof(regel2));
+
+	/*
+	// Alternatief: eindfout op TCP-positie tonen. Verwijder dan ook de (void)motorPos_Rad hierboven.
+	float tcpActual_mm[N_TCP_AXES] = {0.0f, 0.0f, 0.0f};
+
+	if (DeltaKinematics_Forward(motorPos_Rad, tcpActual_mm))
+	{
+		const float ex = tcpActual_mm[0] - tcpTarget_mm[0];
+		const float ey = tcpActual_mm[1] - tcpTarget_mm[1];
+		const float ez = tcpActual_mm[2] - tcpTarget_mm[2];
+		const float eAbs = sqrtf(ex*ex + ey*ey + ez*ez);
+
+		snprintf(regel2, sizeof(regel2), "eEnd X%.2f Y%.2f Z%.2f", ex, ey, ez);
+		vPrintString("%s done. ERROR is: X=%.2f Y=%.2f Z=%.2f mm, abs = %.2f mm\n",
+					 bewegingsNaam, ex, ey, ez, eAbs);
+	}
+	*/
+
+	vPrintString("%s done. %s\n", bewegingsNaam, regel2);
+	PubliceerDisplayInfo(regel1, regel2);
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // static bool StopBewegingMetFout(const char *melding)
@@ -111,6 +199,8 @@ static bool StopBewegingMetFout(const char *melding)
 	setupDone = false;
 
 	vPrintString("%s\n", melding);
+	PubliceerDisplayInfo("PAUSE: bewegingsfout", melding);
+
 	ToState(STATE_PAUSE);
 
 	return false;
@@ -177,26 +267,6 @@ static void RegelMotoren(const float motorRefRad[N_MOTORS], const float Encodedm
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// static void PrintTcpEindFout(...)
-/*
- * Print de TCP-eindfout na een MoveL/MoveHop beweging.
- */
-static void PrintTcpEindFout(const char *bewegingsNaam, const float motorPos_Rad[N_MOTORS])
-{
-	float tcpActual_mm[N_TCP_AXES] = {0.0f, 0.0f, 0.0f};
-
-	//bepaald TCP positie en print actuele fout.
-	if (DeltaKinematics_Forward(motorPos_Rad, tcpActual_mm))
-	{
-		const float ex = tcpActual_mm[0] - tcpTarget_mm[0];
-		const float ey = tcpActual_mm[1] - tcpTarget_mm[1];
-		const float ez = tcpActual_mm[2] - tcpTarget_mm[2];
-		const float eAbs = sqrtf(ex*ex + ey*ey + ez*ez);
-		vPrintString("%s done. ERROR is: X=%.2f Y=%.2f Z=%.2f mm, abs = %.2f mm\n", bewegingsNaam, ex, ey, ez, eAbs);
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // void MotionPlanning_RESET(void)
 /*
  * Zet de interne bewegingsprofielen en wachttimers terug naar hun begintoestand.
@@ -208,6 +278,7 @@ void MotionPlanning_RESET(void)
 	tau = 0.0f;
 	verplaatsingKlaar = false;
 	setupDone = false;
+	ResetErrorSpike();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -230,6 +301,7 @@ bool HoldCurrentPosition(bool grab, float waitTime_s)
 	{
 		port_SetBit(BIT_GRIPPER, grab);
 		LeesMotorPositiesRad(motorHoldRefPos);
+		ResetErrorSpike();
 		RegelMotoren(motorHoldRefPos, motorHoldRefPos, 0);
 		t0 = g_time;
 		setupDone = true;
@@ -238,7 +310,9 @@ bool HoldCurrentPosition(bool grab, float waitTime_s)
 	else if (g_time - t0 >= waitTime_s)
 	{		
 		LeesMotorPositiesRad(motorPos_Rad);
+		UpdateArmErrorSpike(motorHoldRefPos, motorPos_Rad);
 		RegelMotoren(motorHoldRefPos, motorPos_Rad, 0);
+		PubliceerErrorSpikeInfo("Hold positie Done");
 		setupDone = false;
 		g_time += Ts;
 		return true;
@@ -247,6 +321,7 @@ bool HoldCurrentPosition(bool grab, float waitTime_s)
 	else
 	{
 		LeesMotorPositiesRad(motorPos_Rad);
+		UpdateArmErrorSpike(motorHoldRefPos, motorPos_Rad);
 		RegelMotoren(motorHoldRefPos, motorPos_Rad, 0);
 	}
 
@@ -279,9 +354,7 @@ bool HoldCurrentXYZPosition(bool grab, float waitTime_s)
 		// tcp positie bepalen tov motorposities
 		if (!DeltaKinematics_Forward(motorPos_Rad, tcpHoldBasis_mm))
 		{
-			vPrintString("FOUT: huidige motorpositie geeft geen geldige TCP-positie.\n");
-			ToState(STATE_PAUSE);
-			return false;
+			return StopBewegingMetFout("motorPos ongeldige TCPpos.");
 		}
 
 		verplaatsingKlaar = false;
@@ -309,9 +382,12 @@ bool HoldCurrentXYZPosition(bool grab, float waitTime_s)
 		// bepaal nieuwe motorpositie
 		if (!DeltaKinematics_Inverse(tcpHoldRef_mm, motorRef_rad))
 		{
+			return StopBewegingMetFout("HoldXYZ ongeldige IK.");
+			/*
 			vPrintString("FOUT: Hold XYZ positie ongeldig voor inverse kinematica.\n");
 			ToState(STATE_PAUSE);
 			return false;
+			*/
 		}
 
 		holdTargetGeldig = true;
@@ -365,6 +441,8 @@ bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 			return StopBewegingMetFout("FOUT: ongeldige eindpositie voor inverse kinematica.");
 		}
 
+		ResetErrorSpike();
+
 		for (uint8_t mI = 0; mI < N_MOTORS; mI++)
 		{
 			thetaStart[mI] = motorPos_Rad[mI];
@@ -388,12 +466,13 @@ bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	}
 
 	// motoren regelen
+	UpdateArmErrorSpike(motorRefRad, motorPos_Rad);
 	RegelMotoren(motorRefRad, motorPos_Rad, feedForwardAcc);
 
 	if (verplaatsingKlaar)
 	{
 		setupDone = false;
-		PrintTcpEindFout("MoveJ", motorPos_Rad);
+		PubliceerBewegingKlaarInfo("MoveJ", motorPos_Rad);
 	}
 
 	return verplaatsingKlaar;
@@ -434,6 +513,8 @@ bool MoveJ_ArmDEG123t(float M1DEG, float M2DEG, float M3DEG, float maxTime_s)
 		motorRef_rad[1] = -M2DEG * DEG_TO_RAD * i_twk;
 		motorRef_rad[2] = -M3DEG * DEG_TO_RAD * i_twk;
 
+		ResetErrorSpike();
+
 		for (uint8_t mI = 0; mI < N_MOTORS; mI++)
 		{
 			thetaStart[mI] = motorPos_Rad[mI];
@@ -457,12 +538,14 @@ bool MoveJ_ArmDEG123t(float M1DEG, float M2DEG, float M3DEG, float maxTime_s)
 	}
 
 	// motoren regelen
+	UpdateArmErrorSpike(motorRefRad, motorPos_Rad);
 	RegelMotoren(motorRefRad, motorPos_Rad, feedForwardAcc);
 
 	if (verplaatsingKlaar)
 	{
 		setupDone = false;
 		vPrintString("MoveJ_ArmDEG123t voldaan!\n");
+		PubliceerErrorSpikeInfo("MoveJ Arm Done");
 	}
 
 	return verplaatsingKlaar;
@@ -572,6 +655,8 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 		{
 			return false;
 		}
+
+		ResetErrorSpike();
 	}
 
 	//tijd bijhouden
@@ -597,6 +682,7 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 		return StopBewegingMetFout("FOUT: MoveL padpunt ongeldig voor inverse kinematica.");
 	}
 
+	UpdateArmErrorSpike(motorRef_rad, motorPos_Rad);
 	SchatMotorHoekacceleratie(motorRef_rad, verplaatsingKlaar, alphaRefMotors);
 	RegelMotoren(motorRef_rad, motorPos_Rad, alphaRefMotors);
 	
@@ -608,7 +694,7 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	if (verplaatsingKlaar)
 	{
 		setupDone = false;
-		PrintTcpEindFout("MoveL", motorPos_Rad);
+		PubliceerBewegingKlaarInfo("MoveL", motorPos_Rad);
 	}
 
 	return verplaatsingKlaar;
@@ -678,6 +764,8 @@ bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 			return false;
 		}
 
+		ResetErrorSpike();
+
 		//berekenen van hopHoogte
 		hopHeight_mm = BerekenHopHoogte(maxTime_s);
 		vPrintString("MoveHop hoogte: %.2f mm\n", hopHeight_mm);
@@ -716,6 +804,7 @@ bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	}
 
 	//aansturen van de motoren
+	UpdateArmErrorSpike(motorRef_rad, motorPos_Rad);
 	SchatMotorHoekacceleratie(motorRef_rad, verplaatsingKlaar, alphaRefMotors);
 	RegelMotoren(motorRef_rad, motorPos_Rad, alphaRefMotors);
 
@@ -723,7 +812,7 @@ bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	if (verplaatsingKlaar)
 	{
 		setupDone = false;
-		PrintTcpEindFout("MoveHop", motorPos_Rad);
+		PubliceerBewegingKlaarInfo("MoveHop", motorPos_Rad);
 	}
 
 	return verplaatsingKlaar;

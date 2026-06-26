@@ -34,22 +34,33 @@
 // defines
 //#define ADC_REFERENCE_VOLTAGE         (3.3f)
 //#define CURRENT_SENSOR_VOLTS_PER_AMP  (0.1f)
+//#define stroomChannel (2U)
 
-#define adcMaxValue					  (4095.0f)
-#define mmStroke					(30.43f)
-#define mmThreshold					(0.01f)
-
-#define stroomChannel (2U)
+//analoge offset-meting sensoren
 #define xDisturbanceChannel (3U)
 #define yDisturbanceChannel (4U)
 
+#define adcMaxValue					  (4095.0f)
+#define mmStroke					(30.43f)
+#define mmThreshold					(0.05f)
 #define calibrationSamples (100U)
-#define MOVING_AVERAGE_SAMPLES (12U)
+
+/*
+ * Vaste EMA-filterfactor voor de offsetcompensatie.
+ *
+ * Lager geeft meer rust maar meer vertraging. Hoger reageert sneller, maar laat
+ * meer ADC-ruis door. 0.35 is een praktische startwaarde.
+ */
+#define OFFSET_FILTER_ALPHA			(0.35f)
+
+
+
+
 
 ///////////////////////////////////////////////////////////////////////////////
 //static bool hasCurrentSample = false;
 //static uint32_t vorigeStroomData = 0;
-//static float zeroCurrentVoltage = 2.5f;        // Better: measure this during startup
+//static float zeroCurrentVoltage = 2.5f;
 
 ///////////////////////////////////////////////////////////////////////////////
 // static bool IsButtonPressed(uint8_t pcbSwitch, uint8_t inputBit)
@@ -97,67 +108,105 @@ static bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// static void UpdateMovingAverageFilter(...)
+// static uint16_t Median3(...)
 /*
- * Werkt het moving average filter bij met de nieuwste X- en Y-ADC-meting.
+ * Geeft de middelste waarde van drie ADC-samples terug.
+ * Dit haalt losse pieken weg met slechts ongeveer een sample vertraging.
  */
-static void MovingAverageFilter(uint16_t xAdcRaw, uint16_t yAdcRaw, OffsetPos_t *ADCfiltered, bool resetFilter)
+static uint16_t Median3(uint16_t a, uint16_t b, uint16_t c)
 {
-	static uint8_t ADCsampleIndex = 0;
-	static uint16_t xADCbuffer[MOVING_AVERAGE_SAMPLES] = {0}, yADCbuffer[MOVING_AVERAGE_SAMPLES] = {0};	
-	static uint32_t xADCsum = 0, yADCsum = 0;
-	static bool ADCfilterReady = false;
-	
-	//als filter nog niet geinitialiseerd
-	if (!ADCfilterReady || resetFilter)
+	uint16_t temp;
+
+	if (a > b)
 	{
-		//sommaties op nul zetten
-		xADCsum = 0;
-		yADCsum = 0;
+		temp = a;
+		a = b;
+		b = temp;
+	}
+	if (b > c)
+	{
+		temp = b;
+		b = c;
+		c = temp;
+	}
+	if (a > b)
+	{
+		temp = a;
+		a = b;
+		b = temp;
+	}
 
-		// iedere sample vullen met huidig gemeten waarde
-		for (uint8_t i = 0; i < MOVING_AVERAGE_SAMPLES; i++)
+	return b;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// static OffsetPos_t FilterOffsetMeasurement(...)
+/*
+ * Filtert de offsetmeting in twee stappen:
+ *
+ * 1. Median-of-3 op ruwe ADC-waarden.
+ *    Dit pakt drie opeenvolgende samples en kiest de middelste waarde. Een losse
+ *    piek omhoog of omlaag wordt daardoor genegeerd, zonder veel vertraging.
+ *
+ * 2. Vaste EMA op de offset in mm.
+ *    De EMA maakt geen gemiddelde van een grote buffer. Daardoor blijft de
+ *    reactie snel. Per sample schuift de gefilterde waarde een percentage op
+ *    richting de nieuwe meting. Dat percentage is de vaste OFFSET_FILTER_ALPHA.
+ */
+static OffsetPos_t FilterOffsetMeasurement(uint16_t xAdcRaw, uint16_t yAdcRaw, const OffsetPos_t *zeroPos, bool resetFilter)
+{
+	static uint16_t xAdcSamples[3] = {0U, 0U, 0U};
+	static uint16_t yAdcSamples[3] = {0U, 0U, 0U};
+	static uint8_t medianSampleIndex = 0U;
+	static OffsetPos_t filteredMeasurement = {0.0f, 0.0f};
+
+	// vertagingswaardes invullen bij reset
+	if (resetFilter)
+	{
+		for (uint8_t i = 0U; i < 3U; i++)
 		{
-			//gehele buffer vullen met actuele meetwaarde
-			xADCbuffer[i] = xAdcRaw;
-			yADCbuffer[i] = yAdcRaw;
-
-			//sommatie optellen
-			xADCsum += xAdcRaw;
-			yADCsum += yAdcRaw;
+			xAdcSamples[i] = xAdcRaw;
+			yAdcSamples[i] = yAdcRaw;
 		}
 
-		ADCsampleIndex = 0;
-		ADCfilterReady = true;
+		medianSampleIndex = 0U;
 	}
-	// Volgens "Ringbuffer" 
-	// de oudste waarde met nieuwe waarde vervangen 
-	//en gemiddelde uitsturen
 	else
 	{
-		//oude waarde van sommatie aftrekken
-		xADCsum -= xADCbuffer[ADCsampleIndex];
-		yADCsum -= yADCbuffer[ADCsampleIndex];
-		
-		//nieuwe waarde in buffer plaatsen
-		xADCbuffer[ADCsampleIndex] = xAdcRaw;
-		yADCbuffer[ADCsampleIndex] = yAdcRaw;
-		
-		//nieuwe waarde in sommatie plaatsen
-		xADCsum += xAdcRaw;
-		yADCsum += yAdcRaw;
+		xAdcSamples[medianSampleIndex] = xAdcRaw;
+		yAdcSamples[medianSampleIndex] = yAdcRaw;
 
-		//sampleIndex optellen
-		ADCsampleIndex++;
-		if (ADCsampleIndex >= MOVING_AVERAGE_SAMPLES)
+		medianSampleIndex++;
+		if (medianSampleIndex >= 3U)
 		{
-			ADCsampleIndex = 0;
+			medianSampleIndex = 0U;
 		}
 	}
 
-	ADCfiltered->x = (float)xADCsum / (float)MOVING_AVERAGE_SAMPLES;
-	ADCfiltered->y = (float)yADCsum / (float)MOVING_AVERAGE_SAMPLES;
+	// Median-of-3: gebruik de middelste van de laatste drie ruwe ADC-samples.
+	const uint16_t xAdcMedian = Median3(xAdcSamples[0], xAdcSamples[1], xAdcSamples[2]);
+	const uint16_t yAdcMedian = Median3(yAdcSamples[0], yAdcSamples[1], yAdcSamples[2]);
+
+	//ADC-count omrekenen naar milimeters
+	OffsetPos_t rawMeasurement;
+	rawMeasurement.x = (((float)xAdcMedian - zeroPos->x) / adcMaxValue) * mmStroke;
+	rawMeasurement.y = (((float)yAdcMedian - zeroPos->y) / adcMaxValue) * mmStroke;
+
+	if (resetFilter)
+	{
+		// Eerste sample na opstarten/nullen: direct overnemen.
+		filteredMeasurement = rawMeasurement;
+		return filteredMeasurement;
+	}
+
+	// EMA-adaptive filter
+	// filtered = filtered + alpha * delta
+	filteredMeasurement.x += OFFSET_FILTER_ALPHA * (rawMeasurement.x - filteredMeasurement.x);
+	filteredMeasurement.y += OFFSET_FILTER_ALPHA * (rawMeasurement.y - filteredMeasurement.y);
+
+	return filteredMeasurement;
 }
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // static void ProcessCurrentSensorData(uint32_t stroomData)
@@ -214,14 +263,12 @@ static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
 	static OffsetPos_t previousMeasurement = { INFINITY, INFINITY }; //oneindig zodat waarde altijd te groot is voor treshold
 	static OffsetPos_t measurement = { 0.0f, 0.0f };
 	static OffsetPos_t ZeroPos = {0.0f, 0.0f};
-	static OffsetPos_t ADCfiltered = {0.0f, 0.0f};
 
 	static uint32_t xSum = 0, ySum = 0;
 	static uint8_t sampleCount = 0;
 
 	static bool zeroingActive = true;
 	static bool offsetGehomed = true;
-	static bool resetFilter = true;
 
 	
 	// Als zero wordt aangevraagd, TAKE
@@ -267,15 +314,8 @@ static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
 			offsetGehomed = true;
 			
 
-			//filter wordt eenmalig gereset 
-			resetFilter = true;
-			ADCfiltered = (OffsetPos_t){0.0f, 0.0f};
-			MovingAverageFilter(xAdcRaw, yAdcRaw, &ADCfiltered, resetFilter);
-			resetFilter = false;
-			
 			// nieuwe waarde naar queue schrijven
-			measurement.x = ((ADCfiltered.x - ZeroPos.x) / adcMaxValue) * mmStroke;
-			measurement.y = ((ADCfiltered.y - ZeroPos.y) / adcMaxValue) * mmStroke;
+			measurement = FilterOffsetMeasurement(xAdcRaw, yAdcRaw, &ZeroPos, true);
 			if (handle_OffsetQueue != NULL)
 			{
 				if (xQueueOverwrite(handle_OffsetQueue, &measurement) == pdPASS)
@@ -292,13 +332,7 @@ static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
 	}
 	else if (offsetGehomed)
 	{
-		//ADCfiltered = (OffsetPos_t){0.0f, 0.0f};
-		//MovingAverageFilter(xAdcRaw, yAdcRaw, &ADCfiltered, resetFilter);
-		//measurement.x = ((ADCfiltered.x - ZeroPos.x) / adcMaxValue) * mmStroke;
-		//measurement.y = ((ADCfiltered.y - ZeroPos.y) / adcMaxValue) * mmStroke;
-		
-		measurement.x = ((xAdcRaw - ZeroPos.x) / adcMaxValue) * mmStroke;
-		measurement.y = ((yAdcRaw - ZeroPos.y) / adcMaxValue) * mmStroke;
+		measurement = FilterOffsetMeasurement(xAdcRaw, yAdcRaw, &ZeroPos, false);
 	
 		// Bepaal het verschil met de vorige meting die naar de queue is geschreven.
 		// Als X of Y genoeg veranderd is, naar de queue schrijven.
@@ -372,11 +406,11 @@ void InputHandlerTask(void *pvParameters)
 		{
 			// Analoge kanalen uitlezen
 			adc_StartConversion();
-			while ( (adc_IsConversionReady(xDisturbanceChannel) == false) || (adc_IsConversionReady(yDisturbanceChannel) == false))
+			while ( (adc_IsConversionReady(xDisturbanceChannel) == false) || (adc_IsConversionReady(yDisturbanceChannel) == false)) //(adc_IsConversionReady(stroomChannel) == false)
 			{
 				taskSleep(0);
 			}
-		
+
 			//ProcessCurrentSensorData( adc_ReadData(stroomChannel));
 
 			xAdcRaw = (uint16_t)adc_ReadData(xDisturbanceChannel);

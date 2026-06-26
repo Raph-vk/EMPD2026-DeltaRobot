@@ -92,15 +92,16 @@ static inline void MoveHopXYZ(float x_mm, float y_mm, float z_mm, float time_s);
  */
 void BuildSequence(void)
 {
-	float wait = 5.0f; // s
-	float move = 0.5f; // s
+	float wait = 0.5f; // s
+	float move = 0.25f; // s
 	float zHeight = -427.5f; //mm
-	//float moveHop = 0.3f;
+	float moveHop = 0.3f;
 	
 	//setup
 	sequenceLength = 0;
 	sequenceOverflow = false;
-
+	
+	//MoveJXYZ(0.0f, 0.0f, zHeight, move);
 
 	Hold(false, 0.1f);
 	MoveJXYZ(0.0f, 0.0f, zHeight, move);
@@ -114,6 +115,7 @@ void BuildSequence(void)
 	MoveLXYZ(-80.0f, 80.0f, zHeight, move);
 	HoldXYZ(false, wait);
 
+	// coole beweging
 	/*
 	for (uint8_t i = 0; i < 8; i++)
 	{
@@ -150,15 +152,9 @@ static SequenceStep_t sequence[MAX_SEQUENCE_STEPS]; // De sequencielijst!
 
 ///////////////////////////////////////////////////////////////////////////////
 // static bool UserTargetToBase(...)
-static bool UserTargetToBase(float userX_mm,
-							 float userY_mm,
-							 float baseZ_mm,
-							 float baseXYZ_mm[3])
+static bool UserTargetToBase(float userX_mm, float userY_mm, float baseZ_mm, float baseXYZ_mm[3])
 {
-	return UserFrame_ToBaseXY(userX_mm,
-							  userY_mm,
-							  baseZ_mm,
-							  baseXYZ_mm);
+	return UserFrame_ToBaseXY(userX_mm, userY_mm, baseZ_mm, baseXYZ_mm);
 }
 
 /*
@@ -191,18 +187,11 @@ bool RunSequence(void)
 		break;
 
 		case STEP_MOVEJ_XYZ:
-		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM,
-							  step->p2 + WORK_OFFSET_Y_MM,
-							  step->p3,
-							  baseXYZ_mm))
+		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, baseXYZ_mm))
 		{
 			return false;
 		}
-
-		stepDone = MoveJ_XYZt(baseXYZ_mm[0],
-							  baseXYZ_mm[1],
-							  baseXYZ_mm[2],
-							  step->time_s);
+		stepDone = MoveJ_XYZt(baseXYZ_mm[0], baseXYZ_mm[1], baseXYZ_mm[2], step->time_s);
 		break;
 
 		case STEP_MOVEJ_DEG:
@@ -210,33 +199,19 @@ bool RunSequence(void)
 		break;
 
 		case STEP_MOVEL_XYZ:
-		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM,
-							  step->p2 + WORK_OFFSET_Y_MM,
-							  step->p3,
-							  baseXYZ_mm))
+		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, baseXYZ_mm))
 		{
 			return false;
 		}
-
-		stepDone = MoveL_XYZt(baseXYZ_mm[0],
-							  baseXYZ_mm[1],
-							  baseXYZ_mm[2],
-							  step->time_s);
+		stepDone = MoveL_XYZt(baseXYZ_mm[0], baseXYZ_mm[1], baseXYZ_mm[2], step->time_s);
 		break;
 
 		case STEP_MOVEHOP_XYZ:
-		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM,
-							  step->p2 + WORK_OFFSET_Y_MM,
-							  step->p3,
-							  baseXYZ_mm))
+		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, baseXYZ_mm))
 		{
 			return false;
 		}
-
-		stepDone = MoveHop_XYZt(baseXYZ_mm[0],
-								baseXYZ_mm[1],
-								baseXYZ_mm[2],
-								step->time_s);
+		stepDone = MoveHop_XYZt(baseXYZ_mm[0], baseXYZ_mm[1], baseXYZ_mm[2], step->time_s);
 		break;
 
 		default:

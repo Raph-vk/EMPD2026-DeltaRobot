@@ -42,6 +42,7 @@ SemaphoreHandle_t	handle_OffsetZeroDone = NULL;
 QueueHandle_t		handle_StateQueue = NULL;
 QueueHandle_t		handle_stroomQueue = NULL;
 QueueHandle_t		handle_OffsetQueue = NULL;
+QueueHandle_t		handle_DisplayInfoQueue = NULL;
 //QueueHandle_t		handle_DisturbanceQueue = NULL;
 
 
@@ -111,6 +112,14 @@ void StartApplicationTasks(void)
 	if (handle_OffsetQueue == NULL)
 	{
 		vPrintString("handle_OffsetQueue create failed.\n");
+	}
+
+	// Aanmaken van "DisplayInfo queue"
+	// Geeft twee algemene inforegels door aan het scherm.
+	handle_DisplayInfoQueue = xQueueCreate(QueueSize, sizeof(DisplayInfo_t));
+	if (handle_DisplayInfoQueue == NULL)
+	{
+		vPrintString("handle_DisplayInfoQueue create failed.\n");
 	}
 
 	/*

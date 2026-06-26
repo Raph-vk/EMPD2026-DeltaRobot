@@ -85,6 +85,9 @@ void VisualisationTask(void *pvParameters)
 
 	//char stroomLine[24];
 	char stateLine[24];
+	static char overigeInfo1[DISPLAY_INFO_LINE_LENGTH] = "";
+	static char overigeInfo2[DISPLAY_INFO_LINE_LENGTH] = "";
+	DisplayInfo_t displayInfo;
 	const char *stateString = ""; // Moeten const en pointer zijn!
 	const char *operatorLine1 = "";
 	const char *operatorLine2 = "";
@@ -115,7 +118,7 @@ void VisualisationTask(void *pvParameters)
 			vorigeStatus = status;
 			updateDisplay = true;
 		}
-
+		
 		// Iedere loop setten
 		stateString = "";
 		operatorLine1 = "";
@@ -195,36 +198,23 @@ void VisualisationTask(void *pvParameters)
 				break;
 			}
 		}
+		
+		// Laatste algemene scherminformatie ophalen voor de onderste schermregels.
+		if ((handle_DisplayInfoQueue != NULL) && (xQueueReceive(handle_DisplayInfoQueue, &displayInfo, 0) == pdTRUE))
+		{
+			snprintf(overigeInfo1, sizeof(overigeInfo1), "%s", displayInfo.regel1);
+			snprintf(overigeInfo2, sizeof(overigeInfo2), "%s", displayInfo.regel2);
+
+			updateDisplay = true;
+		}
 
 		// NAAR OLED SCHERM SCHRIJVEN
-		if (!updateDisplay || (i < 10))
+		if (updateDisplay || (i == 0))
 		{
-			// Loop teller voor blink, praktisch; 7, 8, 9, 0, 1, 2 ....
-			i++;
-		}
-		else
-		{
-			// Scherm schrijven
-			//uint32_t procent;
-			//float stroom;
-			
-			/*
-			// Stroomwaarde niet-destructief uit de queue lezen
-			if (xQueuePeek(handle_stroomQueue, &stroom, 0) == pdTRUE)
-			{
-				snprintf(stroomLine, sizeof(stroomLine), "Stroom:%.1fA", stroom); // 1 decimaal
-				//vPrintString("Gemeten stroom: %.1fA\n", stroom);
-			}
-			else
-			{
-				snprintf(stroomLine, sizeof(stroomLine), "Stroom:---A");
-			}
-			*/
-
 			// Infolijn toevoegen.
 			snprintf(stateLine, sizeof(stateLine), "Status: %s", stateString);
 			
-			if (Screen_DrawStatus(stateLine, operatorLine1, operatorLine2)) //, stroomLine
+			if (Screen_DrawStatus(stateLine, operatorLine1, operatorLine2, overigeInfo1, overigeInfo2))
 			{
 				updateDisplay = false;
 			}
@@ -235,6 +225,11 @@ void VisualisationTask(void *pvParameters)
 				updateDisplay = true;
 			}
 		}//end-screen if-statement
+		else
+		{
+			// Loop teller voor blink, praktisch; 7, 8, 9, 0, 1, 2 ....
+			i++;
+		}
 		taskSleep(100);
 	}
 	/* Should never get here */

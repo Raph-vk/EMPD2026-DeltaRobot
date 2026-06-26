@@ -68,7 +68,7 @@
  *
  * Omdat homeAllMotors() op 1 kHz wordt aangeroepen: 1000 ticks = 1000 ms = 1 seconde.
  */
-#define STABILISATIE_TIJD_MS         (5000U)
+#define STABILISATIE_TIJD_MS         (1000U)
 
 ///////////////////////////////////////////////////////////////////////////////
 // TYPEDEFINITIES
@@ -397,7 +397,6 @@ static void NaarBackoffPositie(void)
 			//arm is (ECHT) op positie als gemeten binnen 0.5 graad van gewenste positie
 			armOpBackoffPos[motor] = ( fabsf(armPositieRad[motor] - BACKOFF_RAD) <= (0.5 * DEG_TO_RAD));
 		}
-		
 		uDac = PIDregelaar(motor, bepaalFoutOpMotor(armDoelRad[motor], armPositieRad[motor]));
 		ZetMotorSpanning(motor, uDac);
 	}
@@ -419,6 +418,7 @@ static void NaarBackoffPositie(void)
 					xSemaphoreGive(handle_OffsetZeroRequest);      // zeroing starten
 					offsetZeroRequested = true;
 				}
+				return;
 			}
 			//Wachten tot offsetmeting gereed is
 			if (handle_OffsetZeroDone != NULL)
@@ -431,12 +431,8 @@ static void NaarBackoffPositie(void)
 					homingStatus = HOMING_NAUW_ZOEKEN;
 				}
 			}
-			stabilisatieTeller = 0;
-			vPrintString("> OffsetMeting genult. Start nauwkeurig zoeken.\n");
-			homingStatus = HOMING_NAUW_ZOEKEN;
 		}
 	}//end stabilisatie
-
 } //eind NaarBackoffPositie();
 
 ///////////////////////////////////////////////////////////////////////////////

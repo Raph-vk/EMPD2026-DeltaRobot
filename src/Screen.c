@@ -59,13 +59,13 @@ bool Screen_Init(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2, const char *stroomTxt, const char *potTxt)
+// bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2, const char *overigeInfo1, const char *overigeInfo2)
 /*
  * Schrijft de actuele statusregels naar vaste posities op het OLED-scherm.
- * Invoer: tekstregels voor status, operatorinformatie, stroom en potmeter.
+ * Invoer: tekstregels voor status, operatorinformatie en overige informatie.
  * Uitvoer: true wanneer de transfer gelukt is, anders false.
  */
-bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2 ) //, const char *stroomTxt 
+bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2, const char *overigeInfo1, const char *overigeInfo2 )
 {
 	if (g_oledReady == false)
 	{
@@ -87,9 +87,10 @@ bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opT
 		u8g2_DrawStr(&g_u8g2, 0, 21, opTxt1);
 		u8g2_DrawStr(&g_u8g2, 0, 31, opTxt2);
 
-		// Onderste data regel
-		//u8g2_SetFont(&g_u8g2, u8g2_font_5x7_tr);
-		//u8g2_DrawStr(&g_u8g2, 0, 62,  stroomTxt);
+		// Onderste overige info
+		u8g2_DrawStr(&g_u8g2, 0, 50, overigeInfo1);
+		u8g2_DrawStr(&g_u8g2, 0, 60, overigeInfo2);
+
 	} while (u8g2_NextPage(&g_u8g2));
 
 	if (g_oledTransferError)
@@ -98,7 +99,6 @@ bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opT
 		g_oledTransferErrorCount++;
 		return false;
 	}
-
 	return true;
 }
 

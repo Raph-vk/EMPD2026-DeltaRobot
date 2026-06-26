@@ -16,6 +16,16 @@
 #include "task.h"
 
 ///////////////////////////////////////////////////////////////////////////////
+// shared queue payloads
+#define DISPLAY_INFO_LINE_LENGTH	(32U)
+
+typedef struct
+{
+	char regel1[DISPLAY_INFO_LINE_LENGTH];
+	char regel2[DISPLAY_INFO_LINE_LENGTH];
+} DisplayInfo_t;
+
+///////////////////////////////////////////////////////////////////////////////
 // objects made available for external use
 extern EventGroupHandle_t	handle_ThreadEventGroup;
 extern EventGroupHandle_t	handle_ButtonEventGroup;
@@ -25,6 +35,7 @@ extern SemaphoreHandle_t	handle_OffsetZeroDone;
 extern QueueHandle_t		handle_StateQueue;
 extern QueueHandle_t		handle_stroomQueue;
 extern QueueHandle_t		handle_OffsetQueue;
+extern QueueHandle_t		handle_DisplayInfoQueue;
 //extern QueueHandle_t		handle_DisturbanceQueue;
 extern TaskHandle_t			handle_ControlTask;
 
