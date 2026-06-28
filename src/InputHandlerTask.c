@@ -32,32 +32,29 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // defines
-//#define ADC_REFERENCE_VOLTAGE         (3.3f)
-//#define CURRENT_SENSOR_VOLTS_PER_AMP  (0.1f)
-//#define stroomChannel (2U)
 
 //analoge offset-meting sensoren
-#define xDisturbanceChannel (3U)
-#define yDisturbanceChannel (4U)
+#define xDisturbanceChannel		(3U)
+#define yDisturbanceChannel		(4U)
 
-#define adcMaxValue					  (4095.0f)
-#define mmStroke					(30.43f)
-#define mmThreshold					(0.05f)
-#define calibrationSamples (100U)
+#define adcMaxValue				(4095.0f)
+#define mmStroke				(30.43f)
+#define mmThreshold				(0.05f)
+#define calibrationSamples		(1000U)
 
 /*
  * Vaste EMA-filterfactor voor de offsetcompensatie.
  *
- * Lager geeft meer rust maar meer vertraging. Hoger reageert sneller, maar laat
- * meer ADC-ruis door. 0.35 is een praktische startwaarde.
+ * Lager geeft meer rust maar meer vertraging. 
+ * Hoger reageert sneller, maar laat meer ADC-ruis door.
  */
 #define OFFSET_FILTER_ALPHA			(0.35f)
 
 
-
-
-
 ///////////////////////////////////////////////////////////////////////////////
+//#define ADC_REFERENCE_VOLTAGE         (3.3f)
+//#define CURRENT_SENSOR_VOLTS_PER_AMP  (0.1f)
+//#define stroomChannel (2U)
 //static bool hasCurrentSample = false;
 //static uint32_t vorigeStroomData = 0;
 //static float zeroCurrentVoltage = 2.5f;

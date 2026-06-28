@@ -88,14 +88,28 @@ void ToState(SystemState_t newState)
 				DisplayInfo_Publish("Ref: niet uitgevoerd", "Motoren: uit");
 				break;
 
-			case STATE_HOMING:
-				DisplayInfo_Publish("Home: initialiseren", "Start homing");
-				break;
-
 			default:
 				break;
 		}
 	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// void MoveToPose(float q1, float q2, float q3, float time)
+/*
+ * Beweegt de armen naar een positie
+ * Invoer: gewenste armhoeken in graden.
+ * Uitvoer: boolean, true/false of het voldaan is.
+*/
+static bool MoveToPose(float q1, float q2, float q3, float time)
+{
+	if (MoveJ_ArmDEG123t(q1, q2, q3, time))
+	{
+		MotionPlanning_RESET();
+		return true;
+	}
+
+	return false;
 }
 
 
@@ -147,8 +161,6 @@ static void NoodInterruptHandler(uint32_t id, uint32_t mask)
 /*
  * Hoofdtaak voor de systeem-state-machine van de robot.
  * Verwerkt knoppen, noodsituaties, homing, stilstand en bewegingen.
- * Invoer: pvParameters wordt niet gebruikt.
- * Uitvoer: geen returnwaarde; de taak blijft draaien tot het systeem stopt.
 */
 void ControlTask(void *pvParameters)
 {
@@ -308,6 +320,7 @@ void ControlTask(void *pvParameters)
 					homingWaitDone = false;
 					atRust = false;
 					ToState(STATE_HOMING);
+					break;
 				}
 
 				//ALLES UITFORCEREN.
@@ -334,6 +347,7 @@ void ControlTask(void *pvParameters)
 						DisplayInfo_Publish("Home: klaar", "Stabiliseren");
 					}
 				}
+				//Na homen kort wachten
 				else if (!homingWaitDone)
 				{
 					homingWaitDone = HoldCurrentPosition(false, 1.0f);
@@ -346,13 +360,9 @@ void ControlTask(void *pvParameters)
 				}
 				else
 				{
-					atRust = MoveJ_ArmDEG123t(25.0f, 25.0f, 25.0f, 2.5f);
-					
-					if (atRust)
+					if (MoveToPose(25.0f, 25.0f, 25.0f, 2.5f))
 					{
 						vPrintString("> HOMING moved complete, at +25deg -> READY\n");
-						MotionPlanning_RESET();
-						atRust = false;
 						homingWaitDone = false;
 						ToState(STATE_READY);
 					}
@@ -394,16 +404,12 @@ void ControlTask(void *pvParameters)
 					break;
 				}
 				
-				//indien resetknop ingedrukt is eerst naar positie verplaatsen.
+				//indien resetknop ingedrukt is eerst naar horizontaal verplaatsen.
 				if (toBackoffPos)
 				{
-					// Armen naar horizontaal verplaatsen
-					atBackoff = MoveJ_ArmDEG123t(0.0f,0.0f,0.0f,2.5f);
-					
-					if (atBackoff)
+					if (MoveToPose(0.0f, 0.0f, 0.0f, 2.5f))
 					{
 						vPrintString("> READY -> HOMING (op backoffpositie.)\n");
-						atBackoff = false;
 						toBackoffPos = false;
 						ToState(STATE_HOMING);
 					}
@@ -421,14 +427,10 @@ void ControlTask(void *pvParameters)
 			{
 				if (goToRust)
 				{
-					atRust = MoveJ_ArmDEG123t(25.0f, 25.0f, 25.0f, 2.5f);
-
-					if (atRust)
+					if (MoveToPose(25.0f, 25.0f, 25.0f, 2.5f))
 					{
-						vPrintString("> FREEHAND -> READY (op rustpositie.)\n");
-						atRust = false;
+						vPrintString("> FREEHAND -> READY (op rustpositie).\n");
 						goToRust = false;
-						MotionPlanning_RESET();
 						ToState(STATE_READY);
 					}
 				}

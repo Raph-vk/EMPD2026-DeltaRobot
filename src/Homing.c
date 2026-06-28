@@ -373,7 +373,7 @@ static void GrofZoeken(void)
     {
         vPrintString("> Groffe homing klaar, Wacht tot alle armen op terugtrekpositie zijn.\n");
         stabilisatieTeller = 0;
-		DisplayInfo_Publish("Home: backoff", "Armen terugtrekken");
+		DisplayInfo_Publish("Home: NaarBackoffPositie", "Armen terugtrekken");
 		homingStatus = HOMING_NAAR_BACKOFF;
 	}
 } // eind GrofZoeken();

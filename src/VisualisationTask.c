@@ -76,7 +76,7 @@ static void port_SetLamps(bool green, bool orange, bool red)
  */
 void VisualisationTask(void *pvParameters)
 {
-	(void)pvParameters;
+	//(void)pvParameters;
 	vPrintString("> starting VisualisationTask\n");
 
 	SystemState_t status = STATE_INIT;
@@ -84,11 +84,16 @@ void VisualisationTask(void *pvParameters)
 	uint32_t i = 0;
 
 	char stateLine[24];
+	const char *stateString = ""; // Moeten const en pointer zijn!
+	
+	
 	char tcpLine[10];
+	bool TCPcomp = false;
+	bool lastTCPcomp = true;
+	
 	static char overigeInfo1[DISPLAY_INFO_LINE_LENGTH] = "";
 	static char overigeInfo2[DISPLAY_INFO_LINE_LENGTH] = "";
 	DisplayInfo_t displayInfo;
-	const char *stateString = ""; // Moeten const en pointer zijn!
 	const char *operatorLine1 = "";
 	const char *operatorLine2 = "";
 	bool updateDisplay = true;   // eerste schermwrite expliciet aanvragen
@@ -218,14 +223,23 @@ void VisualisationTask(void *pvParameters)
 
 			updateDisplay = true;
 		}
+		
 
+		//controleren of TCPcompensation is veranderd
+		TCPcomp = TcpCompensation_IsEnabled();
+		if (TCPcomp != lastTCPcomp)
+		{
+			snprintf(tcpLine, sizeof(tcpLine), "TCP:%s", TCPcomp ? "AAN" : "UIT");
+			lastTCPcomp = TCPcomp;
+			updateDisplay = true;
+		}
 
 		// NAAR OLED SCHERM SCHRIJVEN
 		if (updateDisplay)
 		{
 			// Infolijn toevoegen.
 			snprintf(stateLine, sizeof(stateLine), "Status: %s", stateString);
-			snprintf(tcpLine, sizeof(tcpLine), "TCP:%s", TcpCompensation_IsEnabled() ? "AAN" : "UIT");
+			//snprintf(tcpLine, sizeof(tcpLine), "TCP:%s", TcpCompensation_IsEnabled() ? "AAN" : "UIT");
 			
 			if (Screen_DrawStatus(stateLine, tcpLine, operatorLine1, operatorLine2, overigeInfo1, overigeInfo2))
 			{
