@@ -118,14 +118,14 @@ bool Screen_Recover(void)
 	g_oledI2c = i2c_GetChannelHandle(OLED_I2C_CHANNEL);
 	if (g_oledI2c == NULL || g_oledI2c->twi == NULL)
 	{
-		//vPrintString("> OLED recover failed: invalid I2C handle.\n");
+		vPrintString("> OLED recover failed: invalid I2C handle.\n");
 		return false;
 	}
 
 	clearResult = i2c_ClearBus(OLED_I2C_CHANNEL);
 	if ((clearResult != I2C_BUS_OK) && (clearResult != I2C_BUS_REPAIRED))
 	{
-		//vPrintString("> OLED recover failed: %s\n", i2c_GetErrorMessage(clearResult));
+		vPrintString("> OLED recover failed: %s\n", i2c_GetErrorMessage(clearResult));
 		return false;
 	}
 
@@ -138,9 +138,7 @@ bool Screen_Recover(void)
 	g_oledReady = true;
 	g_oledRecoverCount++;
 
-	vPrintString("> OLED recovered (%lu), bus=%s\n",
-				 (unsigned long)g_oledRecoverCount,
-				 i2c_GetErrorMessage(clearResult));
+	vPrintString("> OLED recovered (%lu), bus=%s\n", (unsigned long)g_oledRecoverCount, i2c_GetErrorMessage(clearResult));
 
 	return true;
 }

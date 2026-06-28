@@ -91,7 +91,7 @@ void VisualisationTask(void *pvParameters)
 	const char *stateString = ""; // Moeten const en pointer zijn!
 	const char *operatorLine1 = "";
 	const char *operatorLine2 = "";
-	bool updateDisplay = false;
+	bool updateDisplay = true;   // eerste schermwrite expliciet aanvragen
 	bool blink = false;
 
 	// Screen setup
@@ -132,7 +132,7 @@ void VisualisationTask(void *pvParameters)
 			{
 				port_SetLamps(false, true, true);
 
-				stateString = "INITIALISEREN...";
+				stateString = "OPSTARTEN";
 				operatorLine1 = "Wacht A.U.B.";
 				break;
 			}
@@ -172,7 +172,7 @@ void VisualisationTask(void *pvParameters)
 
 				stateString = "FREEHAND";
 				operatorLine1 = "<START> logt TCP pos.";
-				operatorLine2 = "<RESET> naar gereed.";
+				operatorLine2 = "<RESET> terug READY.";
 				break;
 			}
 
@@ -209,6 +209,7 @@ void VisualisationTask(void *pvParameters)
 			}
 		}
 		
+		
 		// Laatste algemene scherminformatie ophalen voor de onderste schermregels.
 		if ((handle_DisplayInfoQueue != NULL) && (xQueueReceive(handle_DisplayInfoQueue, &displayInfo, 0) == pdTRUE))
 		{
@@ -218,8 +219,9 @@ void VisualisationTask(void *pvParameters)
 			updateDisplay = true;
 		}
 
+
 		// NAAR OLED SCHERM SCHRIJVEN
-		if (updateDisplay || (i == 0))
+		if (updateDisplay)
 		{
 			// Infolijn toevoegen.
 			snprintf(stateLine, sizeof(stateLine), "Status: %s", stateString);

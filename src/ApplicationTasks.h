@@ -44,6 +44,7 @@ extern TaskHandle_t			handle_ControlTask;
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes
 void StartApplicationTasks(void);
+void DisplayInfo_Publish(const char *regel1, const char *regel2);
 bool TcpCompensation_IsEnabled(void);
 void TcpCompensation_SetEnabled(bool enabled);
 bool TcpCompensation_Toggle(void);

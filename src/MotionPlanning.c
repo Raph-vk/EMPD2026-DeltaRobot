@@ -104,24 +104,6 @@ static void UpdateArmErrorSpike(const float motorRef_rad[N_MOTORS], const float 
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// static void PubliceerDisplayInfo(...)
-/*
- * Stuurt twee algemene displayregels naar het scherm.
- */
-static void PubliceerDisplayInfo(const char *regel1, const char *regel2)
-{
-	if (handle_DisplayInfoQueue != NULL)
-	{
-		DisplayInfo_t displayInfo;
-
-		snprintf(displayInfo.regel1, sizeof(displayInfo.regel1), "%s", regel1);
-		snprintf(displayInfo.regel2, sizeof(displayInfo.regel2), "%s", regel2);
-
-		xQueueOverwrite(handle_DisplayInfoQueue, &displayInfo);
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // static void PubliceerErrorSpikeInfo(const char *regel1)
 /*
  * Stuurt regel1 met de actuele piekfout als tweede displayregel naar het scherm.
@@ -131,7 +113,7 @@ static void PubliceerErrorSpikeInfo(const char *regel1)
 	char errorLine[DISPLAY_INFO_LINE_LENGTH];
 
 	snprintf(errorLine, sizeof(errorLine), "eMax %.2f %.2f %.2fdeg", ErrorSpike_deg[0], ErrorSpike_deg[1], ErrorSpike_deg[2]);
-	PubliceerDisplayInfo(regel1, errorLine);
+	DisplayInfo_Publish(regel1, errorLine);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -169,7 +151,7 @@ static void PubliceerBewegingKlaarInfo(const char *bewegingsNaam, const float mo
 	*/
 
 	vPrintString("%s done. %s\n", bewegingsNaam, regel2);
-	PubliceerDisplayInfo(regel1, regel2);
+	DisplayInfo_Publish(regel1, regel2);
 }
 
 
@@ -184,7 +166,7 @@ static bool StopBewegingMetFout(const char *melding)
 	setupDone = false;
 
 	vPrintString("%s\n", melding);
-	PubliceerDisplayInfo("PAUSE: bewegingsfout", melding);
+	DisplayInfo_Publish("PAUSE: bewegingsfout", melding);
 
 	ToState(STATE_PAUSE);
 
@@ -241,7 +223,7 @@ static void RegelMotoren(const float motorRefRad[N_MOTORS], const float Encodedm
 			motorControlOutput += FeedForward(feedForwardAcc[mI]);
 		}
 
-		printAnalogVoltage(mI, motorControlOutput); // TEMP
+		//printAnalogVoltage(mI, motorControlOutput); // TEMP
 		uDac[mI] = constrain(motorControlOutput, DAC_MIN_OUTPUTVOLTAGE, DAC_MAX_OUTPUTVOLTAGE);
 	}
 

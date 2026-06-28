@@ -69,7 +69,7 @@ extern "C" {
 
 /* Low level time limit of I2C Fast Mode. */
 #define LOW_LEVEL_TIME_LIMIT 384000
-#define I2C_FAST_MODE_SPEED  400000
+#define I2C_FAST_MODE_SPEED  100000 //400000
 #define TWI_CLK_DIVIDER      2
 #if SAMG55
 #define TWI_CLK_CALC_ARGU    3

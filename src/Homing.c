@@ -35,6 +35,7 @@
 // PROJECT INCLUDES
 ///////////////////////////////////////////////////////////////////////////////
 #include "vPrintString.h"
+#include "PortIOLib.h"
 
 #include "MotorControl.h" //<-- helper functies motor-aansturing
 #include "QuadratureCounters.h" //<-- Lees motorposities
@@ -185,6 +186,7 @@ void resetHoming(void)
 {
 	homingStatus = HOMING_IDLE;
 	stabilisatieTeller = 0U;
+	offsetZeroRequested = false;
 	uDac = 0.0f;
 
 	for (uint8_t motor = 0U; motor < N_MOTORS; motor++)
@@ -286,7 +288,7 @@ static float bepaalFoutOpMotor(float doelArmRad, float gemetenArmRad)
 static void Initialiseren(void)
 {
     vPrintString("> Homing gestart.\n");
-    
+	
 	//Reset flags en teller
 	stabilisatieTeller = 0U;
 	offsetZeroRequested = false;
@@ -297,6 +299,7 @@ static void Initialiseren(void)
 	    fijnGevonden[motor] = false;
 	    armDoelRad[motor] = 0.0f;
     }
+	DisplayInfo_Publish("Home: grof zoeken", "Zoekt referenties");
 	
 	//niet essentieël, wel prettig.
 	uDac = 0.0f;
@@ -307,6 +310,10 @@ static void Initialiseren(void)
     // Absolute startpositie is onbekend. Daarom worden de tellers hier eerst op nul gezet.
     // Vanaf dit moment wordt alleen relatief gezocht.
     EncodersClearCount();
+	
+	//Motorspanning mag nu
+	port_SetBit(BIT_DISABLE_MOTORS, false);
+		
 	vPrintString("> Initialiseren voldaan.\n");
 } //eind Initialiseren();
 
@@ -347,8 +354,7 @@ static void GrofZoeken(void)
             grofGevonden[motor] = true;
             armDoelRad[motor] = HOME_RAD;
 			armPositieRad[motor] = HOME_RAD;   // important
-            vPrintString("> Motor %u: grove homing gevonden, encoder genuld.\n",
-                         (unsigned int)motor);
+            vPrintString("> Motor %u: grove homing gevonden, encoder genuld.\n", (unsigned int)motor);
         }
 		//Als homeSwitch nog niet gevonden is
 		else
@@ -367,6 +373,7 @@ static void GrofZoeken(void)
     {
         vPrintString("> Groffe homing klaar, Wacht tot alle armen op terugtrekpositie zijn.\n");
         stabilisatieTeller = 0;
+		DisplayInfo_Publish("Home: backoff", "Armen terugtrekken");
 		homingStatus = HOMING_NAAR_BACKOFF;
 	}
 } // eind GrofZoeken();
@@ -427,6 +434,7 @@ static void NaarBackoffPositie(void)
 					xSemaphoreGive(handle_OffsetZeroRequest);      // zeroing starten
 					offsetZeroRequested = true;
 				}
+				DisplayInfo_Publish("Offset: nullen", "Wacht op meting");
 				return;
 			}
 			//Wachten tot offsetmeting gereed is
@@ -437,6 +445,7 @@ static void NaarBackoffPositie(void)
 					offsetZeroRequested = false;
 					stabilisatieTeller = 0;
 					vPrintString("> OffsetMeting genult. Start nauwkeurig zoeken.\n");
+					DisplayInfo_Publish("Home: fijn zoeken", "Nauwkeurig nullen");
 					homingStatus = HOMING_NAUW_ZOEKEN;
 				}
 			}

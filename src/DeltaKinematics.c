@@ -24,6 +24,7 @@
 
 #define DEG_TO_RAD		(0.01745329252f)
 #define RAD_TO_DEG		(57.2957795131f)
+#define SQRT3_OVER_2	(0.86602540378443864676f)
 
 //////////////////////////////////////////////////////////////////////////////
 //file globals
@@ -35,8 +36,10 @@ static const float Bovenarm_thetaMax = 35.0 * DEG_TO_RAD; // bovenste limiet
 static const float Bovenarm_thetaMin = -90.0 * DEG_TO_RAD; // onderste limiet
 
 // constantes
-//Mechanische hoeklimieten van de bovenarm.
-static const float phi[N_MOTORS] = {0.0f, (120.0f * DEG_TO_RAD), (240.0f * DEG_TO_RAD)}; // 0deg, 120deg, 240deg in radialen voor rotatiematrix
+/* Vaste armorientaties: 0, 120 en 240 graden. */
+//static const float phi[N_MOTORS] = {0.0f, (120.0f * DEG_TO_RAD), (240.0f * DEG_TO_RAD)}; // 0deg, 120deg, 240deg in radialen voor rotatiematrix
+static const float cosPhi[N_MOTORS] = { 1.0f, -0.5f, -0.5f };
+static const float sinPhi[N_MOTORS] = { 0.0f, SQRT3_OVER_2, -SQRT3_OVER_2 };
 
 //////////////////////////////////////////////////////////////////////////////
 // bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOTORS])
@@ -59,8 +62,11 @@ bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 	//float tcpPosition_mm[N_MOTORS] = {x, y, z};
 		
 	//Per motor
-	for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++){
-	
+	for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
+	{
+		const float c = cosPhi[motorIndex];
+		const float s = sinPhi[motorIndex];
+		
 		// Rotatiematrix rond de z-as. Hiermee wordt de globale TCP-positie
 		// omgerekend naar het lokale coordinatenstelsel van motor k.
 		/*float Rz[3][3] = 
@@ -73,8 +79,8 @@ bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 		// Lokale TCP-positie gezien vanuit motor.
 		//Enkel essenciële berekening uitvoeren voor de rotatie, zonder volledige matrixvermenigvuldiging:
 		float Pk[3];
-		Pk[0] = cosf(phi[motorIndex]) * tcpPosition_mm[0] + sinf(phi[motorIndex]) * tcpPosition_mm[1];	// lokale x
-		Pk[1] = -sinf(phi[motorIndex]) * tcpPosition_mm[0] + cosf(phi[motorIndex]) * tcpPosition_mm[1];	// lokale y
+		Pk[0] = c * tcpPosition_mm[0] + s * tcpPosition_mm[1];
+		Pk[1] = -s * tcpPosition_mm[0] + c * tcpPosition_mm[1];
 		Pk[2] = tcpPosition_mm[2];  // lokale z (geen verandering in z-coördinaat bij rotatie rond z-as)
 
 		// Overzichtelijk en rekentechnisch effienter berekenen
@@ -183,8 +189,11 @@ bool DeltaKinematics_Forward(const float motorRad[N_MOTORS], float tcpPosition_m
 
 		// Projecteer het bolcentrum naar het globale robotcoordinatenstelsel.
 		// phi[motorIndex] bepaalt de 0, 120 of 240 graden orientatie van de arm.
-		cx[motorIndex] = radius_xy * cosf(phi[motorIndex]);
-		cy[motorIndex] = radius_xy * sinf(phi[motorIndex]);
+		const float c = cosPhi[motorIndex];
+		const float s = sinPhi[motorIndex];
+
+		cx[motorIndex] = radius_xy * c;
+		cy[motorIndex] = radius_xy * s;
 		cz[motorIndex] = LengteBovenarm * sinf(armTheta);
 	}
 
@@ -194,18 +203,14 @@ bool DeltaKinematics_Forward(const float motorRad[N_MOTORS], float tcpPosition_m
 	float A1 = 2.0f * (cx[1] - cx[0]);
 	float B1 = 2.0f * (cy[1] - cy[0]);
 	float C1 = 2.0f * (cz[1] - cz[0]);
-	float D1 = cx[1] * cx[1] - cx[0] * cx[0]
-		+ cy[1] * cy[1] - cy[0] * cy[0]
-		+ cz[1] * cz[1] - cz[0] * cz[0];
+	float D1 = cx[1] * cx[1] - cx[0] * cx[0] + cy[1] * cy[1] - cy[0] * cy[0] + cz[1] * cz[1] - cz[0] * cz[0];
 
 	// Stap 4: stel de tweede lineaire vergelijking op.
 	// Deze ontstaat op dezelfde manier, maar nu uit bol 3 - bol 1.
 	float A2 = 2.0f * (cx[2] - cx[0]);
 	float B2 = 2.0f * (cy[2] - cy[0]);
 	float C2 = 2.0f * (cz[2] - cz[0]);
-	float D2 = cx[2] * cx[2] - cx[0] * cx[0]
-		+ cy[2] * cy[2] - cy[0] * cy[0]
-		+ cz[2] * cz[2] - cz[0] * cz[0];
+	float D2 = cx[2] * cx[2] - cx[0] * cx[0] + cy[2] * cy[2] - cy[0] * cy[0] + cz[2] * cz[2] - cz[0] * cz[0];
 
 	// Stap 5: controleer of de twee lineaire vergelijkingen oplosbaar zijn.
 	// Een noemer dicht bij nul betekent dat x en y numeriek niet betrouwbaar

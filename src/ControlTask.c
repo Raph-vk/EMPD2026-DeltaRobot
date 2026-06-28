@@ -81,6 +81,20 @@ void ToState(SystemState_t newState)
 		state = newState;
 		xQueueOverwrite(handle_StateQueue, &state);
 		vPrintString("> Switch to state = %s\n", StateToString(state));
+
+		switch (state)
+		{
+			case STATE_WAIT:
+				DisplayInfo_Publish("Ref: niet uitgevoerd", "Motoren: uit");
+				break;
+
+			case STATE_HOMING:
+				DisplayInfo_Publish("Home: initialiseren", "Start homing");
+				break;
+
+			default:
+				break;
+		}
 	}
 }
 
@@ -298,6 +312,7 @@ void ControlTask(void *pvParameters)
 
 				//ALLES UITFORCEREN.
 				port_SetBit(BIT_GRIPPER, false);
+				port_SetBit(BIT_DISABLE_MOTORS, true);
 				for (uint8_t motorIndex = 0; motorIndex < N_MOTORS; motorIndex++)
 				{
 					dac_SetOutputVoltage(MotorDacChannel[motorIndex], 0.0f);
@@ -314,7 +329,9 @@ void ControlTask(void *pvParameters)
 
 					if (homingAllMotorsDone)
 					{
+						vPrintString("> HOMING complete.\n");
 						MotionPlanning_RESET();   // prepare fresh hold timer
+						DisplayInfo_Publish("Home: klaar", "Stabiliseren");
 					}
 				}
 				else if (!homingWaitDone)
@@ -324,6 +341,7 @@ void ControlTask(void *pvParameters)
 					if (homingWaitDone)
 					{
 						MotionPlanning_RESET();   // prepare fresh MoveJ profile
+						DisplayInfo_Publish("Naar rustpositie", "Doel: 25,25,25deg");
 					}
 				}
 				else
@@ -332,7 +350,7 @@ void ControlTask(void *pvParameters)
 					
 					if (atRust)
 					{
-						vPrintString("> HOMING complete, at +25deg -> READY\n");
+						vPrintString("> HOMING moved complete, at +25deg -> READY\n");
 						MotionPlanning_RESET();
 						atRust = false;
 						homingWaitDone = false;
@@ -359,13 +377,14 @@ void ControlTask(void *pvParameters)
 				// resetknop -> opnieuw homen.
 				else if (buttonBits & EVT_RESET_BUTTON)
 				{
-					RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check
+					//RunningLoopTimer_ResetWindow();	//ONLY for 1kHz loop check
 					homingAllMotorsDone = false;
 					homingWaitDone = false;
 					MotionPlanning_RESET();	
 					toBackoffPos = true;				
 					vPrintString("> Naar Backoffpositie (resetknop ontvangen).\n");
 				}
+				// stopknop -> FreeHand
 				else if (buttonBits & EVT_STOP_BUTTON)
 				{
 					MotionPlanning_RESET();
@@ -378,7 +397,8 @@ void ControlTask(void *pvParameters)
 				//indien resetknop ingedrukt is eerst naar positie verplaatsen.
 				if (toBackoffPos)
 				{
-					atBackoff = MoveJ_ArmDEG123t(0.0f,0.0f,0.0f, 2.0f);
+					// Armen naar horizontaal verplaatsen
+					atBackoff = MoveJ_ArmDEG123t(0.0f,0.0f,0.0f,2.5f);
 					
 					if (atBackoff)
 					{
@@ -387,7 +407,6 @@ void ControlTask(void *pvParameters)
 						toBackoffPos = false;
 						ToState(STATE_HOMING);
 					}
-					//tijdelijk naar homing, normaliter naar; RUNNING					
 				}
 				else
 				{
@@ -400,19 +419,35 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case STATE_FREEHAND:
 			{
-				FreeHand_Control();
+				if (goToRust)
+				{
+					atRust = MoveJ_ArmDEG123t(25.0f, 25.0f, 25.0f, 2.5f);
 
-				if (buttonBits & EVT_START_BUTTON)
-				{
-					FreeHand_PrintCurrentTcpPosition();
+					if (atRust)
+					{
+						vPrintString("> FREEHAND -> READY (op rustpositie.)\n");
+						atRust = false;
+						goToRust = false;
+						MotionPlanning_RESET();
+						ToState(STATE_READY);
+					}
 				}
-				else if (buttonBits & EVT_RESET_BUTTON)
+				else
 				{
-					FreeHand_Reset();
-					MotionPlanning_RESET();
-					vPrintString("> FREEHAND -> READY (resetknop ontvangen.)\n");
-					ToState(STATE_READY);
+					if (buttonBits & EVT_START_BUTTON)
+					{
+						FreeHand_PrintCurrentTcpPosition();
+					}
+					else if (buttonBits & EVT_RESET_BUTTON)
+					{
+						FreeHand_Reset();
+						MotionPlanning_RESET();
+						vPrintString("> FREEHAND -> RUST (resetknop ontvangen.)\n");
+						goToRust = true;
+					}
+					FreeHand_Control();
 				}
+
 				break;
 			}
 
@@ -461,6 +496,13 @@ void ControlTask(void *pvParameters)
 			{
 				// Uitvoeren van bepaalde stappen.
 				sequenceDone = RunSequence();
+
+				if (buttonBits & EVT_START_BUTTON)
+				{
+					bool tcpCompActief = TcpCompensation_Toggle();
+					vPrintString("> RUNNING: TCP-compensatie %s (startknop ontvangen).\n",
+								 tcpCompActief ? "AAN" : "UIT");
+				}
 
 				// Stopknop -> terug naar READY
 				if (buttonBits & EVT_STOP_BUTTON)

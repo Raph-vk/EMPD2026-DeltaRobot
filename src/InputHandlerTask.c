@@ -153,12 +153,18 @@ static uint16_t Median3(uint16_t a, uint16_t b, uint16_t c)
  *    reactie snel. Per sample schuift de gefilterde waarde een percentage op
  *    richting de nieuwe meting. Dat percentage is de vaste OFFSET_FILTER_ALPHA.
  */
-static OffsetPos_t FilterOffsetMeasurement(uint16_t xAdcRaw, uint16_t yAdcRaw, const OffsetPos_t *zeroPos, bool resetFilter)
+static void FilterOffsetMeasurement(OffsetPos_t *outMeasurement, uint16_t xAdcRaw, uint16_t yAdcRaw, const OffsetPos_t *zeroPos, bool resetFilter)
 {
 	static uint16_t xAdcSamples[3] = {0U, 0U, 0U};
 	static uint16_t yAdcSamples[3] = {0U, 0U, 0U};
 	static uint8_t medianSampleIndex = 0U;
 	static OffsetPos_t filteredMeasurement = {0.0f, 0.0f};
+
+	//pointer check of ze wel bestaan
+	if ((outMeasurement == NULL) || (zeroPos == NULL))
+	{
+		return;
+	}
 
 	// vertagingswaardes invullen bij reset
 	if (resetFilter)
@@ -171,6 +177,7 @@ static OffsetPos_t FilterOffsetMeasurement(uint16_t xAdcRaw, uint16_t yAdcRaw, c
 
 		medianSampleIndex = 0U;
 	}
+	//anders oudste waarde herschrijven
 	else
 	{
 		xAdcSamples[medianSampleIndex] = xAdcRaw;
@@ -196,7 +203,8 @@ static OffsetPos_t FilterOffsetMeasurement(uint16_t xAdcRaw, uint16_t yAdcRaw, c
 	{
 		// Eerste sample na opstarten/nullen: direct overnemen.
 		filteredMeasurement = rawMeasurement;
-		return filteredMeasurement;
+		*outMeasurement = filteredMeasurement;
+		return;
 	}
 
 	// EMA-adaptive filter
@@ -204,7 +212,7 @@ static OffsetPos_t FilterOffsetMeasurement(uint16_t xAdcRaw, uint16_t yAdcRaw, c
 	filteredMeasurement.x += OFFSET_FILTER_ALPHA * (rawMeasurement.x - filteredMeasurement.x);
 	filteredMeasurement.y += OFFSET_FILTER_ALPHA * (rawMeasurement.y - filteredMeasurement.y);
 
-	return filteredMeasurement;
+	*outMeasurement = filteredMeasurement;
 }
 
 
@@ -315,7 +323,7 @@ static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
 			
 
 			// nieuwe waarde naar queue schrijven
-			measurement = FilterOffsetMeasurement(xAdcRaw, yAdcRaw, &ZeroPos, true);
+			FilterOffsetMeasurement(&measurement, xAdcRaw, yAdcRaw, &ZeroPos, true);
 			if (handle_OffsetQueue != NULL)
 			{
 				if (xQueueOverwrite(handle_OffsetQueue, &measurement) == pdPASS)
@@ -332,7 +340,7 @@ static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
 	}
 	else if (offsetGehomed)
 	{
-		measurement = FilterOffsetMeasurement(xAdcRaw, yAdcRaw, &ZeroPos, false);
+		FilterOffsetMeasurement(&measurement, xAdcRaw, yAdcRaw, &ZeroPos, false);
 	
 		// Bepaal het verschil met de vorige meting die naar de queue is geschreven.
 		// Als X of Y genoeg veranderd is, naar de queue schrijven.

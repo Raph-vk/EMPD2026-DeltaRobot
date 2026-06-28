@@ -12,6 +12,7 @@ Deze file is de centrale opstart van de applicatie.
 ///////////////////////////////////////////////////////////////////////////////
 // system includes
 #include <asf.h>
+#include <stdio.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // application includes
@@ -46,6 +47,26 @@ QueueHandle_t		handle_DisplayInfoQueue = NULL;
 //QueueHandle_t		handle_DisturbanceQueue = NULL;
 
 static volatile bool tcpCompEnabled = false;
+
+///////////////////////////////////////////////////////////////////////////////
+// void DisplayInfo_Publish(const char *regel1, const char *regel2)
+/*
+ * Publiceert twee algemene displayregels naar de VisualisationTask.
+ * Invoer: regel1 en regel2 zijn nul-getermineerde tekstregels.
+ * Uitvoer: geen returnwaarde; overschrijft de laatste display-info in de queue.
+ */
+void DisplayInfo_Publish(const char *regel1, const char *regel2)
+{
+	if ((handle_DisplayInfoQueue != NULL) && (regel1 != NULL) && (regel2 != NULL))
+	{
+		DisplayInfo_t displayInfo;
+
+		snprintf(displayInfo.regel1, sizeof(displayInfo.regel1), "%s", regel1);
+		snprintf(displayInfo.regel2, sizeof(displayInfo.regel2), "%s", regel2);
+
+		xQueueOverwrite(handle_DisplayInfoQueue, &displayInfo);
+	}
+}
 
 bool TcpCompensation_IsEnabled(void)
 {
@@ -152,7 +173,8 @@ void StartApplicationTasks(void)
 	
 	/**************************************************** Taken aanmaken ****************************************************/
 	// De taken worden aangemaakt en in de ready list geplaatst.
-	// Prioriteit 0 is laagste 4 is hoogste!!
+	// Prioriteit 0 is het laagste,
+	// Prioriteit 4 is de hoogste mogelijk
 	result = xTaskCreate(InputHandlerTask, "tsk_Input", (configMINIMAL_STACK_SIZE), NULL, 0, &handle_InputHandlerTask);
 	if (result != pdPASS )
 	{

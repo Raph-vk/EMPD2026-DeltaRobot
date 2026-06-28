@@ -41,21 +41,6 @@ static bool freehandSetupDone = false;
 static float motorRef_Rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
 
 ///////////////////////////////////////////////////////////////////////////////
-// static void PublishDisplayInfo(...)
-static void PublishDisplayInfo(const char *regel1, const char *regel2)
-{
-	if (handle_DisplayInfoQueue != NULL)
-	{
-		DisplayInfo_t displayInfo;
-
-		snprintf(displayInfo.regel1, sizeof(displayInfo.regel1), "%s", regel1);
-		snprintf(displayInfo.regel2, sizeof(displayInfo.regel2), "%s", regel2);
-
-		xQueueOverwrite(handle_DisplayInfoQueue, &displayInfo);
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // void FreeHand_Reset(void)
 void FreeHand_Reset(void)
 {
@@ -132,7 +117,7 @@ bool FreeHand_PrintCurrentTcpPosition(void)
 	if (!DeltaKinematics_Forward(motorPos_Rad, tcp_mm))
 	{
 		vPrintString("> FREEHAND: actuele TCP positie ongeldig.\n");
-		PublishDisplayInfo("FreeHand TCP fout", "FK ongeldig");
+		DisplayInfo_Publish("FreeHand TCP fout", "FK ongeldig");
 		return false;
 	}
 
@@ -143,7 +128,7 @@ bool FreeHand_PrintCurrentTcpPosition(void)
 	snprintf(regel1, sizeof(regel1), "POS: Z%.2f mm", tcp_mm[2]);
 	snprintf(regel2, sizeof(regel2), "X%.2f Y%.2f", tcp_mm[0], tcp_mm[1]);
 	
-	PublishDisplayInfo(regel1, regel2);
+	DisplayInfo_Publish(regel1, regel2);
 
 	return true;
 }
