@@ -104,17 +104,6 @@ static void UpdateArmErrorSpike(const float motorRef_rad[N_MOTORS], const float 
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// static void FormatErrorSpikeLine(...)
-/*
- * Maakt een korte schermregel van de actuele piekfout.
- */
-static void FormatErrorSpikeLine(char *line, size_t lineSize)
-{
-	snprintf(line, lineSize, "eMax %.2f %.2f %.2fdeg",
-			 ErrorSpike_deg[0], ErrorSpike_deg[1], ErrorSpike_deg[2]);
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // static void PubliceerDisplayInfo(...)
 /*
  * Stuurt twee algemene displayregels naar het scherm.
@@ -141,7 +130,7 @@ static void PubliceerErrorSpikeInfo(const char *regel1)
 {
 	char errorLine[DISPLAY_INFO_LINE_LENGTH];
 
-	FormatErrorSpikeLine(errorLine, sizeof(errorLine));
+	snprintf(errorLine, sizeof(errorLine), "eMax %.2f %.2f %.2fdeg", ErrorSpike_deg[0], ErrorSpike_deg[1], ErrorSpike_deg[2]);
 	PubliceerDisplayInfo(regel1, errorLine);
 }
 
@@ -157,14 +146,10 @@ static void PubliceerBewegingKlaarInfo(const char *bewegingsNaam, const float mo
 
 	(void)motorPos_Rad;
 
-	snprintf(regel1, sizeof(regel1), "%s %.0f,%.0f,%.0f Done",
-			 bewegingsNaam,
-			 tcpTarget_mm[0],
-			 tcpTarget_mm[1],
-			 tcpTarget_mm[2]);
+	snprintf(regel1, sizeof(regel1), "%s %.0f,%.0f,%.0f Done", bewegingsNaam, tcpTarget_mm[0], tcpTarget_mm[1], tcpTarget_mm[2]);
 
 	// Actieve keuze: piekfout op de armen in graden.
-	FormatErrorSpikeLine(regel2, sizeof(regel2));
+	snprintf(regel2, sizeof(regel2), "eMax %.2f %.2f %.2fdeg", ErrorSpike_deg[0], ErrorSpike_deg[1], ErrorSpike_deg[2]);
 
 	/*
 	// Alternatief: eindfout op TCP-positie tonen. Verwijder dan ook de (void)motorPos_Rad hierboven.
@@ -686,11 +671,7 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	SchatMotorHoekacceleratie(motorRef_rad, verplaatsingKlaar, alphaRefMotors);
 	RegelMotoren(motorRef_rad, motorPos_Rad, alphaRefMotors);
 	
-	//if (!RegelTcpReferentie(tcpRef_mm, motorPos_Rad, "FOUT: MoveL padpunt ongeldig voor inverse kinematica."))
-	//{
-	//	return false;
-	//}
-
+	
 	if (verplaatsingKlaar)
 	{
 		setupDone = false;

@@ -408,6 +408,14 @@ static void NaarBackoffPositie(void)
 		stabilisatieTeller++;
 		if (stabilisatieTeller > STABILISATIE_TIJD_MS)
 		{
+			#if TCP_COMP == 0
+				offsetZeroRequested = false;
+				stabilisatieTeller = 0U;
+				vPrintString("> TCP-comp uit. Offset nullen overgeslagen. Start nauwkeurig zoeken.\n");
+				homingStatus = HOMING_NAUW_ZOEKEN;
+				return;
+			#endif
+			
 			// Vragen of offsetmeting genult wordt.
 			if (!offsetZeroRequested)
 			{

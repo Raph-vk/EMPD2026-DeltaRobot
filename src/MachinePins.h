@@ -16,7 +16,7 @@
 // Hoeveelheid motoren
 #define N_MOTORS		(3U)
 #define i_twk			(111375.0f / 2366.0f) // 47:1 reductie tandwielkast
-#define TCP_COMP		(1) // 1=on 0=off
+#define TCP_COMP		(0) // 1=on 0=off
 
 ///////////////////////////////////////////////////////////////////////////////
 // 8-bit input port layout on the RTSW board (handeld by PortIOLib.h)

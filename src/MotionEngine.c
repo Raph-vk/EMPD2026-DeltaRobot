@@ -12,7 +12,6 @@
 // system includes
 #include <stdint.h>
 #include "MotionPlanning.h"
-#include "UserFrame.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // sequence settings
@@ -93,16 +92,17 @@ static inline void MoveHopXYZ(float x_mm, float y_mm, float z_mm, float time_s);
 void BuildSequence(void)
 {
 	float wait = 0.5f; // s
-	float move = 0.25f; // s
-	float zHeight = -427.5f; //mm
-	float moveHop = 0.3f;
+	float move = 0.3f; // s
+	float zHeight = -425.0f; //mm
+	float moveHop = 0.5f;
 	
 	//setup
 	sequenceLength = 0;
 	sequenceOverflow = false;
 	
-	//MoveJXYZ(0.0f, 0.0f, zHeight, move);
+	MoveJXYZ(0.0f, 0.0f, zHeight, 5.0f);
 
+	/*
 	Hold(false, 0.1f);
 	MoveJXYZ(0.0f, 0.0f, zHeight, move);
 	HoldXYZ(false, wait);
@@ -114,13 +114,11 @@ void BuildSequence(void)
 	HoldXYZ(false, wait);
 	MoveLXYZ(-80.0f, 80.0f, zHeight, move);
 	HoldXYZ(false, wait);
+	*/
 
 	// coole beweging
-	/*
 	for (uint8_t i = 0; i < 8; i++)
 	{
-		MoveHopXYZ(0.0f,0.0f,zHeight, moveHop);
-		Hold(false, wait);
 		MoveHopXYZ(80.0f,-80.0f,zHeight, moveHop);
 		Hold(false, wait);
 		MoveLXYZ(-80.0f,-80.0f,zHeight, move);
@@ -131,13 +129,12 @@ void BuildSequence(void)
 		MoveHopXYZ(80.0f,-80.0f,zHeight, moveHop);
 		MoveHopXYZ(80.0f,80.0f,zHeight, moveHop);
 		MoveHopXYZ(-80.0f,-80.0f,zHeight, moveHop);
-		MoveHopXYZ(150.0f,0.0f,zHeight, 0.5f);
-		MoveHopXYZ(-130.0f,0.0f,zHeight, 0.5f);
-		MoveHopXYZ(-130.0f,50.0f,zHeight, 0.5f);
+		MoveHopXYZ(150.0f,0.0f,zHeight, moveHop);
+		MoveHopXYZ(-130.0f,0.0f,zHeight, moveHop);
+		MoveHopXYZ(-130.0f,50.0f,zHeight, moveHop*2);
 		Hold(false, wait);
 	}
-	*/
-	
+		
 	MoveJDEG(25.0f, 25.0f, 25.0f, 1.0f);
 	Hold(false, 0.1f);
 }
@@ -152,10 +149,11 @@ static SequenceStep_t sequence[MAX_SEQUENCE_STEPS]; // De sequencielijst!
 
 ///////////////////////////////////////////////////////////////////////////////
 // static bool UserTargetToBase(...)
+/*
 static bool UserTargetToBase(float userX_mm, float userY_mm, float baseZ_mm, float baseXYZ_mm[3])
 {
 	return UserFrame_ToBaseXY(userX_mm, userY_mm, baseZ_mm, baseXYZ_mm);
-}
+}*/
 
 /*
  * Voert de ingestelde bewegingssequentie stap voor stap uit.
@@ -174,7 +172,6 @@ bool RunSequence(void)
 	//Controle voor bij welke stap we nu zijn
 	SequenceStep_t *step = &sequence[currentStep];
 	bool stepDone = false;
-	float baseXYZ_mm[3] = {0.0f, 0.0f, 0.0f};
 
 	switch (step->type)
 	{
@@ -187,11 +184,7 @@ bool RunSequence(void)
 		break;
 
 		case STEP_MOVEJ_XYZ:
-		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, baseXYZ_mm))
-		{
-			return false;
-		}
-		stepDone = MoveJ_XYZt(baseXYZ_mm[0], baseXYZ_mm[1], baseXYZ_mm[2], step->time_s);
+		stepDone = MoveJ_XYZt(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, step->time_s);
 		break;
 
 		case STEP_MOVEJ_DEG:
@@ -199,19 +192,11 @@ bool RunSequence(void)
 		break;
 
 		case STEP_MOVEL_XYZ:
-		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, baseXYZ_mm))
-		{
-			return false;
-		}
-		stepDone = MoveL_XYZt(baseXYZ_mm[0], baseXYZ_mm[1], baseXYZ_mm[2], step->time_s);
+		stepDone = MoveL_XYZt(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, step->time_s);
 		break;
 
 		case STEP_MOVEHOP_XYZ:
-		if (!UserTargetToBase(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, baseXYZ_mm))
-		{
-			return false;
-		}
-		stepDone = MoveHop_XYZt(baseXYZ_mm[0], baseXYZ_mm[1], baseXYZ_mm[2], step->time_s);
+		stepDone = MoveHop_XYZt(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, step->time_s);
 		break;
 
 		default:
