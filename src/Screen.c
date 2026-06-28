@@ -65,7 +65,7 @@ bool Screen_Init(void)
  * Invoer: tekstregels voor status, operatorinformatie en overige informatie.
  * Uitvoer: true wanneer de transfer gelukt is, anders false.
  */
-bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opTxt2, const char *overigeInfo1, const char *overigeInfo2 )
+bool Screen_DrawStatus(const char *stateTxt, const char *tcpComp, const char *opTxt1, const char *opTxt2, const char *overigeInfo1, const char *overigeInfo2 )
 {
 	if (g_oledReady == false)
 	{
@@ -81,9 +81,11 @@ bool Screen_DrawStatus(const char *stateTxt, const char *opTxt1, const char *opT
 		// Bovenste STATUS regel
 		u8g2_SetFont(&g_u8g2, u8g2_font_6x10_tf);
 		u8g2_DrawStr(&g_u8g2, 0, 10, stateTxt);
-
-		// Operator compact
+		
 		u8g2_SetFont(&g_u8g2, u8g2_font_5x7_tr);
+		u8g2_DrawStr(&g_u8g2, 90, 10, tcpComp);
+		
+		// Operator compact
 		u8g2_DrawStr(&g_u8g2, 0, 21, opTxt1);
 		u8g2_DrawStr(&g_u8g2, 0, 31, opTxt2);
 

@@ -83,8 +83,8 @@ void VisualisationTask(void *pvParameters)
 	SystemState_t vorigeStatus = (SystemState_t)-1;
 	uint32_t i = 0;
 
-	//char stroomLine[24];
 	char stateLine[24];
+	char tcpLine[10];
 	static char overigeInfo1[DISPLAY_INFO_LINE_LENGTH] = "";
 	static char overigeInfo2[DISPLAY_INFO_LINE_LENGTH] = "";
 	DisplayInfo_t displayInfo;
@@ -223,8 +223,9 @@ void VisualisationTask(void *pvParameters)
 		{
 			// Infolijn toevoegen.
 			snprintf(stateLine, sizeof(stateLine), "Status: %s", stateString);
+			snprintf(tcpLine, sizeof(tcpLine), "TCP:%s", TcpCompensation_IsEnabled() ? "AAN" : "UIT");
 			
-			if (Screen_DrawStatus(stateLine, operatorLine1, operatorLine2, overigeInfo1, overigeInfo2))
+			if (Screen_DrawStatus(stateLine, tcpLine, operatorLine1, operatorLine2, overigeInfo1, overigeInfo2))
 			{
 				updateDisplay = false;
 			}

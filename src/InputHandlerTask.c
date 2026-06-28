@@ -401,10 +401,9 @@ void InputHandlerTask(void *pvParameters)
 			xEventGroupSetBits(handle_ButtonEventGroup, EVT_RESET_BUTTON);
 		}
 
-
-		if (TCP_COMP == 1)
-		{
-			// Analoge kanalen uitlezen
+		//if (TCP_COMP == 1)
+		//{
+		// Analoge kanalen uitlezen
 			adc_StartConversion();
 			while ( (adc_IsConversionReady(xDisturbanceChannel) == false) || (adc_IsConversionReady(yDisturbanceChannel) == false)) //(adc_IsConversionReady(stroomChannel) == false)
 			{
@@ -417,7 +416,7 @@ void InputHandlerTask(void *pvParameters)
 			yAdcRaw = (uint16_t)adc_ReadData(yDisturbanceChannel);
 		
 			ProcessOffsetPositionData(xAdcRaw, yAdcRaw);
-		}
+		//}
 		taskSleep(1);
 	}
 /*Should never get Here*/

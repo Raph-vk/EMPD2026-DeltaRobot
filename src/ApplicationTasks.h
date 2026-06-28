@@ -9,6 +9,8 @@
 #ifndef APPLICATIONTASKS_H_
 #define APPLICATIONTASKS_H_
 
+#include <stdbool.h>
+
 #include "FreeRTOS.h"
 #include "event_groups.h"
 #include "queue.h"
@@ -42,6 +44,9 @@ extern TaskHandle_t			handle_ControlTask;
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes
 void StartApplicationTasks(void);
+bool TcpCompensation_IsEnabled(void);
+void TcpCompensation_SetEnabled(bool enabled);
+bool TcpCompensation_Toggle(void);
 
 
 #endif /* APPLICATIONTASKS_H_ */

@@ -200,18 +200,19 @@ static bool StopBewegingMetFout(const char *melding)
 static bool VoegTCPoffsetToe(float tcp_mm[N_TCP_AXES])
 {
 	static OffsetPos_t laatsteOffset = {INFINITY, INFINITY};
-	static OffsetPos_t nieuweOffset = {0.0f, 0.0f};
+	OffsetPos_t nieuweOffset = {0.0f, 0.0f};
 	bool offsetGewijzigd = false;
+	const float offsetThreshold = 0.001f;
 
 	// peeken wat de offset waarde is
-	if (xQueuePeek(handle_OffsetQueue, &nieuweOffset, 0) == pdTRUE && TCP_COMP == 1)
+	if (TcpCompensation_IsEnabled() && handle_OffsetQueue != NULL)
 	{
-		float offsetThreshold = 0.001;
-		
-		//bepalen of offset-waarde gewijzigd is
-		offsetGewijzigd =	fabsf(nieuweOffset.x - laatsteOffset.x) > offsetThreshold ||	fabsf(nieuweOffset.y - laatsteOffset.y) > offsetThreshold;
-		laatsteOffset = nieuweOffset;
+		(void)xQueuePeek(handle_OffsetQueue, &nieuweOffset, 0);
 	}
+
+	//bepalen of offset-waarde gewijzigd is
+	offsetGewijzigd =	fabsf(nieuweOffset.x - laatsteOffset.x) > offsetThreshold ||	fabsf(nieuweOffset.y - laatsteOffset.y) > offsetThreshold;
+	laatsteOffset = nieuweOffset;
 
 	tcp_mm[0] += nieuweOffset.x;
 	tcp_mm[1] += nieuweOffset.y;

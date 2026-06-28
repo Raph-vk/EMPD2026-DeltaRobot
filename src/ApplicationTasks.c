@@ -45,6 +45,24 @@ QueueHandle_t		handle_OffsetQueue = NULL;
 QueueHandle_t		handle_DisplayInfoQueue = NULL;
 //QueueHandle_t		handle_DisturbanceQueue = NULL;
 
+static volatile bool tcpCompEnabled = false;
+
+bool TcpCompensation_IsEnabled(void)
+{
+	return tcpCompEnabled;
+}
+
+void TcpCompensation_SetEnabled(bool enabled)
+{
+	tcpCompEnabled = enabled;
+}
+
+bool TcpCompensation_Toggle(void)
+{
+	tcpCompEnabled = !tcpCompEnabled;
+	return tcpCompEnabled;
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // void StartApplicationTasks(void)
