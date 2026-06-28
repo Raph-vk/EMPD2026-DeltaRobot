@@ -14,6 +14,8 @@ src\InputHandlerTask.c
 
 src\DeltaKinematics.c
 
+src\Freehand.c
+
 src\MotionPlanning.c
 
 src\MotionProfiles.c
@@ -61,8 +63,6 @@ src\u8g2\csrc\u8x8_d_ssd1309.c
 src\u8g2\csrc\u8x8_gpio.c
 
 src\u8g2\csrc\u8x8_setup.c
-
-src\UserFrame.c
 
 src\VisualisationTask.c
 

@@ -37,6 +37,7 @@
 #include "MotionPlanning.h"
 #include "QuadratureCounters.h"
 #include "Regelaar.h"
+#include "Freehand.h"
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -58,6 +59,7 @@ static const char *StateToString(SystemState_t systemState)
 		case STATE_WAIT:    return "WAIT";
 		case STATE_HOMING:  return "HOMING";
 		case STATE_READY:   return "READY";
+		case STATE_FREEHAND:return "FREEHAND";
 		case STATE_PAUSE:   return "PAUSE";
 		case STATE_RUNNING: return "RUNNING";
 		case STATE_FAULT:   return "FAULT";
@@ -352,6 +354,7 @@ void ControlTask(void *pvParameters)
 					SequenceRESET();
 					vPrintString("> READY -> RUNNING (Startknop ontvangen.)\n");
 					ToState(STATE_RUNNING);
+					break;
 				}
 				// resetknop -> opnieuw homen.
 				else if (buttonBits & EVT_RESET_BUTTON)
@@ -362,6 +365,14 @@ void ControlTask(void *pvParameters)
 					MotionPlanning_RESET();	
 					toBackoffPos = true;				
 					vPrintString("> Naar Backoffpositie (resetknop ontvangen).\n");
+				}
+				else if (buttonBits & EVT_STOP_BUTTON)
+				{
+					MotionPlanning_RESET();
+					FreeHand_Reset();
+					vPrintString("> READY -> FREEHAND (stopknop ontvangen.)\n");
+					ToState(STATE_FREEHAND);
+					break;
 				}
 				
 				//indien resetknop ingedrukt is eerst naar positie verplaatsen.
@@ -386,6 +397,25 @@ void ControlTask(void *pvParameters)
 
 				break;
 			}
+			/////////////////////////////////////////////////////////////////////
+			case STATE_FREEHAND:
+			{
+				FreeHand_Control();
+
+				if (buttonBits & EVT_START_BUTTON)
+				{
+					FreeHand_PrintCurrentTcpPosition();
+				}
+				else if (buttonBits & EVT_RESET_BUTTON)
+				{
+					FreeHand_Reset();
+					MotionPlanning_RESET();
+					vPrintString("> FREEHAND -> READY (resetknop ontvangen.)\n");
+					ToState(STATE_READY);
+				}
+				break;
+			}
+
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_PAUSE:
 			{
