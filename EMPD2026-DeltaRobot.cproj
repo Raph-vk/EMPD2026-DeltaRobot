@@ -730,12 +730,6 @@
     <Compile Include="src\DeltaKinematics.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="src\Freehand.c">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="src\Freehand.h">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="src\MachinePins.h">
       <SubType>compile</SubType>
     </Compile>

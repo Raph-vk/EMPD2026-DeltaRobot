@@ -171,16 +171,6 @@ void VisualisationTask(void *pvParameters)
 				break;
 			}
 
-			case STATE_FREEHAND:
-			{
-				port_SetLamps(blink, true, false);
-
-				stateString = "FREEHAND";
-				operatorLine1 = "<START> logt TCP pos.";
-				operatorLine2 = "<RESET> terug READY.";
-				break;
-			}
-
 			case STATE_PAUSE:
 			{
 				port_SetLamps(blink, blink, false);
