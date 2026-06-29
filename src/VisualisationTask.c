@@ -171,15 +171,16 @@ void VisualisationTask(void *pvParameters)
 				break;
 			}
 
-			case STATE_PAUSE:
+			case STATE_TEACH:
 			{
 				port_SetLamps(blink, blink, false);
 
-				stateString = "PAUZE";
-				operatorLine1 = "<START> om te hervatten,";
-				operatorLine2 = "<RESET> om aftebreken.";
+				stateString = "TEACH";
+				operatorLine1 = "UserFrame inmeten";
+				operatorLine2 = " ";
 				break;
 			}
+
 
 			case STATE_RUNNING:
 			{
@@ -189,6 +190,16 @@ void VisualisationTask(void *pvParameters)
 				stateString = "ACTIEF";
 				operatorLine1 = "Druk <STOP> om cyclus";
 				operatorLine2 = "te pauzeren.";
+				break;
+			}
+
+			case STATE_PAUSE:
+			{
+				port_SetLamps(blink, blink, false);
+
+				stateString = "PAUZE";
+				operatorLine1 = "<START> om te hervatten,";
+				operatorLine2 = "<RESET> om aftebreken.";
 				break;
 			}
 
