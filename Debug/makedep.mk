@@ -14,8 +14,6 @@ src\InputHandlerTask.c
 
 src\DeltaKinematics.c
 
-src\Freehand.c
-
 src\MotionPlanning.c
 
 src\MotionProfiles.c

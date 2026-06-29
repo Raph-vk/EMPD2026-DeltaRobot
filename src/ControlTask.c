@@ -37,7 +37,7 @@
 #include "MotionPlanning.h"
 #include "QuadratureCounters.h"
 #include "Regelaar.h"
-
+#include "UserFrame.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // file globals
@@ -58,8 +58,9 @@ static const char *StateToString(SystemState_t systemState)
 		case STATE_WAIT:    return "WAIT";
 		case STATE_HOMING:  return "HOMING";
 		case STATE_READY:   return "READY";
-		case STATE_PAUSE:   return "PAUSE";
+		case STATE_TEACH:	return "TEACH";
 		case STATE_RUNNING: return "RUNNING";
+		case STATE_PAUSE:   return "PAUSE";
 		case STATE_FAULT:   return "FAULT";
 		default:            return "UNKNOWN";
 	}
@@ -181,7 +182,9 @@ void ControlTask(void *pvParameters)
 	bool goToRust = false;
 	bool atRust = false;
 	bool toBackoffPos = false;
-	bool atBackoff = false;
+	//bool atBackoff = false;
+	
+	bool teachFinised = false;
 	
 	uint8_t noodCount = 0;
 	//float gemetenStroom = 0.0f;
@@ -204,6 +207,12 @@ void ControlTask(void *pvParameters)
 	//RunningLoopTimer_Init();
 	Regelaar_INIT();
 	BuildSequence();
+	
+	//rotatie uit geheugen uitlezen
+	if (!UserFrame_LoadPermanent())
+	{
+		vPrintString("> Geen geldig userframe in flash, defaults actief.\n");
+	}
 
 	// Bij opkomend signaal in PIN, run ClockInterruptHandler.
 	interrupt_AttachHandler(ClockInterruptHandler, PIN_CLOCK, PIO_IT_RISE_EDGE);
@@ -392,6 +401,15 @@ void ControlTask(void *pvParameters)
 					toBackoffPos = true;				
 					vPrintString("> Naar Backoffpositie (resetknop ontvangen).\n");
 				}
+				// stopknop -> UF-inmeten
+				else if (buttonBits & EVT_STOP_BUTTON)
+				{
+					MotionPlanning_RESET();
+					teachFinised = false;
+					goToRust = false;
+					ToState(STATE_TEACH);
+					break;
+				}
 				
 				//indien resetknop ingedrukt is eerst naar horizontaal verplaatsen.
 				if (toBackoffPos)
@@ -413,6 +431,66 @@ void ControlTask(void *pvParameters)
 			}
 
 			/////////////////////////////////////////////////////////////////////
+			case  STATE_TEACH:
+			{
+				// naar rust positie gaan of inleren
+				if (goToRust)
+				{
+					atRust = MoveJ_ArmDEG123t(25.0f, 25.0f, 25.0f, 2.5f);
+					if (atRust)
+					{
+						vPrintString("> TEACHING -> READY (terugpositie voldaan).\n");
+						MotionPlanning_RESET();
+						atRust = false;
+						goToRust = false;
+						ToState(STATE_READY);
+					}
+					break;
+				}
+
+				// Drukknoppen meecommuniceren
+				teachFinised = TeachUserframe(buttonBits);
+				
+				// inleren beindigd -> terug naar READY
+				if (teachFinised)
+				{
+					vPrintString("> inleren geeindigd, terug naar rustpositie.\n");
+					goToRust = true;
+					MotionPlanning_RESET();
+				}
+				break;
+			}
+
+			/////////////////////////////////////////////////////////////////////
+			case  STATE_RUNNING:
+			{
+				// Uitvoeren van bepaalde stappen.
+				sequenceDone = RunSequence();
+
+				if (buttonBits & EVT_START_BUTTON)
+				{
+					bool tcpCompActief = TcpCompensation_Toggle();
+					vPrintString("> RUNNING: TCP-compensatie %s (startknop ontvangen).\n", tcpCompActief ? "AAN" : "UIT");
+				}
+
+				// Stopknop -> terug naar READY
+				if (buttonBits & EVT_STOP_BUTTON)
+				{
+					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
+					MotionPlanning_RESET();
+					ToState(STATE_PAUSE);
+				}
+				// Cyclus klaar -> terug naar READY
+				else if (sequenceDone)
+				{
+					vPrintString("> RUNNING -> READY (cyclus voldaan).\n");
+					MotionPlanning_RESET();
+					ToState(STATE_READY);
+				}
+				break;
+			}
+			
+			/////////////////////////////////////////////////////////////////////
 			case  STATE_PAUSE:
 			{
 				if (goToRust)
@@ -429,7 +507,7 @@ void ControlTask(void *pvParameters)
 				else
 				{
 					// Op vaste positie regelen op iedere control tick
-					HoldCurrentXYZPosition(true, INFINITY);					
+					HoldCurrentXYZPosition(true, INFINITY);
 				}
 
 
@@ -447,37 +525,6 @@ void ControlTask(void *pvParameters)
 					vPrintString("> RESET -> READY (Startknop ontvangen.)\n");
 					MotionPlanning_RESET();
 					goToRust = true;
-				}
-				break;
-			}
-
-
-			/////////////////////////////////////////////////////////////////////
-			case  STATE_RUNNING:
-			{
-				// Uitvoeren van bepaalde stappen.
-				sequenceDone = RunSequence();
-
-				if (buttonBits & EVT_START_BUTTON)
-				{
-					bool tcpCompActief = TcpCompensation_Toggle();
-					vPrintString("> RUNNING: TCP-compensatie %s (startknop ontvangen).\n",
-								 tcpCompActief ? "AAN" : "UIT");
-				}
-
-				// Stopknop -> terug naar READY
-				if (buttonBits & EVT_STOP_BUTTON)
-				{
-					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
-					MotionPlanning_RESET();
-					ToState(STATE_PAUSE);
-				}
-				// Cyclus klaar -> terug naar READY
-				else if (sequenceDone)
-				{
-					vPrintString("> RUNNING -> READY (cyclus voldaan).\n");
-					MotionPlanning_RESET();
-					ToState(STATE_READY);
 				}
 				break;
 			}
