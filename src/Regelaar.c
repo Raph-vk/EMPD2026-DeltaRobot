@@ -40,7 +40,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // REGELAAR constants 
 ///////////////////////////////////////////////////////////////////////////////
-#define wb_factor (0.35f) //bandbreedte factor van de resonantiefrequentie
+#define wb_factor (0.4f) //bandbreedte factor van de resonantiefrequentie
 #define Tsample (0.001f)
 
 #define Je1M (1.0308e-5f) // kgm^2, op de motor

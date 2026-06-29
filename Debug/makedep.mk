@@ -68,6 +68,8 @@ src\VisualisationTask.c
 
 src\MotionEngine.c
 
+src\UserFrame.c
+
 src\QuadratureCounters.c
 
 src\RTSWLibrary\ADCLib.c

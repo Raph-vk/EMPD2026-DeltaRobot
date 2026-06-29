@@ -40,7 +40,7 @@
 #define adcMaxValue				(4095.0f)
 #define mmStroke				(30.43f)
 #define mmThreshold				(0.05f)
-#define calibrationSamples		(1000U)
+#define calibrationSamples		(100U)
 
 /*
  * Vaste EMA-filterfactor voor de offsetcompensatie.
@@ -317,7 +317,6 @@ static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
 
 			zeroingActive = false;
 			offsetGehomed = true;
-			
 
 			// nieuwe waarde naar queue schrijven
 			FilterOffsetMeasurement(&measurement, xAdcRaw, yAdcRaw, &ZeroPos, true);

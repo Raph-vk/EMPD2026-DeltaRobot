@@ -470,7 +470,7 @@ void ControlTask(void *pvParameters)
 				else
 				{
 					// Op vaste positie regelen op iedere control tick
-					HoldCurrentXYZPosition(false, INFINITY);					
+					HoldCurrentXYZPosition(true, INFINITY);					
 				}
 
 

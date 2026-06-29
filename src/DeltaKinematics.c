@@ -91,13 +91,87 @@ bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 		// Negatief betekent dat de zijwaartse afstand groter is dan de onderarm.
 		float L_oa_eff = LengteOnderarm * LengteOnderarm - Pk[1] * Pk[1];
 		if(L_oa_eff < 0.0f){
+			vPrintString("IK: invalide positie, onderarm kan niet zover zijwaarts reiken.\n");
 			return false; //invalide positie, onderarm kan niet zover zijwaarts reiken
 		}
+		
+		
+		
+		//nieuwe calc
+		float K = L_oa_eff
+			- LengteBovenarm * LengteBovenarm
+			- x_pols * x_pols
+			- Pk[2] * Pk[2]
+			+ rBase * rBase;
 
+		/*
+		 * Zelfde lijn als voorheen, maar opgelost als z = m*x + b.
+		 * Dit voorkomt deling door (rBase - x_pols), die bij hoekpunten bijna nul kan zijn.
+		 */
+		if (fabsf(Pk[2]) < 1e-6f)
+		{
+			return false;
+		}
+
+		float m = (rBase - x_pols) / Pk[2];
+		float b = -K / (2.0f * Pk[2]);
+
+		float A = 1.0f + m * m;
+		float B = -2.0f * rBase + 2.0f * m * b;
+		float C = rBase * rBase + b * b - LengteBovenarm * LengteBovenarm;
+
+		float discriminant = B * B - 4.0f * A * C;
+		if (discriminant < 0.0f)
+		{
+			if (discriminant > -0.01f)
+			{
+				discriminant = 0.0f;
+			}
+			else
+			{
+				return false;
+			}
+		}
+
+		float sqrt_d = sqrtf(discriminant);
+		float inv2A = 1.0f / (2.0f * A);
+
+		float xE1_plus = (-B + sqrt_d) * inv2A;
+		float zE1_plus = m * xE1_plus + b;
+		float theta_plus = atan2f(zE1_plus, xE1_plus - rBase);
+
+		float xE1_minus = (-B - sqrt_d) * inv2A;
+		float zE1_minus = m * xE1_minus + b;
+		float theta_minus = atan2f(zE1_minus, xE1_minus - rBase);
+
+		if (theta_plus > Bovenarm_thetaMin && theta_plus < Bovenarm_thetaMax)
+		{
+			motorRad[motorIndex] = -theta_plus * i_twk;
+		}
+		else if (theta_minus > Bovenarm_thetaMin && theta_minus < Bovenarm_thetaMax)
+		{
+			motorRad[motorIndex] = -theta_minus * i_twk;
+		}
+		else
+		{
+			vPrintString("IK: Beide oplossingen liggen buiten de mechanische limieten.\n");
+			vPrintString(
+				"IK limiet motor %u: theta+=%.2fdeg theta-=%.2fdeg lim=[%.2f..%.2f]deg\n",
+				(unsigned int)motorIndex,
+				theta_plus * RAD_TO_DEG,
+				theta_minus * RAD_TO_DEG,
+				Bovenarm_thetaMin * RAD_TO_DEG,
+				Bovenarm_thetaMax * RAD_TO_DEG
+			);
+			return false;
+		}
+
+		/*
 		// Noemer van de lijnvergelijking tussen motorpunt en TCP. Bij bijna nul
 		// ontstaat een singuliere of numeriek onbetrouwbare berekening.
 		float dx_motor_target = 2 * (rBase  - x_pols);
 		if(fabsf(dx_motor_target) < 1e-12f){
+			vPrintString("IK: invalide positie, TCP ligt te dicht bij de lijn van motor k.\n");
 			return false; // invalide positie, TCP ligt te dicht bij de lijn van motor k
 		}
 		
@@ -117,6 +191,7 @@ bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 		// motor niet haalbaar is.
 		float discriminant = (B * B) - ( 4.0f * A * C);
 		if( discriminant < 0.0f){
+			vPrintString("IK: invalide positie, elleboogpunt kan niet op de lijn liggen vanwege te grote afstand tot motorpunt.\n");
 			//invalide positie, elleboogpunt kan niet op de lijn liggen vanwege te grote afstand tot motorpunt
 			return false; 
 		}
@@ -150,9 +225,40 @@ bool DeltaKinematics_Inverse(const float tcpPosition_mm[3], float motorRad[N_MOT
 			}
 			// Beide oplossingen liggen buiten de mechanische limieten.
 			else{
+				vPrintString("IK: Beide oplossingen liggen buiten de mechanische limieten.\n");
+				
+				float theta_plus_deg = theta_plus * RAD_TO_DEG;
+				float theta_minus_deg = theta_minus * RAD_TO_DEG;
+				
+				vPrintString(
+				"IK limiet motor %u\n"
+				"TCP X=%.2f Y=%.2f Z=%.2f\n"
+				"Pk X=%.2f Y=%.2f Z=%.2f\n"
+				"disc=%.6e sqrt=%.6e\n"
+				"plus:  xE=%.2f zE=%.2f xE-rBase=%.2f theta=%.3fdeg\n"
+				"minus: xE=%.2f zE=%.2f xE-rBase=%.2f theta=%.3fdeg\n"
+				"lim=[%.2f..%.2f]deg\n",
+				(unsigned int)motorIndex,
+				tcpPosition_mm[0], tcpPosition_mm[1], tcpPosition_mm[2],
+				Pk[0], Pk[1], Pk[2],
+				discriminant, sqrt_d,
+				xE1_plus, zE1_plus, xE1_plus - rBase, theta_plus * RAD_TO_DEG,
+				xE1_minus, zE1_minus, xE1_minus - rBase, theta_minus * RAD_TO_DEG,
+				Bovenarm_thetaMin * RAD_TO_DEG,
+				Bovenarm_thetaMax * RAD_TO_DEG
+				);
+				vPrintString(
+				"IK limiet motor %u: theta+=%.2fdeg theta-=%.2fdeg lim=[%.2f..%.2f]deg\n",
+				(unsigned int)motorIndex,
+				theta_plus_deg,
+				theta_minus_deg,
+				Bovenarm_thetaMin * RAD_TO_DEG,
+				Bovenarm_thetaMax * RAD_TO_DEG
+				);
+
 				return false;
 			}
-		}
+		}*/
 	}//eind motor loop
 
 
@@ -218,6 +324,7 @@ bool DeltaKinematics_Forward(const float motorRad[N_MOTORS], float tcpPosition_m
 	float denominator = A1 * B2 - A2 * B1;
 	if (fabsf(denominator) < 1e-12f)
 	{
+		vPrintString("FK: Een noemer dicht bij nul betekent dat x en y numeriek niet betrouwbaar.\n");
 		return false;
 	}
 
@@ -246,6 +353,7 @@ bool DeltaKinematics_Forward(const float motorRad[N_MOTORS], float tcpPosition_m
 	float discriminant = quad_b * quad_b - 4.0f * quad_a * quad_c;
 	if (discriminant < 0.0f)
 	{
+		vPrintString("FK: Een negatieve discriminant betekent dat de drie bollen elkaar niet snijden.\n");
 		return false;
 	}
 

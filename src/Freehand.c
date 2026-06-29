@@ -29,10 +29,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 // Freehand tuning
 #define FREEHAND_FOLLOW_ALPHA        (0.02f)
-#define FREEHAND_KP                  (0.10f)
-#define FREEHAND_MAX_VOLTAGE         (0.80f)
+#define FREEHAND_KP                  (4.00f)
+#define FREEHAND_MAX_VOLTAGE         (1.50f)
 
-#define FREEHAND_GRAVITY_GAIN        (1.5f)
+#define FREEHAND_GRAVITY_GAIN        (5.0f)
 #define FREEHAND_GRAVITY_OFFSET_RAD  (-1.89f)
 
 ///////////////////////////////////////////////////////////////////////////////

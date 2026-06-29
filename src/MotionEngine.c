@@ -12,12 +12,10 @@
 // system includes
 #include <stdint.h>
 #include "MotionPlanning.h"
+#include "UserFrame.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // sequence settings
-#define WORK_OFFSET_X_MM	(0.0f)
-#define WORK_OFFSET_Y_MM	(0.0f)
-
 #define MAX_SEQUENCE_STEPS		(360U)  //voor vaste memory grootte
 ///////////////////////////////////////////////////////////////////////////////
 // globals vars
@@ -68,7 +66,7 @@ const Coordinate_t RM05 = {210.27f, -40.0f};
 
 /* Hoekplaat linksonder (moeren). */
 const Coordinate_t LO00 = {-139.78f, -122.10f};
-const Coordinate_t LO01 = {-162.1f, -139.78f};
+const Coordinate_t LO01 = {-139.78f, -162.10f};
 const Coordinate_t LO02 = {-91.93f, -159.23f};
 const Coordinate_t LO03 = {-110.21f, -190.90f};
 const Coordinate_t LO04 = { -35.85f, -182.1f};
@@ -91,52 +89,138 @@ static inline void MoveHopXYZ(float x_mm, float y_mm, float z_mm, float time_s);
  */
 void BuildSequence(void)
 {
-	float wait = 0.5f; // s
-	float move = 0.3f; // s
-	float zHeight = -425.0f; //mm
-	float moveHop = 0.5f;
-	
-	//setup
+	float waitGrip = 0.5f;
+	float moveShort = 0.4f;
+	float move = 0.5f;
+	float moveLong = 1.30f;
+	float moveHop = 1.60f;
+
+	float zFly = -400.0f;
+	float zPickBout = -456.0f;
+	float zPickMoer = -460.0f;
+
+	// Bouten minimaal 25 mm omhoog; hier 30 mm.
+	float zBoutClear = zPickBout + 30.0f;
+	float zMoerClear = zPickMoer + 5.0f;
+
+	const Coordinate_t boutStart[6] = {M00, M01, M02, M03, M04, M05};
+	const Coordinate_t boutDoel[6]  = {M15, M06, M10, M11, M13, M07};
+
+	const Coordinate_t moerStart[6] = {RM00, RM01, RM02, RM03, RM04, RM05};
+	const Coordinate_t moerDoel[6]  = {LB02, LO00, LB05, LO05, LB03, LB00};
+
 	sequenceLength = 0;
 	sequenceOverflow = false;
-	
-	MoveJXYZ(0.0f, 0.0f, zHeight, 5.0f);
 
-	/*
-	Hold(false, 0.1f);
-	MoveJXYZ(0.0f, 0.0f, zHeight, move);
-	HoldXYZ(false, wait);
-	MoveLXYZ(80.0f, 80.0f, zHeight, move);
-	HoldXYZ(false, wait);
-	MoveLXYZ(80.0f, -80.0f, zHeight, move);
-	HoldXYZ(false, wait);
-	MoveLXYZ(-80.0f, -80.0f, zHeight, move);
-	HoldXYZ(false, wait);
-	MoveLXYZ(-80.0f, 80.0f, zHeight, move);
-	HoldXYZ(false, wait);
-	*/
+	MoveJXYZ(0.0f, 0.0f, zFly, moveLong);
+	Hold(false, 0.5f);
 
-	// coole beweging
-	for (uint8_t i = 0; i < 8; i++)
+	// Bouten plaatsen.
+	for (uint8_t i = 0; i < 6; i++)
 	{
-		MoveHopXYZ(80.0f,-80.0f,zHeight, moveHop);
-		Hold(false, wait);
-		MoveLXYZ(-80.0f,-80.0f,zHeight, move);
-		Hold(false, wait);
-		MoveLXYZ(-80.0f,80.0f,zHeight, move);
-		MoveLXYZ(80.0f,80.0f,zHeight, move);
-		MoveHopXYZ(-80.0f,-80.0f,zHeight, moveHop);
-		MoveHopXYZ(80.0f,-80.0f,zHeight, moveHop);
-		MoveHopXYZ(80.0f,80.0f,zHeight, moveHop);
-		MoveHopXYZ(-80.0f,-80.0f,zHeight, moveHop);
-		MoveHopXYZ(150.0f,0.0f,zHeight, moveHop);
-		MoveHopXYZ(-130.0f,0.0f,zHeight, moveHop);
-		MoveHopXYZ(-130.0f,50.0f,zHeight, moveHop*2);
-		Hold(false, wait);
+		Coordinate_t pick = boutStart[i];
+		Coordinate_t place = boutDoel[i];
+
+		MoveHopXYZ(pick.x, pick.y, zBoutClear, moveHop);
+		MoveLXYZ(pick.x, pick.y, zPickBout, moveShort);
+		HoldXYZ(false, waitGrip);
+		HoldXYZ(true, waitGrip);
+		MoveLXYZ(pick.x, pick.y, zBoutClear, moveShort);
+
+		MoveHopXYZ(place.x, place.y, zBoutClear, moveHop);
+		MoveLXYZ(place.x, place.y, zPickBout, moveShort);
+		HoldXYZ(false, waitGrip);
+		MoveLXYZ(place.x, place.y, zBoutClear, moveShort);
 	}
-		
-	MoveJDEG(25.0f, 25.0f, 25.0f, 1.0f);
-	Hold(false, 0.1f);
+
+	MoveHopXYZ(0.0f, 0.0f, zFly, moveHop);
+
+	// Moeren verplaatsen.
+	for (uint8_t i = 0; i < 6; i++)
+	{
+		Coordinate_t pick = moerStart[i];
+		Coordinate_t place = moerDoel[i];
+
+		MoveLXYZ(pick.x, pick.y, zBoutClear, moveHop); 
+		MoveLXYZ(pick.x, pick.y, zPickMoer, moveShort);
+		HoldXYZ(false, waitGrip);
+		HoldXYZ(true, waitGrip);
+		MoveLXYZ(pick.x, pick.y, zMoerClear, moveShort);
+
+		MoveHopXYZ(place.x, place.y, zMoerClear, moveHop);
+		MoveLXYZ(place.x, place.y, zPickMoer, moveShort);
+		HoldXYZ(false, waitGrip);
+		MoveLXYZ(place.x, place.y, zBoutClear, moveShort);
+	}
+	
+	// Moeren terugleggen.
+	for (uint8_t i = 0; i < 6; i++)
+	{
+		Coordinate_t pick = moerDoel[i];
+		Coordinate_t place = moerStart[i];
+
+		MoveLXYZ(pick.x, pick.y, zBoutClear, moveHop);
+		MoveLXYZ(pick.x, pick.y, zPickMoer, moveShort);
+		HoldXYZ(false, waitGrip);
+		HoldXYZ(true, waitGrip);
+		MoveLXYZ(pick.x, pick.y, zMoerClear, moveShort);
+
+		MoveHopXYZ(place.x, place.y, zMoerClear, moveHop);
+		MoveLXYZ(place.x, place.y, zPickMoer, moveShort);
+		HoldXYZ(false, waitGrip);
+		MoveLXYZ(place.x, place.y, zBoutClear, moveShort);
+	}
+
+	MoveLXYZ(0.0f, 0.0f, zBoutClear, moveHop);
+
+	// Bouten terugleggen.
+	for (uint8_t i = 0; i < 6; i++)
+	{
+		Coordinate_t pick = boutDoel[i];
+		Coordinate_t place = boutStart[i];
+
+		MoveHopXYZ(pick.x, pick.y, zBoutClear, moveHop);
+		MoveLXYZ(pick.x, pick.y, zPickBout, moveShort);
+		HoldXYZ(false, waitGrip);
+		HoldXYZ(true, waitGrip);
+		MoveLXYZ(pick.x, pick.y, zBoutClear, moveShort);
+
+		MoveHopXYZ(place.x, place.y, zBoutClear, moveHop);
+		MoveLXYZ(place.x, place.y, zPickBout, moveShort);
+		HoldXYZ(false, waitGrip);
+		MoveLXYZ(place.x, place.y, zBoutClear, moveShort);
+	}
+
+	// Snelle demo-beweging.
+	MoveLXYZ(0.0f, 0.0f, zBoutClear, move);
+	Hold(false, waitGrip);
+	MoveLXYZ(80.0f, 80.0f, (zBoutClear+20.0), moveShort);
+	Hold(false, waitGrip);
+	MoveLXYZ(80.0f, -80.0f, (zBoutClear+20.0), moveShort);
+	Hold(false, waitGrip);
+	MoveLXYZ(-80.0f, -80.0f, (zBoutClear+20.0), moveShort);
+	Hold(false, waitGrip);
+	MoveLXYZ(-80.0f, 80.0f, (zBoutClear+20.0), moveShort);
+	Hold(false, waitGrip);
+	MoveLXYZ(80.0f, 80.0f, (zBoutClear+20.0), moveShort);
+	Hold(false, waitGrip);
+	
+	MoveLXYZ(0.0f, 0.0f, zBoutClear, moveShort);
+	Hold(false, (waitGrip*4));
+	
+	MoveHopXYZ(125.0f, 0.0f, zBoutClear, moveHop);
+	Hold(false, waitGrip);
+	MoveHopXYZ(0.0f, 125.0f, zBoutClear, moveHop);
+	Hold(false, waitGrip);
+	MoveHopXYZ(0.0f, -125.0f, zBoutClear, moveHop);
+	Hold(false, waitGrip);
+	MoveLXYZ(0.0f, 0.0f, zBoutClear, moveShort);
+	Hold(false, (waitGrip*4));
+	
+
+
+	MoveJXYZ(0.0f, 0.0f, zFly, moveLong);
+	Hold(false, 0.8f);
 }
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -145,16 +229,25 @@ void BuildSequence(void)
 static uint16_t currentStep = 0;
 typedef enum {STEP_HOLD_CURRENT,  STEP_HOLDXYZ_CURRENT, STEP_MOVEJ_XYZ,  STEP_MOVEJ_DEG,  STEP_MOVEL_XYZ, STEP_MOVEHOP_XYZ  } StepType_t;
 typedef struct{ StepType_t type;   bool gripper;   float p1;   float p2;  float p3;  float time_s;  } SequenceStep_t;
+typedef bool (*MoveXYZFunction_t)(float x_mm, float y_mm, float z_mm, float time_s);
 static SequenceStep_t sequence[MAX_SEQUENCE_STEPS]; // De sequencielijst!
 
 ///////////////////////////////////////////////////////////////////////////////
-// static bool UserTargetToBase(...)
-/*
-static bool UserTargetToBase(float userX_mm, float userY_mm, float baseZ_mm, float baseXYZ_mm[3])
+// static bool RunUserFrameXYZStep(...)
+static bool RunUserFrameXYZStep(const SequenceStep_t *step, MoveXYZFunction_t moveFunction)
 {
-	return UserFrame_ToBaseXY(userX_mm, userY_mm, baseZ_mm, baseXYZ_mm);
-}*/
+	float baseXYZ_mm[3] = {0.0f, 0.0f, 0.0f};
 
+	if (!UserFrame_ToBaseXY(step->p1, step->p2, step->p3, baseXYZ_mm))
+	{
+		return false;
+	}
+
+	return moveFunction(baseXYZ_mm[0], baseXYZ_mm[1], baseXYZ_mm[2], step->time_s);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// static bool RunSequence(...)
 /*
  * Voert de ingestelde bewegingssequentie stap voor stap uit.
  * Invoer: GEEN, wordt eenmaal per 1 ms clocktick aangeroepen.
@@ -184,7 +277,7 @@ bool RunSequence(void)
 		break;
 
 		case STEP_MOVEJ_XYZ:
-		stepDone = MoveJ_XYZt(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, step->time_s);
+		stepDone = RunUserFrameXYZStep(step, MoveJ_XYZt);
 		break;
 
 		case STEP_MOVEJ_DEG:
@@ -192,11 +285,11 @@ bool RunSequence(void)
 		break;
 
 		case STEP_MOVEL_XYZ:
-		stepDone = MoveL_XYZt(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, step->time_s);
+		stepDone = RunUserFrameXYZStep(step, MoveL_XYZt);
 		break;
 
 		case STEP_MOVEHOP_XYZ:
-		stepDone = MoveHop_XYZt(step->p1 + WORK_OFFSET_X_MM, step->p2 + WORK_OFFSET_Y_MM, step->p3, step->time_s);
+		stepDone = RunUserFrameXYZStep(step, MoveHop_XYZt);
 		break;
 
 		default:

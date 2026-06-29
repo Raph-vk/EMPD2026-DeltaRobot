@@ -41,7 +41,7 @@
 #define N_TCP_AXES					(3U)
 
 //hop vars
-#define HOP_DISTANCE_FACTOR			(0.20f)       // [mm lift / mm XY] gewenste hophoogte uit horizontale afstand
+#define HOP_DISTANCE_FACTOR			(0.15f)       // [mm lift / mm XY] gewenste hophoogte uit horizontale afstand
 #define HOP_MIN_HEIGHT_MM			(0.0f)        // geen geforceerde minimumhop; gebruik MoveL als hoppen niet nodig is
 #define HOP_MAX_HEIGHT_MM			(60.0f)       // absolute begrenzing van extra Z-lift
 #define HOP_MAX_Z_ACCEL_MM_S2		(10000.0f)    // effectieve Z-versnellingslimiet voor automatische hophoogte
@@ -111,7 +111,7 @@ static void UpdateArmErrorSpike(const float motorRef_rad[N_MOTORS], const float 
 static void PubliceerErrorSpikeInfo(const char *regel1)
 {
 	char errorLine[DISPLAY_INFO_LINE_LENGTH];
-
+	//vPrintString("> eMax %.2f %.2f %.2fdeg.\n", ErrorSpike_deg[0], ErrorSpike_deg[1], ErrorSpike_deg[2]);
 	snprintf(errorLine, sizeof(errorLine), "eMax %.2f %.2f %.2fdeg", ErrorSpike_deg[0], ErrorSpike_deg[1], ErrorSpike_deg[2]);
 	DisplayInfo_Publish(regel1, errorLine);
 }
@@ -150,7 +150,7 @@ static void PubliceerBewegingKlaarInfo(const char *bewegingsNaam, const float mo
 	}
 	*/
 
-	vPrintString("%s done. %s\n", bewegingsNaam, regel2);
+	//vPrintString("%s done. %s\n", bewegingsNaam, regel2);
 	DisplayInfo_Publish(regel1, regel2);
 }
 
@@ -288,6 +288,7 @@ bool HoldCurrentPosition(bool grab, float waitTime_s)
 	// tussentijd positieuitlezen en regelen
 	else
 	{
+		//port_SetBit(BIT_GRIPPER, grab);
 		LeesMotorPositiesRad(motorPos_Rad);
 		UpdateArmErrorSpike(motorHoldRefPos, motorPos_Rad);
 		RegelMotoren(motorHoldRefPos, motorPos_Rad, 0);
@@ -333,6 +334,7 @@ bool HoldCurrentXYZPosition(bool grab, float waitTime_s)
 	//als tijd verstreken is
 	else if (g_time - t0 >= waitTime_s)
 	{
+		//port_SetBit(BIT_GRIPPER, grab);
 		setupDone = false;
 		verplaatsingKlaar = true;
 	}
@@ -351,11 +353,6 @@ bool HoldCurrentXYZPosition(bool grab, float waitTime_s)
 		if (!DeltaKinematics_Inverse(tcpHoldRef_mm, motorRef_rad))
 		{
 			return StopBewegingMetFout("HoldXYZ ongeldige IK.");
-			/*
-			vPrintString("FOUT: Hold XYZ positie ongeldig voor inverse kinematica.\n");
-			ToState(STATE_PAUSE);
-			return false;
-			*/
 		}
 
 		holdTargetGeldig = true;
@@ -401,7 +398,7 @@ bool MoveJ_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 		tcpTarget_mm[2] = z_mm;
 		float motorRef_rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
 
-		vPrintString("start MoveJ X=%.1fmm, Y=%.1fmm, Z=%.1fmm.\n", x_mm, y_mm, z_mm);
+		//vPrintString("> start MoveJ X=%.1fmm, Y=%.1fmm, Z=%.1fmm.\n", x_mm, y_mm, z_mm);
 		t0 = g_time;
 
 		if (!DeltaKinematics_Inverse(tcpTarget_mm, motorRef_rad))
@@ -473,7 +470,7 @@ bool MoveJ_ArmDEG123t(float M1DEG, float M2DEG, float M3DEG, float maxTime_s)
 	{
 		float motorRef_rad[N_MOTORS] = {0.0f, 0.0f, 0.0f};
 
-		vPrintString("start MoveJ M1=%.1fdeg, M2=%.1fdeg, M3=%.1fdeg.\n", M1DEG, M2DEG, M3DEG);
+		//vPrintString("start MoveJ M1=%.1fdeg, M2=%.1fdeg, M3=%.1fdeg.\n", M1DEG, M2DEG, M3DEG);
 		t0 = g_time;
 
 		// Doelpositie omzetten naar motor-radialen.
@@ -616,7 +613,7 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	//in setup incrementele verplaatsing bepalen -> tcpMax_inc_mm[axis]
 	if (!setupDone)
 	{
-		vPrintString("start MoveL X=%.1fmm, Y=%.1fmm, Z=%.1fmm.\n", x_mm, y_mm, z_mm);
+		//vPrintString("start MoveL X=%.1fmm, Y=%.1fmm, Z=%.1fmm.\n", x_mm, y_mm, z_mm);
 		t0 = g_time;
 
 		if (!InitialiseerTcpBeweging(motorPos_Rad, x_mm, y_mm, z_mm))
@@ -720,7 +717,7 @@ bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	// bewegingsprofiel bepalen
 	if (!setupDone)
 	{
-		vPrintString("start MoveHop X=%.1fmm, Y=%.1fmm, Z=%.1fmm.\n", x_mm, y_mm, z_mm);
+		//vPrintString("start MoveHop X=%.1fmm, Y=%.1fmm, Z=%.1fmm.\n", x_mm, y_mm, z_mm);
 		t0 = g_time;
 
 		if (!InitialiseerTcpBeweging(motorPos_Rad, x_mm, y_mm, z_mm))
@@ -732,7 +729,7 @@ bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 
 		//berekenen van hopHoogte
 		hopHeight_mm = BerekenHopHoogte(maxTime_s);
-		vPrintString("MoveHop hoogte: %.2f mm\n", hopHeight_mm);
+		//vPrintString("MoveHop hoogte: %.2f mm\n", hopHeight_mm);
 	}
 
 	//tijd bijhouden

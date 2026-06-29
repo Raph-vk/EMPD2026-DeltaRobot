@@ -22,6 +22,11 @@ Deze file is de centrale opstart van de applicatie.
 #include "InputHandlerTask.h"
 #include "VisualisationTask.h"
 
+///////////////////////////////////////////////////////////////////////////////
+// defines
+#define STACK_INPUT_TASK          (configMINIMAL_STACK_SIZE * 2)
+#define STACK_CONTROL_TASK        (configMINIMAL_STACK_SIZE * 5)
+#define STACK_VISUALISATION_TASK  (configMINIMAL_STACK_SIZE * 3)
 
 ///////////////////////////////////////////////////////////////////////////////
 // application tasks handler declarations
@@ -175,17 +180,17 @@ void StartApplicationTasks(void)
 	// De taken worden aangemaakt en in de ready list geplaatst.
 	// Prioriteit 0 is het laagste,
 	// Prioriteit 4 is de hoogste mogelijk
-	result = xTaskCreate(InputHandlerTask, "tsk_Input", (configMINIMAL_STACK_SIZE), NULL, 0, &handle_InputHandlerTask);
+	result = xTaskCreate(InputHandlerTask, "tsk_Input", (STACK_INPUT_TASK), NULL, 0, &handle_InputHandlerTask);
 	if (result != pdPASS )
 	{
 		vPrintString("InputHandlerTask task create failed.\n");
 	}
-	result = xTaskCreate(ControlTask, "tsk_Control", (configMINIMAL_STACK_SIZE), NULL, 2, &handle_ControlTask);
+	result = xTaskCreate(ControlTask, "tsk_Control", (STACK_CONTROL_TASK), NULL, 2, &handle_ControlTask);
 	if (result != pdPASS )
 	{
 		vPrintString("ControlTask task create failed.\n");
 	}
-	result = xTaskCreate(VisualisationTask, "tsk_Visualisation", (configMINIMAL_STACK_SIZE), NULL, 1, &handle_VisualisationTask);
+	result = xTaskCreate(VisualisationTask, "tsk_Visualisation", (STACK_VISUALISATION_TASK), NULL, 1, &handle_VisualisationTask);
 	if (result != pdPASS )
 	{
 		vPrintString("VisualisationTask task create failed.\n");

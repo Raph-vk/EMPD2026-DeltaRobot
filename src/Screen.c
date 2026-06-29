@@ -83,7 +83,7 @@ bool Screen_DrawStatus(const char *stateTxt, const char *tcpComp, const char *op
 		u8g2_DrawStr(&g_u8g2, 0, 10, stateTxt);
 		
 		u8g2_SetFont(&g_u8g2, u8g2_font_5x7_tr);
-		u8g2_DrawStr(&g_u8g2, 90, 10, tcpComp);
+		u8g2_DrawStr(&g_u8g2, 95, 10, tcpComp);
 		
 		// Operator compact
 		u8g2_DrawStr(&g_u8g2, 0, 21, opTxt1);
@@ -118,14 +118,14 @@ bool Screen_Recover(void)
 	g_oledI2c = i2c_GetChannelHandle(OLED_I2C_CHANNEL);
 	if (g_oledI2c == NULL || g_oledI2c->twi == NULL)
 	{
-		vPrintString("> OLED recover failed: invalid I2C handle.\n");
+		//vPrintString("> OLED recover failed: invalid I2C handle.\n");
 		return false;
 	}
 
 	clearResult = i2c_ClearBus(OLED_I2C_CHANNEL);
 	if ((clearResult != I2C_BUS_OK) && (clearResult != I2C_BUS_REPAIRED))
 	{
-		vPrintString("> OLED recover failed: %s\n", i2c_GetErrorMessage(clearResult));
+		//vPrintString("> OLED recover failed: %s\n", i2c_GetErrorMessage(clearResult));
 		return false;
 	}
 

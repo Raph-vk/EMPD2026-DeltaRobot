@@ -156,7 +156,7 @@ void VisualisationTask(void *pvParameters)
 			{
 				port_SetLamps(false, true, false);
 
-				stateString = "HOMING...";
+				stateString = "HOMING";
 				operatorLine1 = "Wacht A.U.B.";
 				break;
 			}
