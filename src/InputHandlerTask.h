@@ -15,6 +15,7 @@
 #define EVT_START_BUTTON    BIT_10
 #define EVT_STOP_BUTTON     BIT_11
 #define EVT_RESET_BUTTON    BIT_12
+#define EVT_TEACH_BUTTON    BIT_13
 
 ///////////////////////////////////////////////////////////////////////////////
 // function prototypes

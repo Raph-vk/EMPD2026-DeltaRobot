@@ -50,6 +50,9 @@
  */
 #define OFFSET_FILTER_ALPHA			(0.35f)
 
+// STOP-knop lang vasthouden om bewust userframe teach aan te vragen.
+#define STOP_LONG_PRESS_TICKS		(5000U)
+#define STOP_DEBOUNCE_TICKS			(20U)
 
 ///////////////////////////////////////////////////////////////////////////////
 //#define ADC_REFERENCE_VOLTAGE         (3.3f)
@@ -102,6 +105,59 @@ static bool ButtonWasPressed(uint8_t pcbSwitch, uint8_t inputBit)
 	}
 
 	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// static void ProcessStopButton(void)
+/*
+ * Verwerkt de STOP-knop zonder blokkeren.
+ * Korte druk blijft een normaal STOP-event na loslaten.
+ * Lang vasthouden geeft een apart TEACH-event en onderdrukt daarna het STOP-event.
+ */
+static void ProcessStopButton(void)
+{
+	static bool stopWasPressed = false;
+	static bool teachEventSent = false;
+	static uint16_t stopPressTicks = 0U;
+
+	const bool stopPressed = IsButtonPressed(PCB_SWITCH_STOP, BIT_STOP);
+
+	if (stopPressed)
+	{
+		if (!stopWasPressed)
+		{
+			stopWasPressed = true;
+			teachEventSent = false;
+			stopPressTicks = 0U;
+		}
+
+		if (stopPressTicks < STOP_LONG_PRESS_TICKS)
+		{
+			stopPressTicks++;
+		}
+
+		if ((stopPressTicks >= STOP_LONG_PRESS_TICKS) && !teachEventSent)
+		{
+			vPrintString("> STOP lang ingedrukt: TEACH aangevraagd.\n");
+			xEventGroupSetBits(handle_ButtonEventGroup, EVT_TEACH_BUTTON);
+			teachEventSent = true;
+		}
+
+		return;
+	}
+
+	if (stopWasPressed)
+	{
+		if (!teachEventSent && (stopPressTicks >= STOP_DEBOUNCE_TICKS))
+		{
+			vPrintString("> STOP button is pressed!\n");
+			xEventGroupSetBits(handle_ButtonEventGroup, EVT_STOP_BUTTON);
+		}
+
+		stopWasPressed = false;
+		teachEventSent = false;
+		stopPressTicks = 0U;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -374,6 +430,10 @@ static void ProcessOffsetPositionData(uint16_t xAdcRaw, uint16_t yAdcRaw)
 void InputHandlerTask(void *pvParameters)
 {
 	vPrintString("> starting InputHandlerTask\n");
+	
+	bool stopWasPressed = false;
+	bool teachEventSent = false;
+	uint16_t stopPressTicks = 0U;
 
 	//adc_EnableChannel(stroomChannel);
 	adc_EnableChannel(xDisturbanceChannel);
@@ -386,18 +446,51 @@ void InputHandlerTask(void *pvParameters)
 	
 	while (true)
 	{		
-		// START
+		// STOP
+		//ProcessStopButton();
+		//als stopknop wordt ingedrukt
+		if (IsButtonPressed(PCB_SWITCH_STOP, BIT_STOP))
+		{
+			if (!stopWasPressed)
+			{
+				stopWasPressed = true;
+				teachEventSent = false;
+				stopPressTicks = 0U;
+			}
+
+			if (stopPressTicks < STOP_LONG_PRESS_TICKS)
+			{
+				stopPressTicks++;
+			}
+
+			// Indien knop langer dan 5 sec vastgehouden wordt.
+			if ((stopPressTicks >= STOP_LONG_PRESS_TICKS) && !teachEventSent)
+			{
+				vPrintString("> STOP lang ingedrukt: TEACH aangevraagd.\n");
+				xEventGroupSetBits(handle_ButtonEventGroup, EVT_TEACH_BUTTON);
+				teachEventSent = true;
+			}
+		}
+		// Als stopknop losgelaten wordt.
+		else if (stopWasPressed)
+		{
+			if (!teachEventSent && (stopPressTicks >= STOP_DEBOUNCE_TICKS))
+			{
+				vPrintString("> STOP button is pressed!\n");
+				xEventGroupSetBits(handle_ButtonEventGroup, EVT_STOP_BUTTON);
+			}
+
+			stopWasPressed = false;
+			teachEventSent = false;
+			stopPressTicks = 0U;
+		}
+		
+		// START wordt losgelaten
 		if ( ButtonWasPressed(PCB_SWITCH_START, BIT_START) )
 		{
 			vPrintString("> START button is pressed!\n");
 			xEventGroupSetBits(handle_ButtonEventGroup, EVT_START_BUTTON);
-		}
-		// STOP
-		if ( ButtonWasPressed(PCB_SWITCH_STOP, BIT_STOP) )
-		{
-			vPrintString("> STOP button is pressed!\n");
-			xEventGroupSetBits(handle_ButtonEventGroup, EVT_STOP_BUTTON);
-		}
+		}		
 		// RESET
 		if ( ButtonWasPressed(PCB_SWITCH_RESET, BIT_RESET) )
 		{

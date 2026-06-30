@@ -167,10 +167,10 @@ void ControlTask(void *pvParameters)
 	// Event settings
 	EventBits_t buttonBits = 0;
 	const BaseType_t clearAllbits  = pdTRUE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
-	const BaseType_t waitForAnyBit= pdFALSE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
+	const BaseType_t waitForAnyBit= pdFALSE;			// FALSE = wacht totdat ��n v/d bits is gezet, TRUE wacht op ALLE bits.
 
 	const BaseType_t stayAllbits  = pdFALSE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
-	const BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
+	const BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat ��n v/d bits is gezet, TRUE wacht op ALLE bits.
 	const TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -185,6 +185,7 @@ void ControlTask(void *pvParameters)
 	//bool atBackoff = false;
 	
 	bool teachFinised = false;
+	bool teachRequested = false;
 	
 	uint8_t noodCount = 0;
 	//float gemetenStroom = 0.0f;
@@ -209,10 +210,10 @@ void ControlTask(void *pvParameters)
 	BuildSequence();
 	
 	//rotatie uit geheugen uitlezen
-	if (!UserFrame_LoadPermanent())
-	{
-		vPrintString("> Geen geldig userframe in flash, defaults actief.\n");
-	}
+	//if (!UserFrame_LoadPermanent())
+	//{
+	//	vPrintString("> Geen geldig userframe in flash, defaults actief.\n");
+	//}
 
 	// Bij opkomend signaal in PIN, run ClockInterruptHandler.
 	interrupt_AttachHandler(ClockInterruptHandler, PIN_CLOCK, PIO_IT_RISE_EDGE);
@@ -269,7 +270,7 @@ void ControlTask(void *pvParameters)
 
 		// Lees uit of er een knop ingedrukt is.
 		buttonBits = xEventGroupWaitBits(handle_ButtonEventGroup,
-			EVT_START_BUTTON | EVT_STOP_BUTTON | EVT_RESET_BUTTON,
+			EVT_START_BUTTON | EVT_STOP_BUTTON | EVT_RESET_BUTTON | EVT_TEACH_BUTTON,
 			clearAllbits,	// ontvangen bits wissen
 			waitForAnyBit,	// één van de bits is genoeg
 			0				// niet blokkeren
@@ -318,6 +319,14 @@ void ControlTask(void *pvParameters)
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_WAIT:
 			{
+				// STOP 5s vasthouden -> userframe teach aanvragen.
+				if (buttonBits & EVT_TEACH_BUTTON)
+				{
+					teachRequested = true;
+					vPrintString("> TEACH aangevraagd. Druk START om eerst te homen.\n");
+					DisplayInfo_Publish("TEACH aangevraagd", "Druk START voor homing");
+				}
+
 				// Wachten op start-of resetknop
 				if ((buttonBits & EVT_START_BUTTON)) //|| (buttonBits & EVT_RESET_BUTTON)
 				{
@@ -369,12 +378,56 @@ void ControlTask(void *pvParameters)
 				{
 					if (MoveToPose(25.0f, 25.0f, 25.0f, 2.5f))
 					{
-						vPrintString("> HOMING moved complete, at +25deg -> READY\n");
+						vPrintString("> HOMING moved complete, at +25deg.\n");
 						homingWaitDone = false;
-						ToState(STATE_READY);
+
+						//indien UserFrame inmeten is aangevraagd in WAIT
+						if (teachRequested)
+						{
+							vPrintString("> HOMING -> TEACH (teach aangevraagd).\n");
+							teachFinised = false;
+							goToRust = false;
+							MotionPlanning_RESET();
+							ToState(STATE_TEACH);
+						}
+						else
+						{
+							ToState(STATE_READY);
+						}
 					}
 				}
+				break;
+			}
+			
+			/////////////////////////////////////////////////////////////////////
+			case  STATE_TEACH:
+			{
+				// naar rust positie gaan of inleren
+				if (goToRust)
+				{
+					atRust = MoveJ_ArmDEG123t(25.0f, 25.0f, 25.0f, 2.5f);
+					if (atRust)
+					{
+						vPrintString("> TEACHING -> READY (terugpositie voldaan).\n");
+						teachRequested = false;
+						MotionPlanning_RESET();
+						atRust = false;
+						goToRust = false;
+						ToState(STATE_READY);
+					}
+					break;
+				}
 
+				// Drukknoppen meecommuniceren
+				teachFinised = TeachUserframe(buttonBits);
+				
+				// inleren beindigd -> terug naar READY
+				if (teachFinised)
+				{
+					vPrintString("> inleren geeindigd, terug naar rustpositie.\n");
+					goToRust = true;
+					MotionPlanning_RESET();
+				}
 				break;
 			}
 
@@ -401,16 +454,6 @@ void ControlTask(void *pvParameters)
 					toBackoffPos = true;				
 					vPrintString("> Naar Backoffpositie (resetknop ontvangen).\n");
 				}
-				// stopknop -> UF-inmeten
-				else if (buttonBits & EVT_STOP_BUTTON)
-				{
-					MotionPlanning_RESET();
-					teachFinised = false;
-					goToRust = false;
-					ToState(STATE_TEACH);
-					break;
-				}
-				
 				//indien resetknop ingedrukt is eerst naar horizontaal verplaatsen.
 				if (toBackoffPos)
 				{
@@ -427,37 +470,6 @@ void ControlTask(void *pvParameters)
 					HoldCurrentPosition(false, INFINITY);
 				}
 
-				break;
-			}
-
-			/////////////////////////////////////////////////////////////////////
-			case  STATE_TEACH:
-			{
-				// naar rust positie gaan of inleren
-				if (goToRust)
-				{
-					atRust = MoveJ_ArmDEG123t(25.0f, 25.0f, 25.0f, 2.5f);
-					if (atRust)
-					{
-						vPrintString("> TEACHING -> READY (terugpositie voldaan).\n");
-						MotionPlanning_RESET();
-						atRust = false;
-						goToRust = false;
-						ToState(STATE_READY);
-					}
-					break;
-				}
-
-				// Drukknoppen meecommuniceren
-				teachFinised = TeachUserframe(buttonBits);
-				
-				// inleren beindigd -> terug naar READY
-				if (teachFinised)
-				{
-					vPrintString("> inleren geeindigd, terug naar rustpositie.\n");
-					goToRust = true;
-					MotionPlanning_RESET();
-				}
 				break;
 			}
 

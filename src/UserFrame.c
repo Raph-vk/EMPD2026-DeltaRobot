@@ -335,10 +335,10 @@ bool TeachUserframe(EventBits_t buttonBits)
 					DisplayInfo_Publish("UF: klaar", "Frame actief");
 					
 					// permanent opslaan zodat ook na voeding ontnemen onthouden wordt.
-					if (!UserFrame_PermanentSave())
-					{
-						DisplayInfo_Publish("UF: fout", "Flash save fout");
-					}
+					//if (!UserFrame_PermanentSave())
+					//{
+					//	DisplayInfo_Publish("UF: fout", "Flash save fout");
+					//}
 
 					// Teach-flow opnieuw klaarzetten voor een volgende keer.
 					teachStep = TEACH_SETUP;
