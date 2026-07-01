@@ -91,47 +91,50 @@ static inline void MoveHopXYZ(float x_mm, float y_mm, float z_mm, float time_s);
 static void MooieSeqeunce(void)
 {
 	float waitGrip = 0.5f;
-	float moveShort = 0.4f;
-	float move = 0.5f;
-	float moveLong = 1.30f;
-	float moveHop = 1.60f;
-
+	float moveShort = 0.3f;
+	float moveDemo = 0.5f;
+	//float move = 0.5f;
+	float moveLong = 1.0f;
+	//float moveHop = 1.00f;
 	float zFly = -400.0f;
-	float zPickBout = -456.0f;
-	float zPickMoer = -460.0f;
+	float zPickBout = -455.5f;
+	float zPickMoer = -459.8f;
 
 	// Bouten minimaal 25 mm omhoog; hier 30 mm.
 	float zBoutClear = zPickBout + 30.0f;
 	float zMoerClear = zPickMoer + 5.0f;
 
-	const Coordinate_t boutStart[6] = {M00, M01, M02, M03, M04, M05};
-	const Coordinate_t boutDoel[6]  = {M15, M06, M10, M11, M13, M07};
+	const Coordinate_t boutStart[5] = {M00, M01, M02, M03, M04};
+	const Coordinate_t boutDoel[5]  = {M15, M06, M10, M11, M13};
 
 	const Coordinate_t moerStart[6] = {RM00, RM01, RM02, RM03, RM04, RM05};
 	const Coordinate_t moerDoel[6]  = {LB02, LO00, LB05, LO05, LB03, LB00};
 
+	sequenceLength = 0;
+	sequenceOverflow = false;
+
 	MoveJXYZ(0.0f, 0.0f, zFly, moveLong);
-	Hold(false, 0.5f);
+	HoldXYZ(false, 0.5f);
 
 	// Bouten plaatsen.
-	for (uint8_t i = 0; i < 6; i++)
+	for (uint8_t i = 0; i < 5; i++)
 	{
 		Coordinate_t pick = boutStart[i];
 		Coordinate_t place = boutDoel[i];
 
-		MoveHopXYZ(pick.x, pick.y, zBoutClear, moveHop);
+		MoveHopXYZ(pick.x, pick.y, zBoutClear, moveLong);
 		MoveLXYZ(pick.x, pick.y, zPickBout, moveShort);
-		HoldXYZ(false, waitGrip);
-		HoldXYZ(true, waitGrip);
+		Hold(false, waitGrip);
+		Hold(true, waitGrip);
 		MoveLXYZ(pick.x, pick.y, zBoutClear, moveShort);
 
-		MoveHopXYZ(place.x, place.y, zBoutClear, moveHop);
+		MoveHopXYZ(place.x, place.y, zBoutClear, moveLong);
 		MoveLXYZ(place.x, place.y, zPickBout, moveShort);
-		HoldXYZ(false, waitGrip);
+		Hold(false, waitGrip);
 		MoveLXYZ(place.x, place.y, zBoutClear, moveShort);
 	}
 
-	MoveHopXYZ(0.0f, 0.0f, zFly, moveHop);
+	MoveLXYZ(0.0f, 0.0f, zFly, moveLong);
 
 	// Moeren verplaatsen.
 	for (uint8_t i = 0; i < 6; i++)
@@ -139,15 +142,15 @@ static void MooieSeqeunce(void)
 		Coordinate_t pick = moerStart[i];
 		Coordinate_t place = moerDoel[i];
 
-		MoveLXYZ(pick.x, pick.y, zBoutClear, moveHop);
+		MoveLXYZ(pick.x, pick.y, zBoutClear, moveLong);
 		MoveLXYZ(pick.x, pick.y, zPickMoer, moveShort);
-		HoldXYZ(false, waitGrip);
-		HoldXYZ(true, waitGrip);
+		Hold(false, waitGrip);
+		Hold(true, waitGrip);
 		MoveLXYZ(pick.x, pick.y, zMoerClear, moveShort);
 
-		MoveHopXYZ(place.x, place.y, zMoerClear, moveHop);
+		MoveHopXYZ(place.x, place.y, zMoerClear, moveLong);
 		MoveLXYZ(place.x, place.y, zPickMoer, moveShort);
-		HoldXYZ(false, waitGrip);
+		Hold(false, waitGrip);
 		MoveLXYZ(place.x, place.y, zBoutClear, moveShort);
 	}
 	
@@ -157,63 +160,69 @@ static void MooieSeqeunce(void)
 		Coordinate_t pick = moerDoel[i];
 		Coordinate_t place = moerStart[i];
 
-		MoveLXYZ(pick.x, pick.y, zBoutClear, moveHop);
+		MoveLXYZ(pick.x, pick.y, zBoutClear, moveLong);
 		MoveLXYZ(pick.x, pick.y, zPickMoer, moveShort);
-		HoldXYZ(false, waitGrip);
-		HoldXYZ(true, waitGrip);
+		Hold(false, waitGrip);
+		Hold(true, waitGrip);
 		MoveLXYZ(pick.x, pick.y, zMoerClear, moveShort);
 
-		MoveHopXYZ(place.x, place.y, zMoerClear, moveHop);
+		MoveHopXYZ(place.x, place.y, zMoerClear, moveLong);
 		MoveLXYZ(place.x, place.y, zPickMoer, moveShort);
-		HoldXYZ(false, waitGrip);
+		Hold(false, waitGrip);
 		MoveLXYZ(place.x, place.y, zBoutClear, moveShort);
 	}
 
-	MoveLXYZ(0.0f, 0.0f, zBoutClear, moveHop);
+	MoveLXYZ(0.0f, 0.0f, zBoutClear, moveLong);
+	HoldXYZ(false,1.0f);
 
 	// Bouten terugleggen.
-	for (uint8_t i = 0; i < 6; i++)
+	for (uint8_t i = 0; i < 5; i++)
 	{
 		Coordinate_t pick = boutDoel[i];
 		Coordinate_t place = boutStart[i];
 
-		MoveHopXYZ(pick.x, pick.y, zBoutClear, moveHop);
+		MoveHopXYZ(pick.x, pick.y, zBoutClear, moveLong);
 		MoveLXYZ(pick.x, pick.y, zPickBout, moveShort);
 		HoldXYZ(false, waitGrip);
 		HoldXYZ(true, waitGrip);
 		MoveLXYZ(pick.x, pick.y, zBoutClear, moveShort);
 
-		MoveHopXYZ(place.x, place.y, zBoutClear, moveHop);
+		MoveHopXYZ(place.x, place.y, zBoutClear, moveLong);
 		MoveLXYZ(place.x, place.y, zPickBout, moveShort);
 		HoldXYZ(false, waitGrip);
 		MoveLXYZ(place.x, place.y, zBoutClear, moveShort);
 	}
 
 	// Snelle demo-beweging.
-	MoveLXYZ(0.0f, 0.0f, zBoutClear, move);
+	MoveLXYZ(0.0f, 0.0f, zBoutClear, moveLong);
 	Hold(false, waitGrip);
-	MoveLXYZ(80.0f, 80.0f, (zBoutClear+20.0), moveShort);
+	MoveLXYZ(100.0f, 100.0f, (zBoutClear+20.0), moveDemo);
 	Hold(false, waitGrip);
-	MoveLXYZ(80.0f, -80.0f, (zBoutClear+20.0), moveShort);
+	MoveLXYZ(100.0f, -100.0f, (zBoutClear+20.0), moveDemo);
 	Hold(false, waitGrip);
-	MoveLXYZ(-80.0f, -80.0f, (zBoutClear+20.0), moveShort);
+	MoveLXYZ(-100.0f, -100.0f, (zBoutClear+20.0), moveDemo);
 	Hold(false, waitGrip);
-	MoveLXYZ(-80.0f, 80.0f, (zBoutClear+20.0), moveShort);
+	MoveLXYZ(-100.0f, 100.0f, (zBoutClear+20.0), moveDemo);
 	Hold(false, waitGrip);
-	MoveLXYZ(80.0f, 80.0f, (zBoutClear+20.0), moveShort);
+	MoveLXYZ(100.0f, 100.0f, (zBoutClear+20.0), moveDemo);
 	Hold(false, waitGrip);
 	
-	MoveLXYZ(0.0f, 0.0f, zBoutClear, moveShort);
+	MoveLXYZ(0.0f, 0.0f, zBoutClear, moveDemo);
+	HoldXYZ(false, (waitGrip*4));
+	
+	MoveHopXYZ(125.0f, 0.0f, zBoutClear, (moveLong/2));
+	Hold(false, waitGrip);
+	MoveHopXYZ(0.0f, 125.0f, zBoutClear, (moveLong/2));
+	Hold(false, waitGrip);
+	MoveHopXYZ(0.0f, -125.0f, zBoutClear, (moveLong/2.5));
+	Hold(false, waitGrip);
+	MoveLXYZ(0.0f, 0.0f, zBoutClear, moveDemo);
 	Hold(false, (waitGrip*4));
 	
-	MoveHopXYZ(125.0f, 0.0f, zBoutClear, moveHop);
-	Hold(false, waitGrip);
-	MoveHopXYZ(0.0f, 125.0f, zBoutClear, moveHop);
-	Hold(false, waitGrip);
-	MoveHopXYZ(0.0f, -125.0f, zBoutClear, moveHop);
-	Hold(false, waitGrip);
-	MoveLXYZ(0.0f, 0.0f, zBoutClear, moveShort);
-	Hold(false, (waitGrip*4));
+
+
+	MoveJDEG(25.0f, 25.0f, 25.0f, 2.5f);
+	HoldXYZ(false, 0.8f);
 }//end-mooie sequence
 
 ///////////////////////////////////////////////////////////////////////////////

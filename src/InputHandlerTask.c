@@ -237,7 +237,7 @@ static void FilterOffsetMeasurement(OffsetPos_t *outMeasurement, uint16_t xAdcRa
 		return;
 	}
 
-	// EMA-adaptive filter
+	// EMA filter
 	// filtered = filtered + alpha * delta
 	filteredMeasurement.x += OFFSET_FILTER_ALPHA * (rawMeasurement.x - filteredMeasurement.x);
 	filteredMeasurement.y += OFFSET_FILTER_ALPHA * (rawMeasurement.y - filteredMeasurement.y);

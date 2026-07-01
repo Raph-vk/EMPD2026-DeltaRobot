@@ -44,6 +44,10 @@
 static SystemState_t state = STATE_INIT;
 
 ///////////////////////////////////////////////////////////////////////////////
+// Cycles
+#define NUMBER_OF_CYCLES    (10U)
+static uint8_t completedCycles = 0U;
+///////////////////////////////////////////////////////////////////////////////
 // static const char *StateToString(SystemState_t systemState)
 /*
  * Zet een SystemState_t om naar een leesbare tekst voor debug-uitvoer.
@@ -474,33 +478,48 @@ void ControlTask(void *pvParameters)
 			}
 
 			/////////////////////////////////////////////////////////////////////
-			case  STATE_RUNNING:
+			case STATE_RUNNING:
 			{
-				// Uitvoeren van bepaalde stappen.
 				sequenceDone = RunSequence();
 
-				if (buttonBits & EVT_START_BUTTON)
-				{
-					bool tcpCompActief = TcpCompensation_Toggle();
-					vPrintString("> RUNNING: TCP-compensatie %s (startknop ontvangen).\n", tcpCompActief ? "AAN" : "UIT");
-				}
+			if (buttonBits & EVT_START_BUTTON)
+			{
+				bool tcpCompActief = TcpCompensation_Toggle();
+				vPrintString("> RUNNING: TCP-compensatie %s (startknop ontvangen).\n",
+				tcpCompActief ? "AAN" : "UIT");
+			}
 
-				// Stopknop -> terug naar READY
-				if (buttonBits & EVT_STOP_BUTTON)
+			if (buttonBits & EVT_STOP_BUTTON)
+			{
+				vPrintString("> RUNNING -> PAUSE (stopknop ontvangen).\n");
+
+				MotionPlanning_RESET();
+				completedCycles = 0U;
+				ToState(STATE_PAUSE);
+			}
+			else if (sequenceDone)
+			{
+				completedCycles++;
+
+				if (completedCycles >= NUMBER_OF_CYCLES)
 				{
-					vPrintString("> RUNNING -> READY (stopknop ontvangen).\n");
+					vPrintString("> RUNNING -> READY (%u cycli voltooid).\n",
+					NUMBER_OF_CYCLES);
+
 					MotionPlanning_RESET();
-					ToState(STATE_PAUSE);
-				}
-				// Cyclus klaar -> terug naar READY
-				else if (sequenceDone)
-				{
-					vPrintString("> RUNNING -> READY (cyclus voldaan).\n");
-					MotionPlanning_RESET();
+					completedCycles = 0U;
 					ToState(STATE_READY);
 				}
-				break;
+				else
+				{
+					vPrintString("> Cyclus %u van %u voltooid, volgende cyclus start.\n",
+					completedCycles,
+					NUMBER_OF_CYCLES);
+				}
 			}
+
+			break;
+		}
 			
 			/////////////////////////////////////////////////////////////////////
 			case  STATE_PAUSE:
