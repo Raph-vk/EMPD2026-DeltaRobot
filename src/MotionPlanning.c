@@ -639,7 +639,7 @@ bool MoveL_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	}
 
 	//Actieve demping toevoegen
-	VoegTCPoffsetToe(tcpRef_mm);
+	//VoegTCPoffsetToe(tcpRef_mm);
 
 	// motorpositie bij tcpRef punt bepalen (XYZ->M123
 	if (!DeltaKinematics_Inverse(tcpRef_mm, motorRef_rad))
@@ -756,7 +756,7 @@ bool MoveHop_XYZt(float x_mm, float y_mm, float z_mm, float maxTime_s)
 	tcpRef_mm[2] = tcpStart_mm[2] + tcpMax_inc_mm[2] * s + hopLift_mm; //additioneel de hopLift
 
 	//Actieve demping toevoegen
-	VoegTCPoffsetToe(tcpRef_mm);
+	//VoegTCPoffsetToe(tcpRef_mm);
 
 	// motorpositie bij tcpRef punt bepalen (XYZ->M123
 	if (!DeltaKinematics_Inverse(tcpRef_mm, motorRef_rad))

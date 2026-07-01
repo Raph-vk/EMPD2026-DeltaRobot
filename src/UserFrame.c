@@ -32,7 +32,7 @@
 #include "MotorControl.h"
 
 #define PRELOAD_VOLTAGE       (0.5f)
-#define PRELOAD_TIME_S        (0.5f)
+#define PRELOAD_TIME_S        (2.0f)
 #define UF_MIN_DISTANCE_MM       (10.0f)
 
 #define USERFRAME_FLASH_PAGE_SIZE   (256U)

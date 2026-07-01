@@ -82,12 +82,13 @@ static inline void MoveJDEG(float m1_deg, float m2_deg, float m3_deg, float time
 static inline void MoveLXYZ(float x_mm, float y_mm, float z_mm, float time_s);
 static inline void MoveHopXYZ(float x_mm, float y_mm, float z_mm, float time_s);
 
+
 ///////////////////////////////////////////////////////////////////////////////
-// static void BuildSequence(void)
+// static void MooieSeqeunce(...)
 /*
- * Bouwt de bewegingssequentie. Het vult alleen de staplijst.
+ * Wrapper om een step mooie bewegingen.
  */
-void BuildSequence(void)
+static void MooieSeqeunce(void)
 {
 	float waitGrip = 0.5f;
 	float moveShort = 0.4f;
@@ -108,9 +109,6 @@ void BuildSequence(void)
 
 	const Coordinate_t moerStart[6] = {RM00, RM01, RM02, RM03, RM04, RM05};
 	const Coordinate_t moerDoel[6]  = {LB02, LO00, LB05, LO05, LB03, LB00};
-
-	sequenceLength = 0;
-	sequenceOverflow = false;
 
 	MoveJXYZ(0.0f, 0.0f, zFly, moveLong);
 	Hold(false, 0.5f);
@@ -141,7 +139,7 @@ void BuildSequence(void)
 		Coordinate_t pick = moerStart[i];
 		Coordinate_t place = moerDoel[i];
 
-		MoveLXYZ(pick.x, pick.y, zBoutClear, moveHop); 
+		MoveLXYZ(pick.x, pick.y, zBoutClear, moveHop);
 		MoveLXYZ(pick.x, pick.y, zPickMoer, moveShort);
 		HoldXYZ(false, waitGrip);
 		HoldXYZ(true, waitGrip);
@@ -216,10 +214,21 @@ void BuildSequence(void)
 	Hold(false, waitGrip);
 	MoveLXYZ(0.0f, 0.0f, zBoutClear, moveShort);
 	Hold(false, (waitGrip*4));
+}//end-mooie sequence
+
+///////////////////////////////////////////////////////////////////////////////
+// static void BuildSequence(void)
+/*
+ * Bouwt de bewegingssequentie. Het vult alleen de staplijst.
+ */
+void BuildSequence(void)
+{
+	sequenceLength = 0;
+	sequenceOverflow = false;
 	
+	MooieSeqeunce();
 
-
-	MoveJXYZ(0.0f, 0.0f, zFly, moveLong);
+	MoveJDEG(25.0f, 25.0f, 25.0f, 2.5f);
 	Hold(false, 0.8f);
 }
 ///////////////////////////////////////////////////////////////////////////////

@@ -49,6 +49,8 @@ static const uint8_t G_OutputPins[N_OUTPUT_PINS] =
 	PIN_45,	// MSB, bit 7
 };
 
+static uint8_t G_OutputState = 0;
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // void port_Init(void)
@@ -67,6 +69,7 @@ void port_Init(void)
 	
 	// initialize 8-bit output port
 
+	G_OutputState = 0;
 	for (pin = 0; pin < N_OUTPUT_PINS; pin++)
 	{
 		dio_SetPinDirection(G_OutputPins[pin], IOPORT_DIR_OUTPUT);
@@ -120,12 +123,29 @@ bool port_IsBitSet(uint8_t bitNumber)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// bool port_IsOutputBitSet(uint8_t bitNumber)
+
+bool port_IsOutputBitSet(uint8_t bitNumber)
+{
+	bool isSet = false;
+	
+	if (port_IsValidBitNumber(bitNumber))
+	{
+		isSet = ((G_OutputState & (uint8_t)(0x01 << bitNumber)) != 0);
+	}
+	
+	return isSet;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // void port_WriteOutput(uint8_t value)
 
 void port_WriteOutput(uint8_t value)
 {
 	uint8_t bitNr = 0;
 	bool bitOn	  = false;
+	
+	G_OutputState = value;
 	
 	for (bitNr = 0; bitNr < N_OUTPUT_PINS; bitNr++)
 	{
@@ -149,6 +169,15 @@ void port_SetBit(uint8_t bitNumber, bool bitOn)
 {
 	if (port_IsValidBitNumber(bitNumber))
 	{
+		if (bitOn)
+		{
+			G_OutputState |= (uint8_t)(0x01 << bitNumber);
+		}
+		else
+		{
+			G_OutputState &= (uint8_t)~(0x01 << bitNumber);
+		}
+		
 		dio_SetPin(G_OutputPins[bitNumber], bitOn);
 	}
 }

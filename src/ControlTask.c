@@ -167,10 +167,10 @@ void ControlTask(void *pvParameters)
 	// Event settings
 	EventBits_t buttonBits = 0;
 	const BaseType_t clearAllbits  = pdTRUE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
-	const BaseType_t waitForAnyBit= pdFALSE;			// FALSE = wacht totdat ��n v/d bits is gezet, TRUE wacht op ALLE bits.
+	const BaseType_t waitForAnyBit= pdFALSE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
 
 	const BaseType_t stayAllbits  = pdFALSE;		// FALSE = bits blijven staan na continue, TRUE = bits worden gewist.
-	const BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat ��n v/d bits is gezet, TRUE wacht op ALLE bits.
+	const BaseType_t waitForAllbits = pdTRUE;			// FALSE = wacht totdat één v/d bits is gezet, TRUE wacht op ALLE bits.
 	const TickType_t ticksToWait	  = portMAX_DELAY;	// Maximale wachttijd, portMAX_DELAY = onbeperkt wachten.
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -270,9 +270,9 @@ void ControlTask(void *pvParameters)
 
 		// Lees uit of er een knop ingedrukt is.
 		buttonBits = xEventGroupWaitBits(handle_ButtonEventGroup,
-			EVT_START_BUTTON | EVT_STOP_BUTTON | EVT_RESET_BUTTON | EVT_TEACH_BUTTON,
+			EVT_START_BUTTON | EVT_STOP_BUTTON | EVT_RESET_BUTTON | EVT_START_HOLD_BUTTON | EVT_STOP_HOLD_BUTTON | EVT_RESET_HOLD_BUTTON,
 			clearAllbits,	// ontvangen bits wissen
-			waitForAnyBit,	// één van de bits is genoeg
+			waitForAnyBit,	// ��n van de bits is genoeg
 			0				// niet blokkeren
 		);
 
@@ -320,7 +320,7 @@ void ControlTask(void *pvParameters)
 			case  STATE_WAIT:
 			{
 				// STOP 5s vasthouden -> userframe teach aanvragen.
-				if (buttonBits & EVT_TEACH_BUTTON)
+				if (buttonBits & EVT_STOP_HOLD_BUTTON)
 				{
 					teachRequested = true;
 					vPrintString("> TEACH aangevraagd. Druk START om eerst te homen.\n");
